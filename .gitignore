@@ -1,0 +1,10 @@
+*.obj
+*.exe
+*.dat
+build
+target
+**/*.rs.bk
+
+__pycache__
+/benches/input.*
+/output.*

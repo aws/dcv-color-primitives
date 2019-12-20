@@ -1,0 +1,16 @@
+[package]
+name = "dcp"
+version = "0.1.0"
+authors = ["Fabio Lagalla <lagfabio@amazon.com>"]
+edition = "2018"
+
+[lib]
+name = "dcp"
+crate-type = ["staticlib", "rlib"]
+
+[dev-dependencies]
+criterion = "0.3.0"
+
+[[bench]]
+name = "benches"
+harness = false
