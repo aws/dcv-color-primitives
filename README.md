@@ -1,4 +1,4 @@
-# DCP Color Primitives Library - dcp
+# DCV Color Primitives Library - dcp
 
 [![Build Status](https://travis-ci.org/aws/dcv-color-primitives.png?branch=master)](https://travis-ci.org/aws/dcv-color-primitives)
 
