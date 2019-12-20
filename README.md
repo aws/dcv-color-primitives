@@ -1,5 +1,7 @@
 # DCP Color Primitives Library - dcp
 
+[![Build Status](https://travis-ci.org/aws/dcv-color-primitives.png?branch=master)](https://travis-ci.org/aws/dcv-color-primitives)
+
 dcp is a library to perform image color model conversion.
 
 ## Design guidelines
