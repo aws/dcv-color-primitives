@@ -7,8 +7,8 @@ license = "MIT-0"
 repository = "https://github.com/aws/dcv-color-primitives"
 authors = ["Fabio Lagalla <lagfabio@amazon.com>"]
 readme = "README.md"
-keywords = ["colors", "converter", "rgb", "yuv"]
-categories = ["graphics", "video"]
+keywords = ["colors", "converter", "rgb", "yuv", "video"]
+categories = ["graphics"]
 
 [lib]
 name = "dcv_color_primitives"
