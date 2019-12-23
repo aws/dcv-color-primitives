@@ -82,10 +82,10 @@ message('Building DCV Color Primitives')
 
 if get_option('buildtype') == 'release'
   dcp_build_dir = 'release'
-  cargo_target = 'build --release'
+  cargo_target = ['build', '--release', ]
 else
   dcp_build_dir = 'debug'
-  cargo_target = 'build'
+  cargo_target = ['build', ]
 endif
 
 run_command('cargo', cargo_target)
