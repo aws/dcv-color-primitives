@@ -1,5 +1,5 @@
 project(
-  'dcp-unit-tests', 'c',
+  'dcv-color-primitives-unit-tests', 'c',
   version : '0.1'
 )
 
@@ -78,7 +78,7 @@ foreach cflag: test_cflags
   endif
 endforeach
 
-message('Building dcp')
+message('Building DCV Color Primitives')
 
 if get_option('buildtype') == 'release'
   dcp_build_dir = 'release'
@@ -95,13 +95,13 @@ dcp_deps = []
 
 if is_win
   dcp_deps += [
-    cc.find_library('dcp', dirs: [dcp_lib_path]),
+    cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path]),
     cc.find_library('ws2_32'),
     cc.find_library('userenv')
   ]
 else
   dcp_deps += [
-    cc.find_library('libdcp', dirs: [dcp_lib_path]),
+    cc.find_library('libdcv_color_primitives', dirs: [dcp_lib_path]),
     cc.find_library('pthread'),
     cc.find_library('dl'),
   ]

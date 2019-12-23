@@ -20,7 +20,7 @@
 #![deny(unstable_features)]
 #![deny(unused_import_braces)]
 
-//! Dcp (DCV color primitives) is a library to perform image color model conversion.
+//! DCV color primitives is a library to perform image color model conversion.
 //!
 //! It is able to convert the following pixel formats:
 //! * BGRA8
@@ -44,6 +44,7 @@
 //!
 //! Initialize the library:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! fn main() {
 //!     dcp::initialize();
 //! }
@@ -51,6 +52,7 @@
 //!
 //! Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 //!
 //! fn convert() {
@@ -90,6 +92,7 @@
 //!
 //! Handle conversion errors:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 //! use std::error;
 //!
@@ -132,6 +135,7 @@
 //!
 //! Compute how many bytes are needed to store and image of a given format and size:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 //! use std::error;
 //!
@@ -163,6 +167,7 @@
 //! Provide image planes to hangle data scattered in multiple buffers that are not
 //! necessarily contiguous:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 //! use std::error;
 //!
@@ -216,6 +221,7 @@
 //!
 //! Provide image strides to convert data which is not tightly packed:
 //! ```
+//! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 //! use std::error;
 //!
@@ -283,7 +289,7 @@ use std::fmt;
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
 
-/// An enumeration of dcp errors.
+/// An enumeration of errors.
 #[derive(Debug)]
 #[repr(C)]
 pub enum ErrorKind {
@@ -305,7 +311,7 @@ impl fmt::Display for ErrorKind {
         match *self {
             ErrorKind::NotInitialized => write!(
                 f,
-                "Library was not initialized by calling dcp::initialize()"
+                "Library was not initialized by calling initialize()"
             ),
             ErrorKind::InvalidValue => write!(
                 f,
@@ -425,14 +431,15 @@ static mut GLOBAL_STATE: GlobalState = GlobalState {
 /// Automatically initializes the library functions that are most appropriate for
 /// the current processor type.
 ///
-/// You should call this function before calling any other dcp function
+/// You should call this function before calling any other library function
 ///
 /// # Safety
-/// You can not use any other dcp function (also in other threads) while the initialization
+/// You can not use any other library function (also in other threads) while the initialization
 /// is in progress. Failure to do so result in undefined behaviour
 ///
 /// # Examples
 /// ```
+/// use dcv_color_primitives as dcp;
 /// dcp::initialize();
 /// ```
 pub fn initialize() {
@@ -463,14 +470,15 @@ pub fn initialize() {
     }
 }
 
-/// Returns a description of the algorithms dcp will pick best for the running cpu and
+/// Returns a description of the algorithms that are best for the running cpu and
 /// available instruction sets
 ///
 /// # Errors
-/// * [`NotInitialized`] if dcp was not initialized before
+/// * [`NotInitialized`] if the library was not initialized before
 ///
 /// # Examples
 /// ```
+/// use dcv_color_primitives as dcp;
 /// dcp::initialize();
 /// match dcp::describe_acceleration() {
 ///     Ok(description) => println!("{}", description),
@@ -481,6 +489,7 @@ pub fn initialize() {
 ///
 /// When [`initialize`] is not called:
 /// ```
+/// use dcv_color_primitives as dcp;
 /// match dcp::describe_acceleration() {
 ///     Ok(description) => println!("{}", description),
 ///     Err(error) => println!("Unable to describe the acceleration: {}", error),
@@ -519,6 +528,7 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// Compute how many bytes are needed to store and image of a given format and size
 /// assuming *all planes contain data which is tightly packed*:
 /// ```
+/// use dcv_color_primitives as dcp;
 /// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 /// use std::error;
 ///
@@ -545,6 +555,7 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// Compute how many bytes are needed to store and image of a given format and size
 /// in which *all planes have custom strides*:
 /// ```
+/// use dcv_color_primitives as dcp;
 /// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 /// use std::error;
 ///
@@ -575,6 +586,7 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// in which *some planes have custom strides*, while *some other are assumed to
 /// contain data which is tightly packed*:
 /// ```
+/// use dcv_color_primitives as dcp;
 /// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat, STRIDE_AUTO};
 /// use std::error;
 ///
@@ -665,7 +677,7 @@ pub fn get_buffers_size(
 ///
 /// # Errors
 ///
-/// * [`NotInitialized`] if dcp was not initialized before
+/// * [`NotInitialized`] if the library was not initialized before
 ///
 /// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`]
 ///   that might by imposed by the source and destination image pixel formats

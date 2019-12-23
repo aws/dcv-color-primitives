@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <dcp.h>
+#include <dcv_color_primitives.h>
 
 static char domain[256];
 static uint8_t domain_size = 0;

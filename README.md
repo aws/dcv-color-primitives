@@ -1,8 +1,8 @@
-# DCV Color Primitives Library - dcp
+# DCV Color Primitives - dcp
 
 [![Build Status](https://travis-ci.org/aws/dcv-color-primitives.png?branch=master)](https://travis-ci.org/aws/dcv-color-primitives)
 
-dcp is a library to perform image color model conversion.
+DCV Color Primitives is a library to perform image color model conversion.
 
 ## Design guidelines
 
@@ -13,7 +13,7 @@ dcp is a library to perform image color model conversion.
 
 ## Color space conversion
 
-dcp is currenty able to convert the following pixel formats:
+The library is currenty able to convert the following pixel formats:
 
 * BGRA8
 * RGBA8
@@ -64,7 +64,7 @@ You may require administrative privileges.
 
 ## Building
 
-Open a terminal inside the dcp root directory.
+Open a terminal inside the library root directory.
 
 To build for debug experience:
 ```
@@ -91,10 +91,10 @@ cargo bench
 
 ### Initialize the library
 
-This function has to be called before any other dcp function call:
+This function has to be called before any other library function call:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 
 fn main() {
     dcp::initialize();
@@ -106,7 +106,7 @@ fn main() {
 Convert an image from bgra to nv12 (single plane) format containing yuv in BT601:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 
 fn main() {
@@ -146,7 +146,7 @@ fn main() {
 
 ### Error Handling
 
-Dcp functions return a `Result` describing the operation outcome:
+The library functions return a `Result` describing the operation outcome:
 
 | Result                             | Description                                                           |
 | ---------------------------------- | --------------------------------------------------------------------- |
@@ -160,7 +160,7 @@ In the following example, `result` will match `Err(ErrorKind::InvalidValue)`, be
 color space is not compatible with `PixelFormat::Bgra`:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
 fn main() {
@@ -205,7 +205,7 @@ fn main() {
 
 Even better, you might want to propagate errors to the caller function or mix with some other error types:
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
@@ -253,7 +253,7 @@ you can use a function to compute how many bytes are needed to store an image of
 and size:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 If your data is scattered in multiple buffers that are not necessarily contiguous, you can provide image planes:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
@@ -344,7 +344,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 To take into account data which is not tightly packed, you can provide image strides:
 
 ```rust
-use dcp;
+use dcv_color_primitives as dcp;
 use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
@@ -403,11 +403,12 @@ See documentation for further information.
 
 ## C bindings
 
-Dcp provides C bindings. A static library will be automatically generated for the default build.
+DCV Color Primitives provides C bindings. A static library will be automatically generated for the 
+default build.
 
-API is slighter different than rust one. Check dcp.h for examples and further information.
+API is slighter different than rust one. Check dcv_color_primitives.h for examples and further information.
 
-Dcp also come with some unit tests written in C, to add some coverage also for the bindings. If you
+There are also some unit tests written in C, to add some coverage also for the bindings. If you
 want to build those, you need meson build system.
 
 * **Windows**  
@@ -444,9 +445,9 @@ want to build those, you need meson build system.
 
   You may require administrative privileges.
 * **Build and run**  
-  Move inside the dcp root directory:
+  Move inside the library root directory:
   ```
-  cd `dcp_root_dir`
+  cd `dcv_color_primitives_root_dir`
   ```
 
   Then:

@@ -1,11 +1,11 @@
 [package]
-name = "dcp"
+name = "dcv-color-primitives"
 version = "0.1.0"
 authors = ["Fabio Lagalla <lagfabio@amazon.com>"]
 edition = "2018"
 
 [lib]
-name = "dcp"
+name = "dcv_color_primitives"
 crate-type = ["staticlib", "rlib"]
 
 [dev-dependencies]

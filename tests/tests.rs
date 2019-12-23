@@ -8,6 +8,7 @@
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::slice::*;
 
+use dcv_color_primitives as dcp;
 use dcp::*;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;

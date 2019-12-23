@@ -8,6 +8,7 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
 
+use dcv_color_primitives as dcp;
 use dcp::*;
 
 const NV12_OUTPUT: &str = &"./output.nv12";
@@ -79,7 +80,7 @@ fn pnm_data(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32, Vec<u8>)> {
     Ok((width, height, x))
 }
 
-fn bgra_nv12_dcp(
+fn bgra_nv12(
     mut input_file: &mut Cursor<&[u8]>,
     output_path: &str,
 ) -> BenchmarkResult<Duration> {
@@ -90,7 +91,6 @@ fn bgra_nv12_dcp(
     let dst_size: usize = 3 * (width as usize) * (height as usize) / 2;
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
 
-    // Setup dcp
     let input_data: &[&[u8]] = &[&input_buffer];
     let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
 
@@ -132,7 +132,7 @@ fn bgra_nv12_dcp(
     Ok(elapsed)
 }
 
-fn nv12_bgra_dcp(
+fn nv12_bgra(
     mut input_file: &mut Cursor<&[u8]>,
     output_path: &str,
 ) -> BenchmarkResult<Duration> {
@@ -143,7 +143,6 @@ fn nv12_bgra_dcp(
     let dst_size: usize = 4 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
 
-    // Setup dcp
     let input_data: &[&[u8]] = &[&input_buffer];
     let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
 
@@ -189,7 +188,7 @@ fn nv12_bgra_dcp(
 fn bench(c: &mut Criterion) {
     initialize();
 
-    let mut group = c.benchmark_group("dcp");
+    let mut group = c.benchmark_group("dcv-color-primitives");
     group.sample_size(SAMPLE_SIZE);
 
     {
@@ -206,7 +205,7 @@ fn bench(c: &mut Criterion) {
             b.iter_custom(|iters| {
                 let mut total = Duration::new(0, 0);
                 for _i in 0..iters {
-                    total += bgra_nv12_dcp(&mut input_file, output_path)
+                    total += bgra_nv12(&mut input_file, output_path)
                         .expect("Benchmark iteration failed");
                 }
 
@@ -229,7 +228,7 @@ fn bench(c: &mut Criterion) {
             b.iter_custom(|iters| {
                 let mut total = Duration::new(0, 0);
                 for _i in 0..iters {
-                    total += nv12_bgra_dcp(&mut input_file, output_path)
+                    total += nv12_bgra(&mut input_file, output_path)
                         .expect("Benchmark iteration failed");
                 }
 
