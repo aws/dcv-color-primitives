@@ -16,6 +16,7 @@
 
 use crate::convert_image::common::*;
 use crate::convert_image::sse2;
+use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -920,4 +921,26 @@ pub fn nv12_bt709_bgra_lrgb(
             dst_buffers,
         )
     }
+}
+
+pub fn rgb_lrgb_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::rgb_lrgb_bgra_lrgb(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
 }

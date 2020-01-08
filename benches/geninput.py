@@ -7,6 +7,8 @@ from os import environ
 from fractions import Fraction as frac
 import sys
 
+sys.path.append(dirname(realpath(__file__)))
+
 kr = 0.299
 kg = 0.587
 kb = 0.114
@@ -28,7 +30,6 @@ ATLAS_WIDTH = 8192
 
 SHUFFLER = Random(0xDEADBEEF)
 
-
 def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
@@ -38,8 +39,9 @@ if __name__ == '__main__':
 
     # write encode input test source
     bgra_input = join(root_dir, 'input.bgra')
+    rgb_input = join(root_dir, 'input.rgb')
 
-    if not exists(bgra_input):
+    if not exists(bgra_input) or not exists(rgb_input):
         sample_list = list(cartesian_product(range(256), repeat=3))
         rgb_gamut_size = len(sample_list)
         SHUFFLER.shuffle(sample_list)
@@ -59,6 +61,24 @@ if __name__ == '__main__':
         with open(bgra_input, 'wb') as fn:
             fn.write(('P5\n%d %d\n255\n' % (ATLAS_WIDTH, height)).encode('utf-8'))
             BGRA.tofile(fn)
+
+    # the same in RGB format
+    if not exists(rgb_input):
+        atlas_width = 6144 # 3 * 2048 -> this way width evenly divisible by 3
+
+        height = ((3 * len(sample_list)) + (atlas_width - 1)) // atlas_width
+        RGB = array('B', [0] * (atlas_width * height))
+
+        color = 0
+        for r, g, b in sample_list:
+            RGB[3 * color] = r
+            RGB[3 * color + 1] = g
+            RGB[3 * color + 2] = b
+            color += 1
+
+        with open(rgb_input, 'wb') as fn:
+            fn.write(('P5\n%d %d\n255\n' % (atlas_width, height)).encode('utf-8'))
+            RGB.tofile(fn)
 
     # write decode input test source
     decode_input = join(root_dir, 'input.nv12')

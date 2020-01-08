@@ -8,11 +8,12 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
 
-use dcv_color_primitives as dcp;
 use dcp::*;
+use dcv_color_primitives as dcp;
 
 const NV12_OUTPUT: &str = &"./output.nv12";
 const BGRA_OUTPUT: &str = &"./output.bgra";
+const RGB_BGRA_OUTPUT: &str = &"./rgb_output.bgra";
 
 const SAMPLE_SIZE: usize = 22;
 
@@ -80,10 +81,7 @@ fn pnm_data(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32, Vec<u8>)> {
     Ok((width, height, x))
 }
 
-fn bgra_nv12(
-    mut input_file: &mut Cursor<&[u8]>,
-    output_path: &str,
-) -> BenchmarkResult<Duration> {
+fn bgra_nv12(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
     let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
     width /= 4;
 
@@ -132,10 +130,7 @@ fn bgra_nv12(
     Ok(elapsed)
 }
 
-fn nv12_bgra(
-    mut input_file: &mut Cursor<&[u8]>,
-    output_path: &str,
-) -> BenchmarkResult<Duration> {
+fn nv12_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
     let (width, mut height, input_buffer) = { pnm_data(&mut input_file)? };
     height = 2 * height / 3;
 
@@ -149,6 +144,56 @@ fn nv12_bgra(
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
+        num_planes: 1,
+    };
+
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::Bgra,
+        color_space: ColorSpace::Lrgb,
+        num_planes: 1,
+    };
+
+    let start = Instant::now();
+    convert_image(
+        width,
+        height,
+        &src_format,
+        None,
+        input_data,
+        &dst_format,
+        None,
+        output_data,
+    )?;
+
+    let elapsed = start.elapsed();
+
+    // Write to file
+    if !Path::new(output_path).exists() {
+        let mut buffer = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(output_path)?;
+        write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
+        buffer.write(&output_buffer)?;
+    }
+
+    Ok(elapsed)
+}
+
+fn rgb_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+    width /= 3;
+
+    // Allocate output
+    let dst_size: usize = 4 * (width as usize) * (height as usize);
+    let mut output_buffer: Vec<u8> = vec![0; dst_size];
+
+    let input_data: &[&[u8]] = &[&input_buffer];
+    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+
+    let src_format = ImageFormat {
+        pixel_format: PixelFormat::Rgb,
+        color_space: ColorSpace::Lrgb,
         num_planes: 1,
     };
 
@@ -230,6 +275,29 @@ fn bench(c: &mut Criterion) {
                 for _i in 0..iters {
                     total += nv12_bgra(&mut input_file, output_path)
                         .expect("Benchmark iteration failed");
+                }
+
+                total
+            });
+        });
+    }
+
+    {
+        let output_path = &RGB_BGRA_OUTPUT;
+        if Path::new(output_path).exists() {
+            remove_file(Path::new(output_path)).expect("Unable to delete benchmark output");
+        }
+
+        let mut input_file: Cursor<&[u8]> = Cursor::new(include_bytes!("input.rgb"));
+        let (width, height) =
+            { pnm_size(&mut input_file).expect("Malformed benchmark input file") };
+        group.throughput(Throughput::Elements((width as u64) * (height as u64)));
+        group.bench_function("rgb>bgra", move |b| {
+            b.iter_custom(|iters| {
+                let mut total = Duration::new(0, 0);
+                for _i in 0..iters {
+                    total +=
+                        rgb_bgra(&mut input_file, output_path).expect("Benchmark iteration failed");
                 }
 
                 total

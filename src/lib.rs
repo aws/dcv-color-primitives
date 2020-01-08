@@ -309,10 +309,9 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ErrorKind::NotInitialized => write!(
-                f,
-                "Library was not initialized by calling initialize()"
-            ),
+            ErrorKind::NotInitialized => {
+                write!(f, "Library was not initialized by calling initialize()")
+            }
             ErrorKind::InvalidValue => write!(
                 f,
                 "One or more parameters have not legal values for the command"
@@ -411,6 +410,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709, bgr_lrgb_nv12_bt709);
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb, nv12_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb, nv12_bt709_bgra_lrgb);
+        set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);
     };
 }
 

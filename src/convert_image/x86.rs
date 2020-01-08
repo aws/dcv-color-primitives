@@ -16,6 +16,18 @@
 
 use crate::convert_image::common::*;
 
+#[cfg(target_arch = "x86")]
+use core::arch::x86::_bswap;
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::_bswap;
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::_bswap64;
+
+#[cfg(target_arch = "x86")]
+unsafe fn _bswap64(x: i64) -> i64 {
+    (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
+}
+
 const FORWARD_WEIGHTS: [[i32; 9]; Colorimetry::Length as usize] = [
     [
         XR_601, XG_601, XB_601, YR_601, YG_601, YB_601, ZR_601, ZG_601, ZB_601,
@@ -620,4 +632,152 @@ pub fn nv12_bt709_bgra_lrgb(
         PixelFormatChannels::Four,
         Colorimetry::Bt709,
     )
+}
+
+pub fn rgb_lrgb_bgra_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    if dst_buffers.is_empty()
+        || dst_strides.is_empty()
+        || src_buffers.is_empty()
+        || src_strides.is_empty()
+    {
+        return false;
+    }
+
+    let max_stride = usize::max_value() / height as usize;
+    if (src_strides[0] > max_stride) || (dst_strides[0] > max_stride) {
+        return false;
+    }
+
+    if src_strides[0] * height as usize > src_buffers[0].len()
+        || dst_strides[0] * height as usize > dst_buffers[0].len()
+    {
+        return false;
+    }
+
+    const HIGH_MASK: u64 = 0xFFFFFFFF00000000;
+    const LOW_MASK: u64 = 0x00000000FFFFFFFF;
+    const ALPHAS_MASK: u64 = 0x000000FF000000FF;
+    const INPUT_BPP: usize = 3;
+    const OUTPUT_BPP: usize = 4;
+    const ITEMS_PER_ITERATION: usize = 8;
+    const SHIFT_40: u8 = 40;
+    const SHIFT_16: u8 = 16;
+    const SHIFT_8: u8 = 8;
+
+    let w = width as usize;
+    let output_stride_diff = if dst_strides[0] == 0 {
+        0
+    } else {
+        dst_strides[0] - (OUTPUT_BPP * w)
+    };
+    let input_stride_diff = if src_strides[0] == 0 {
+        0
+    } else {
+        src_strides[0] - (INPUT_BPP * w)
+    };
+
+    // For single swap iteration, since the swap is done on 32 bits while the input is only
+    // 24 bits (RGB), to avoid reading an extra byte of memory that could be outside the
+    // boundaries of the buffer it is necessary to check if the there is at least one byte
+    // of stride in the input buffer, in that case we can read till the end of the buffer.
+    let single_swap_iterations = if input_stride_diff < 1 { w - 1 } else { w };
+
+    // For multiple swap iteration, since each swap reads two extra bytes it is necessary
+    // to check if there is enough space to read them without going out of boundaries.
+    // Since each step retrieves items_per_iteration colors, it is checked if the width of
+    // the image is a multiple of items_per_iteration,
+    // in that case it is checked if there are 2 extra bytes of stride, if there is not
+    // enough space then the number of multiple swap iterarions is reduced by items_per_iteration
+    // since it is not safe to read till the end of the buffer, otherwise it is not.
+    let multi_swap_iterations =
+        if ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION) == w && input_stride_diff < 2 {
+            ITEMS_PER_ITERATION * ((w - 1) / ITEMS_PER_ITERATION)
+        } else {
+            ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION)
+        };
+
+    unsafe {
+        let ibuffer = src_buffers[0].as_ptr();
+        let obuffer = dst_buffers[0].as_mut_ptr();
+        let mut ibuffer_offset = 0;
+        let mut obuffer_offset = 0;
+
+        for _ in 0..height {
+            let mut x = 0;
+
+            // Retrieves items_per_iteration colors per cycle if possible
+            for _ in (0..multi_swap_iterations).step_by(ITEMS_PER_ITERATION) {
+                *(obuffer.add(obuffer_offset) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset) as *const u64) << SHIFT_40) & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 8) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 6) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 6) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 16) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 12) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 12) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 24) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 18) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 18) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                x += ITEMS_PER_ITERATION;
+                ibuffer_offset += INPUT_BPP * ITEMS_PER_ITERATION;
+                obuffer_offset += OUTPUT_BPP * ITEMS_PER_ITERATION;
+            }
+
+            // Retrieves the ramaining colors in the line
+            for _ in x..single_swap_iterations {
+                *(obuffer.add(obuffer_offset) as *mut i32) = _bswap(
+                    ((*(ibuffer.add(ibuffer_offset) as *const u32) << SHIFT_8) | 0xFF) as i32,
+                );
+
+                x += 1;
+                ibuffer_offset += INPUT_BPP;
+                obuffer_offset += OUTPUT_BPP;
+            }
+
+            // If the input stride is not at least 1 byte it directly copies byte per byte,
+            // this could happen once per line
+            if x < w {
+                *obuffer.add(obuffer_offset + 0) = *ibuffer.add(ibuffer_offset + 2);
+                *obuffer.add(obuffer_offset + 1) = *ibuffer.add(ibuffer_offset + 1);
+                *obuffer.add(obuffer_offset + 2) = *ibuffer.add(ibuffer_offset + 0);
+                *obuffer.add(obuffer_offset + 3) = 0xFF;
+
+                ibuffer_offset += INPUT_BPP;
+                obuffer_offset += OUTPUT_BPP;
+            }
+
+            ibuffer_offset += input_stride_diff;
+            obuffer_offset += output_stride_diff;
+        }
+    }
+    return true;
 }

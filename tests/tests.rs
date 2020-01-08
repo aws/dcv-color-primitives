@@ -8,8 +8,9 @@
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::slice::*;
 
-use dcv_color_primitives as dcp;
 use dcp::*;
+use dcv_color_primitives as dcp;
+use rand::random;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -1053,5 +1054,108 @@ fn over_4gb() {
         }
 
         dealloc(src_ptr, src_layout);
+    }
+}
+
+#[test]
+fn rgb_bgra_ok() {
+    bootstrap();
+
+    const MAX_WIDTH: usize = 32;
+    const MAX_HEIGHT: usize = 32;
+    const MAX_FILL_BYTES: usize = 7;
+    const SRC_BPP: usize = 3;
+    const DST_BPP: usize = 4;
+
+    let src_format = ImageFormat {
+        pixel_format: PixelFormat::Rgb,
+        color_space: ColorSpace::Lrgb,
+        num_planes: 1,
+    };
+
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::Bgra,
+        color_space: ColorSpace::Lrgb,
+        num_planes: 1,
+    };
+
+    for width in 0..=MAX_WIDTH {
+        for height in 0..=MAX_HEIGHT {
+            for src_stride_fill in 0..=MAX_FILL_BYTES {
+                for dst_stride_fill in 0..=MAX_FILL_BYTES {
+                    let src_stride = (SRC_BPP * width) + src_stride_fill;
+                    let dst_stride = (DST_BPP * width) + dst_stride_fill;
+
+                    let src_stride_param = if src_stride_fill == 0 {
+                        STRIDE_AUTO
+                    } else {
+                        src_stride
+                    };
+
+                    let dst_stride_param = if dst_stride_fill == 0 {
+                        STRIDE_AUTO
+                    } else {
+                        dst_stride
+                    };
+
+                    let mut src_buffers: Vec<&[u8]> = Vec::with_capacity(1);
+                    let mut test_input: Box<[u8]> =
+                        vec![0u8; src_stride * height].into_boxed_slice();
+                    let mut test_output: Box<[u8]> =
+                        vec![0u8; dst_stride * height].into_boxed_slice();
+
+                    for h_iter in 0..height {
+                        for w_iter in 0..width {
+                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 0] =
+                                random::<u8>();
+                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 1] =
+                                random::<u8>();
+                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 2] =
+                                random::<u8>();
+                        }
+                    }
+                    src_buffers.push(&test_input);
+
+                    match convert_image(
+                        width as u32,
+                        height as u32,
+                        &src_format,
+                        Some(&[src_stride_param]),
+                        &src_buffers[..],
+                        &dst_format,
+                        Some(&[dst_stride_param]),
+                        &mut [&mut test_output[..]],
+                    ) {
+                        Err(e) => {
+                            println!("{}", e);
+                            assert!(false)
+                        }
+                        Ok(_) => {
+                            for h_iter in 0..height {
+                                for w_iter in 0..width {
+                                    let input_index: usize =
+                                        (h_iter * src_stride) + (w_iter * SRC_BPP);
+                                    let output_index: usize =
+                                        (h_iter * dst_stride) + (w_iter * DST_BPP);
+                                    assert_eq!(
+                                        test_output[output_index + 0],
+                                        test_input[input_index + 2]
+                                    );
+                                    assert_eq!(
+                                        test_output[output_index + 1],
+                                        test_input[input_index + 1]
+                                    );
+                                    assert_eq!(
+                                        test_output[output_index + 2],
+                                        test_input[input_index + 0]
+                                    );
+                                    assert_eq!(test_output[output_index + 3], 255);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
