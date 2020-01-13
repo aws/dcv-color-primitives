@@ -81,8 +81,9 @@ if __name__ == '__main__':
             RGB.tofile(fn)
 
     # write decode input test source
-    decode_input = join(root_dir, 'input.nv12')
-    if not exists(decode_input):
+    decode_input_nv12 = join(root_dir, 'input.nv12')
+    decode_input_i420 = join(root_dir, 'input.i420')
+    if not exists(decode_input_nv12) or not exists(decode_input_i420):
         frac_kr = frac(int(kr * 10000), 10000)
         frac_kg = frac(int(kg * 10000), 10000)
         frac_kb = frac(int(kb * 10000), 10000)
@@ -120,6 +121,8 @@ if __name__ == '__main__':
         height = 2 * ((cols + (ATLAS_WIDTH - 1)) // ATLAS_WIDTH)
         Y = array('B', [Y_MIN] * (ATLAS_WIDTH * height))
         CbCr = array('B', [C_HALF] * (ATLAS_WIDTH * height // 2))
+        Cb = array('B', [C_HALF] * (ATLAS_WIDTH * height // 4))
+        Cr = array('B', [C_HALF] * (ATLAS_WIDTH * height // 4))
         i = 0
         j = 0
 
@@ -133,12 +136,22 @@ if __name__ == '__main__':
                 Y[ATLAS_WIDTH + i + 1] = y
                 CbCr[j] = cb + C_HALF
                 CbCr[j + 1] = cr + C_HALF
+                Cb[j // 2] = cb + C_HALF
+                Cr[j // 2] = cb + C_HALF
+
                 i += 2
                 j += 2
 
             i += ATLAS_WIDTH
 
-        with open(decode_input, 'wb') as fn:
+        with open(decode_input_nv12, 'wb') as fn:
             fn.write(('P5\n%d %d\n255\n' % (ATLAS_WIDTH, height + height // 2)).encode('utf-8'))
             Y.tofile(fn)
             CbCr.tofile(fn)
+
+        # i420
+        with open(decode_input_i420, 'wb') as fn:
+            fn.write(('P5\n%d %d\n255\n' % (ATLAS_WIDTH, height + height // 2)).encode('utf-8'))
+            Y.tofile(fn)
+            Cb.tofile(fn)
+            Cr.tofile(fn)

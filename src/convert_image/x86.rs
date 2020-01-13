@@ -436,6 +436,301 @@ fn yuv_to_lrgb(
     true
 }
 
+#[inline(always)]
+fn i420_to_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+) -> bool {
+    if last_src_plane != 2
+        || last_src_plane >= src_strides.len()
+        || last_src_plane >= src_buffers.len()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let depth = channels as usize;
+    let col_count = width as usize;
+    let line_count = height as usize;
+    let packed_rgb_stride = depth * col_count;
+
+    let y_stride = if src_strides[0] != 0 {
+        src_strides[0]
+    } else {
+        col_count
+    };
+
+    let u_stride = if src_strides[1] != 0 {
+        src_strides[1]
+    } else {
+        col_count / 2
+    };
+
+    let v_stride = if src_strides[2] != 0 {
+        src_strides[2]
+    } else {
+        col_count / 2
+    };
+
+    let rgb_stride = if dst_strides[0] == 0 {
+        packed_rgb_stride
+    } else {
+        dst_strides[0]
+    };
+
+    let rgb_plane = &mut dst_buffers[0];
+    let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
+
+    if line_count == 0 {
+        return true;
+    }
+
+    let max_stride = usize::max_value() / line_count;
+    if (y_stride > max_stride)
+        || (u_stride > max_stride)
+        || (v_stride > max_stride)
+        || (rgb_stride > max_stride)
+    {
+        return false;
+    }
+
+    let wg_height = line_count / 2;
+    if y_stride * line_count > y_plane.len()
+        || u_stride * wg_height > u_plane.len()
+        || v_stride * wg_height > v_plane.len()
+        || rgb_stride * line_count > rgb_plane.len()
+    {
+        return false;
+    }
+
+    let col = colorimetry as usize;
+    let xxym = BACKWARD_WEIGHTS[col][0];
+    let rcrm = BACKWARD_WEIGHTS[col][1];
+    let gcrm = BACKWARD_WEIGHTS[col][2];
+    let gcbm = BACKWARD_WEIGHTS[col][3];
+    let bcbm = BACKWARD_WEIGHTS[col][4];
+    let rn = BACKWARD_WEIGHTS[col][5];
+    let gp = BACKWARD_WEIGHTS[col][6];
+    let bn = BACKWARD_WEIGHTS[col][7];
+
+    // Implementation details inside yuv_to_lrgb function
+    unsafe {
+        let y_group = y_plane.as_ptr();
+        let u_group = u_plane.as_ptr();
+        let v_group = v_plane.as_ptr();
+        let rgb_group = rgb_plane.as_mut_ptr();
+        let wg_width = col_count / 2;
+
+        for y in 0..wg_height {
+            for x in 0..wg_width {
+                let cb = i32::from(*u_group.add(wg_index(x, y, 1, u_stride)));
+                let cr = i32::from(*v_group.add(wg_index(x, y, 1, v_stride)));
+
+                let sr = mulhi_i32(cr, rcrm) - rn;
+                let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
+                let sb = mulhi_i32(cb, bcbm) - bn;
+
+                let (y00, y10) = unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)));
+
+                let sy00 = mulhi_i32(y00, xxym);
+
+                pack_ui8x3(
+                    rgb_group.add(wg_index(2 * x, 2 * y, depth, rgb_stride)),
+                    fix_to_u8_sat(sy00 + sb, FIX6),
+                    fix_to_u8_sat(sy00 + sg, FIX6),
+                    fix_to_u8_sat(sy00 + sr, FIX6),
+                );
+
+                let sy10 = mulhi_i32(y10, xxym);
+                pack_ui8x3(
+                    rgb_group.add(wg_index(2 * x + 1, 2 * y, depth, rgb_stride)),
+                    fix_to_u8_sat(sy10 + sb, FIX6),
+                    fix_to_u8_sat(sy10 + sg, FIX6),
+                    fix_to_u8_sat(sy10 + sr, FIX6),
+                );
+
+                let (y01, y11) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
+
+                let sy01 = mulhi_i32(y01, xxym);
+                pack_ui8x3(
+                    rgb_group.add(wg_index(2 * x, 2 * y + 1, depth, rgb_stride)),
+                    fix_to_u8_sat(sy01 + sb, FIX6),
+                    fix_to_u8_sat(sy01 + sg, FIX6),
+                    fix_to_u8_sat(sy01 + sr, FIX6),
+                );
+
+                let sy11 = mulhi_i32(y11, xxym);
+                pack_ui8x3(
+                    rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, depth, rgb_stride)),
+                    fix_to_u8_sat(sy11 + sb, FIX6),
+                    fix_to_u8_sat(sy11 + sg, FIX6),
+                    fix_to_u8_sat(sy11 + sr, FIX6),
+                );
+            }
+        }
+    }
+
+    true
+}
+
+pub fn rgb_lrgb_bgra_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    if dst_buffers.is_empty()
+        || dst_strides.is_empty()
+        || src_buffers.is_empty()
+        || src_strides.is_empty()
+    {
+        return false;
+    }
+
+    let max_stride = usize::max_value() / height as usize;
+    if (src_strides[0] > max_stride) || (dst_strides[0] > max_stride) {
+        return false;
+    }
+
+    if src_strides[0] * height as usize > src_buffers[0].len()
+        || dst_strides[0] * height as usize > dst_buffers[0].len()
+    {
+        return false;
+    }
+
+    const HIGH_MASK: u64 = 0xFFFFFFFF00000000;
+    const LOW_MASK: u64 = 0x00000000FFFFFFFF;
+    const ALPHAS_MASK: u64 = 0x000000FF000000FF;
+    const INPUT_BPP: usize = 3;
+    const OUTPUT_BPP: usize = 4;
+    const ITEMS_PER_ITERATION: usize = 8;
+    const SHIFT_40: u8 = 40;
+    const SHIFT_16: u8 = 16;
+    const SHIFT_8: u8 = 8;
+
+    let w = width as usize;
+    let output_stride_diff = if dst_strides[0] == 0 {
+        0
+    } else {
+        dst_strides[0] - (OUTPUT_BPP * w)
+    };
+    let input_stride_diff = if src_strides[0] == 0 {
+        0
+    } else {
+        src_strides[0] - (INPUT_BPP * w)
+    };
+
+    // For single swap iteration, since the swap is done on 32 bits while the input is only
+    // 24 bits (RGB), to avoid reading an extra byte of memory that could be outside the
+    // boundaries of the buffer it is necessary to check if the there is at least one byte
+    // of stride in the input buffer, in that case we can read till the end of the buffer.
+    let single_swap_iterations = if input_stride_diff < 1 { w - 1 } else { w };
+
+    // For multiple swap iteration, since each swap reads two extra bytes it is necessary
+    // to check if there is enough space to read them without going out of boundaries.
+    // Since each step retrieves items_per_iteration colors, it is checked if the width of
+    // the image is a multiple of items_per_iteration,
+    // in that case it is checked if there are 2 extra bytes of stride, if there is not
+    // enough space then the number of multiple swap iterarions is reduced by items_per_iteration
+    // since it is not safe to read till the end of the buffer, otherwise it is not.
+    let multi_swap_iterations =
+        if ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION) == w && input_stride_diff < 2 {
+            ITEMS_PER_ITERATION * ((w - 1) / ITEMS_PER_ITERATION)
+        } else {
+            ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION)
+        };
+
+    unsafe {
+        let ibuffer = src_buffers[0].as_ptr();
+        let obuffer = dst_buffers[0].as_mut_ptr();
+        let mut ibuffer_offset = 0;
+        let mut obuffer_offset = 0;
+
+        for _ in 0..height {
+            let mut x = 0;
+
+            // Retrieves items_per_iteration colors per cycle if possible
+            for _ in (0..multi_swap_iterations).step_by(ITEMS_PER_ITERATION) {
+                *(obuffer.add(obuffer_offset) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset) as *const u64) << SHIFT_40) & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 8) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 6) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 6) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 16) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 12) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 12) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                *(obuffer.add(obuffer_offset + 24) as *mut i64) = _bswap64(
+                    (((*(ibuffer.add(ibuffer_offset + 18) as *const u64) >> SHIFT_16) & LOW_MASK)
+                        | ((*(ibuffer.add(ibuffer_offset + 18) as *const u64) << SHIFT_40)
+                            & HIGH_MASK)
+                        | ALPHAS_MASK) as i64,
+                );
+
+                x += ITEMS_PER_ITERATION;
+                ibuffer_offset += INPUT_BPP * ITEMS_PER_ITERATION;
+                obuffer_offset += OUTPUT_BPP * ITEMS_PER_ITERATION;
+            }
+
+            // Retrieves the ramaining colors in the line
+            for _ in x..single_swap_iterations {
+                *(obuffer.add(obuffer_offset) as *mut i32) = _bswap(
+                    ((*(ibuffer.add(ibuffer_offset) as *const u32) << SHIFT_8) | 0xFF) as i32,
+                );
+
+                x += 1;
+                ibuffer_offset += INPUT_BPP;
+                obuffer_offset += OUTPUT_BPP;
+            }
+
+            // If the input stride is not at least 1 byte it directly copies byte per byte,
+            // this could happen once per line
+            if x < w {
+                *obuffer.add(obuffer_offset + 0) = *ibuffer.add(ibuffer_offset + 2);
+                *obuffer.add(obuffer_offset + 1) = *ibuffer.add(ibuffer_offset + 1);
+                *obuffer.add(obuffer_offset + 2) = *ibuffer.add(ibuffer_offset + 0);
+                *obuffer.add(obuffer_offset + 3) = 0xFF;
+
+                ibuffer_offset += INPUT_BPP;
+                obuffer_offset += OUTPUT_BPP;
+            }
+
+            ibuffer_offset += input_stride_diff;
+            obuffer_offset += output_stride_diff;
+        }
+    }
+    return true;
+}
+
 pub fn argb_lrgb_nv12_bt601(
     width: u32,
     height: u32,
@@ -634,150 +929,50 @@ pub fn nv12_bt709_bgra_lrgb(
     )
 }
 
-pub fn rgb_lrgb_bgra_lrgb(
+pub fn i420_bt601_bgra_lrgb(
     width: u32,
     height: u32,
-    _last_src_plane: u32,
+    last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    _last_dst_plane: u32,
+    last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if width == 0 || height == 0 {
-        return true;
-    }
+    i420_to_lrgb(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601,
+    )
+}
 
-    if dst_buffers.is_empty()
-        || dst_strides.is_empty()
-        || src_buffers.is_empty()
-        || src_strides.is_empty()
-    {
-        return false;
-    }
-
-    let max_stride = usize::max_value() / height as usize;
-    if (src_strides[0] > max_stride) || (dst_strides[0] > max_stride) {
-        return false;
-    }
-
-    if src_strides[0] * height as usize > src_buffers[0].len()
-        || dst_strides[0] * height as usize > dst_buffers[0].len()
-    {
-        return false;
-    }
-
-    const HIGH_MASK: u64 = 0xFFFFFFFF00000000;
-    const LOW_MASK: u64 = 0x00000000FFFFFFFF;
-    const ALPHAS_MASK: u64 = 0x000000FF000000FF;
-    const INPUT_BPP: usize = 3;
-    const OUTPUT_BPP: usize = 4;
-    const ITEMS_PER_ITERATION: usize = 8;
-    const SHIFT_40: u8 = 40;
-    const SHIFT_16: u8 = 16;
-    const SHIFT_8: u8 = 8;
-
-    let w = width as usize;
-    let output_stride_diff = if dst_strides[0] == 0 {
-        0
-    } else {
-        dst_strides[0] - (OUTPUT_BPP * w)
-    };
-    let input_stride_diff = if src_strides[0] == 0 {
-        0
-    } else {
-        src_strides[0] - (INPUT_BPP * w)
-    };
-
-    // For single swap iteration, since the swap is done on 32 bits while the input is only
-    // 24 bits (RGB), to avoid reading an extra byte of memory that could be outside the
-    // boundaries of the buffer it is necessary to check if the there is at least one byte
-    // of stride in the input buffer, in that case we can read till the end of the buffer.
-    let single_swap_iterations = if input_stride_diff < 1 { w - 1 } else { w };
-
-    // For multiple swap iteration, since each swap reads two extra bytes it is necessary
-    // to check if there is enough space to read them without going out of boundaries.
-    // Since each step retrieves items_per_iteration colors, it is checked if the width of
-    // the image is a multiple of items_per_iteration,
-    // in that case it is checked if there are 2 extra bytes of stride, if there is not
-    // enough space then the number of multiple swap iterarions is reduced by items_per_iteration
-    // since it is not safe to read till the end of the buffer, otherwise it is not.
-    let multi_swap_iterations =
-        if ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION) == w && input_stride_diff < 2 {
-            ITEMS_PER_ITERATION * ((w - 1) / ITEMS_PER_ITERATION)
-        } else {
-            ITEMS_PER_ITERATION * (w / ITEMS_PER_ITERATION)
-        };
-
-    unsafe {
-        let ibuffer = src_buffers[0].as_ptr();
-        let obuffer = dst_buffers[0].as_mut_ptr();
-        let mut ibuffer_offset = 0;
-        let mut obuffer_offset = 0;
-
-        for _ in 0..height {
-            let mut x = 0;
-
-            // Retrieves items_per_iteration colors per cycle if possible
-            for _ in (0..multi_swap_iterations).step_by(ITEMS_PER_ITERATION) {
-                *(obuffer.add(obuffer_offset) as *mut i64) = _bswap64(
-                    (((*(ibuffer.add(ibuffer_offset) as *const u64) >> SHIFT_16) & LOW_MASK)
-                        | ((*(ibuffer.add(ibuffer_offset) as *const u64) << SHIFT_40) & HIGH_MASK)
-                        | ALPHAS_MASK) as i64,
-                );
-
-                *(obuffer.add(obuffer_offset + 8) as *mut i64) = _bswap64(
-                    (((*(ibuffer.add(ibuffer_offset + 6) as *const u64) >> SHIFT_16) & LOW_MASK)
-                        | ((*(ibuffer.add(ibuffer_offset + 6) as *const u64) << SHIFT_40)
-                            & HIGH_MASK)
-                        | ALPHAS_MASK) as i64,
-                );
-
-                *(obuffer.add(obuffer_offset + 16) as *mut i64) = _bswap64(
-                    (((*(ibuffer.add(ibuffer_offset + 12) as *const u64) >> SHIFT_16) & LOW_MASK)
-                        | ((*(ibuffer.add(ibuffer_offset + 12) as *const u64) << SHIFT_40)
-                            & HIGH_MASK)
-                        | ALPHAS_MASK) as i64,
-                );
-
-                *(obuffer.add(obuffer_offset + 24) as *mut i64) = _bswap64(
-                    (((*(ibuffer.add(ibuffer_offset + 18) as *const u64) >> SHIFT_16) & LOW_MASK)
-                        | ((*(ibuffer.add(ibuffer_offset + 18) as *const u64) << SHIFT_40)
-                            & HIGH_MASK)
-                        | ALPHAS_MASK) as i64,
-                );
-
-                x += ITEMS_PER_ITERATION;
-                ibuffer_offset += INPUT_BPP * ITEMS_PER_ITERATION;
-                obuffer_offset += OUTPUT_BPP * ITEMS_PER_ITERATION;
-            }
-
-            // Retrieves the ramaining colors in the line
-            for _ in x..single_swap_iterations {
-                *(obuffer.add(obuffer_offset) as *mut i32) = _bswap(
-                    ((*(ibuffer.add(ibuffer_offset) as *const u32) << SHIFT_8) | 0xFF) as i32,
-                );
-
-                x += 1;
-                ibuffer_offset += INPUT_BPP;
-                obuffer_offset += OUTPUT_BPP;
-            }
-
-            // If the input stride is not at least 1 byte it directly copies byte per byte,
-            // this could happen once per line
-            if x < w {
-                *obuffer.add(obuffer_offset + 0) = *ibuffer.add(ibuffer_offset + 2);
-                *obuffer.add(obuffer_offset + 1) = *ibuffer.add(ibuffer_offset + 1);
-                *obuffer.add(obuffer_offset + 2) = *ibuffer.add(ibuffer_offset + 0);
-                *obuffer.add(obuffer_offset + 3) = 0xFF;
-
-                ibuffer_offset += INPUT_BPP;
-                obuffer_offset += OUTPUT_BPP;
-            }
-
-            ibuffer_offset += input_stride_diff;
-            obuffer_offset += output_stride_diff;
-        }
-    }
-    return true;
+pub fn i420_bt709_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    i420_to_lrgb(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709,
+    )
 }

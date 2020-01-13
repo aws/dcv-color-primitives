@@ -1,6 +1,6 @@
 project(
   'dcv-color-primitives-unit-tests', 'c',
-  version : '0.1.1'
+  version : '0.1.2'
 )
 
 cc = meson.get_compiler('c')
@@ -124,6 +124,6 @@ test('convert_image_rgb_to_yuv_errors', unit, args : ['unit_convert_image_rgb_to
 test('convert_image_yuv_to_rgb_errors', unit, args : ['unit_convert_image_yuv_to_rgb_errors'])
 test('convert_image_rgb_to_yuv_p1_ok', unit, args : ['unit_convert_image_rgb_to_yuv_ok', '1'])
 test('convert_image_rgb_to_yuv_p2_ok', unit, args : ['unit_convert_image_rgb_to_yuv_ok', '2'])
-test('convert_image_yuv_to_rgb_p1_ok', unit, args : ['unit_convert_image_yuv_to_rgb_ok', '1'])
-test('convert_image_yuv_to_rgb_p2_ok', unit, args : ['unit_convert_image_yuv_to_rgb_ok', '2'])
+test('convert_image_nv12_to_rgb_ok', unit, args : ['unit_convert_image_nv12_to_rgb_ok'])
+test('convert_image_i420_to_rgb_ok', unit, args : ['unit_convert_image_i420_to_rgb_ok'])
 test('convert_image_over_4gb_limit', unit, args : ['unit_convert_image_over_4gb_limit'], is_parallel : false)

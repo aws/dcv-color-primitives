@@ -25,8 +25,9 @@
  * | Source pixel format  | Destination pixel formats  |
  * | -------------------- | -------------------------- |
  * | ARGB                 | NV12                       |
- * | BGRA                 | NV12                       |
  * | BGR                  | NV12                       |
+ * | BGRA                 | NV12                       |
+ * | I420                 | BGRA                       |
  * | NV12                 | BGRA                       |
  * | RGB                  | BGRA                       |
  *
@@ -632,8 +633,9 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *   Source image pixel format         | Supported destination image pixel formats
  *   ----------------------------------|------------------------------------------
  *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
- *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_I420             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_RGB              | DCP_PIXEL_FORMAT_BGRA [3][algo-3]
  *
