@@ -111,6 +111,13 @@ macro_rules! fix_to_i16_16x {
     };
 }
 
+#[cfg(target_arch = "x86")]
+unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64
+{
+    let slice = std::mem::transmute::<__m256i, [i64; 4]>(a);
+    return slice[index as usize];
+}
+
 /// Convert short to 2D short vector (16-wide)
 unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
     let y = _mm256_unpacklo_epi16(x, x);

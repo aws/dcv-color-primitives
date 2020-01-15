@@ -973,6 +973,7 @@ fn buffers_size() {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 #[test]
 fn over_4gb() {
     bootstrap();
