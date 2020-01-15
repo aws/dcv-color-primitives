@@ -28,6 +28,7 @@
  * | BGR                  | NV12                       |
  * | BGRA                 | NV12                       |
  * | I420                 | BGRA                       |
+ * | I444                 | BGRA                       |
  * | NV12                 | BGRA                       |
  * | RGB                  | BGRA                       |
  *
@@ -380,9 +381,9 @@ typedef enum {
  * DCP_PIXEL_FORMAT_BGR  | 4:4:4       |     |     | 1       | bgr:3  |        |
  * DCP_PIXEL_FORMAT_RGBA | 4:4:4       |     |     | 1       | rgba:4 |        |
  * DCP_PIXEL_FORMAT_RGB  | 4:4:4       |     |     | 1       | rgb:3  |        |
- * DCP_PIXEL_FORMAT_I444 | 4:4:4       |     |     | 1, 3    | y:1    | u:1    | v:1
+ * DCP_PIXEL_FORMAT_I444 | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
  * DCP_PIXEL_FORMAT_I422 | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
- * DCP_PIXEL_FORMAT_I420 | 4:2:0       |  2  |  2  | 1, 3    | y:1    | u:1/4  | v:1/4
+ * DCP_PIXEL_FORMAT_I420 | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
  * DCP_PIXEL_FORMAT_NV12 | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
  *
  * The values reported in columns `w` and `h`, when specified, indicate that the described
