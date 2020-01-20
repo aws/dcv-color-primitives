@@ -14,9 +14,9 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #[cfg(target_arch = "x86")]
-use std::arch::x86::__cpuid;
+use core::arch::x86::__cpuid;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::__cpuid;
+use core::arch::x86_64::__cpuid;
 
 #[derive(Debug)]
 pub enum CpuManufacturer {
