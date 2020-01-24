@@ -1,6 +1,6 @@
 project(
   'dcv-color-primitives-unit-tests', 'c',
-  version : '0.1'
+  version : '0.1.1'
 )
 
 cc = meson.get_compiler('c')

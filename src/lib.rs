@@ -23,18 +23,14 @@
 //! DCV color primitives is a library to perform image color model conversion.
 //!
 //! It is able to convert the following pixel formats:
-//! * BGRA8
-//! * RGBA8
-//! * BGR8
 //!
-//! To the following destination pixel formats:
-//! * NV12 (single plane or biplanar 4:2:0)
-//!
-//! Additionally, it is possible to convert the following pixel formats:
-//! * NV12 (single plane or biplanar 4:2:0)
-//!
-//! To the following destination pixel formats:
-//! * BGRA8 (alpha is set to 255)
+//! | Source pixel format  | Destination pixel formats  |
+//! | -------------------- | -------------------------- |
+//! | ARGB                 | NV12                       |
+//! | BGRA                 | NV12                       |
+//! | BGR                  | NV12                       |
+//! | NV12                 | BGRA                       |
+//! | RGB                  | BGRA                       |
 //!
 //! The supported color models are:
 //! * YCbCr, ITU-R Recommendation BT.601 (standard video system)
@@ -696,6 +692,7 @@ pub fn get_buffers_size(
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Nv12             | PixelFormat::Bgra [`2`]
+///   PixelFormat::Rgb              | PixelFormat::Bgra
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
 ///   source image format number of planes
@@ -745,6 +742,9 @@ pub fn get_buffers_size(
 /// g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
 /// ```
+///
+/// # Algorithm 2
+/// Conversion from RGB to BGRA using _bswap
 ///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
