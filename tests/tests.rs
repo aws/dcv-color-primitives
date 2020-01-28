@@ -5,11 +5,12 @@
 #![deny(unstable_features)]
 #![deny(unused_import_braces)]
 
-use std::alloc::{alloc_zeroed, dealloc, Layout};
+use std::alloc::{alloc, alloc_zeroed, dealloc, Layout};
+use std::ptr::write_bytes;
 use std::slice::*;
 
-use dcv_color_primitives as dcp;
 use dcp::*;
+use dcv_color_primitives as dcp;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -978,26 +979,33 @@ fn buffers_size() {
 fn over_4gb() {
     bootstrap();
 
-    const WIDTH: u32 = 0x40000000;
+    // In this test the output image will larger than 4GB:
+    // width = 536870944 * 2 * 4 = 4294967552
+    const WIDTH: u32 = 0x20000020;
     const HEIGHT: u32 = 2;
 
     const LUMA_SIZE: usize = (WIDTH as usize) * (HEIGHT as usize);
-    const EXPECTED_SRC_BUFFER_SIZE: usize = LUMA_SIZE * 4;
-    const EXPECTED_DST_BUFFER_SIZE: usize = (LUMA_SIZE * 3) / 2;
+    const EXPECTED_SRC_BUFFER_SIZE: usize = (LUMA_SIZE * 3) / 2;
+    const EXPECTED_DST_BUFFER_SIZE: usize = LUMA_SIZE * 4;
+
+    const PAGE_SIZE: usize = 4096;
+    const MAX_LUMA: u8 = 235;
+    const HALF_CHROMA: u8 = 128;
 
     let src_format = ImageFormat {
-        pixel_format: PixelFormat::Argb,
-        color_space: ColorSpace::Lrgb,
-        num_planes: 1,
-    };
-
-    let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
         num_planes: 1,
     };
 
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::Bgra,
+        color_space: ColorSpace::Lrgb,
+        num_planes: 1,
+    };
+
     let src_buffers_size = &mut [0usize; 1];
+
     match get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_buffers_size) {
         Ok(()) => assert_eq!(src_buffers_size[0], EXPECTED_SRC_BUFFER_SIZE),
         Err(_) => assert!(false),
@@ -1012,17 +1020,31 @@ fn over_4gb() {
     #[allow(unsafe_code)]
     unsafe {
         let src_layout = Layout::from_size_align_unchecked(EXPECTED_SRC_BUFFER_SIZE, 1);
-
-        let src_ptr = alloc_zeroed(src_layout);
+        let src_ptr = alloc(src_layout);
         if src_ptr.is_null() {
             return;
         }
 
+        write_bytes::<u8>(src_ptr, MAX_LUMA, LUMA_SIZE);
+        write_bytes::<u8>(
+            src_ptr.add(LUMA_SIZE),
+            HALF_CHROMA,
+            EXPECTED_SRC_BUFFER_SIZE - LUMA_SIZE,
+        );
+
         let dst_layout = Layout::from_size_align_unchecked(EXPECTED_DST_BUFFER_SIZE, 1);
         let dst_ptr = alloc_zeroed(dst_layout);
         if !dst_ptr.is_null() {
-            let src_image: &[u8] = from_raw_parts(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
+            let src_image: &mut [u8] = from_raw_parts_mut(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
+
             let mut dst_image: &mut [u8] = from_raw_parts_mut(dst_ptr, EXPECTED_DST_BUFFER_SIZE);
+
+            // Touch output
+            for i in (0..EXPECTED_DST_BUFFER_SIZE).step_by(PAGE_SIZE) {
+                dst_image[i] = 0;
+            }
+
+            dst_image[dst_image.len() - 1] = 0;
 
             let src_buffers: &[&[u8]] = &[&src_image];
             let dst_buffers: &mut [&mut [u8]] = &mut [&mut dst_image];
@@ -1040,15 +1062,10 @@ fn over_4gb() {
 
             assert_eq!(status.is_ok(), true);
 
-            // Check all luma samples are correct
-            for i in 0..LUMA_SIZE {
-                assert_eq!(dst_image[i], 16);
-            }
-
-            // Check all chroma samples are correct
-            for i in LUMA_SIZE..EXPECTED_DST_BUFFER_SIZE {
-                assert_eq!(dst_image[i], 128);
-            }
+            // Check all samples are correct
+            let dst_image_as_u64: &[u64] =
+                from_raw_parts(dst_ptr as *const u64, EXPECTED_DST_BUFFER_SIZE / 8);
+            assert!(dst_image_as_u64.iter().all(|&x| x == std::u64::MAX));
 
             dealloc(dst_ptr, dst_layout);
         }
