@@ -692,7 +692,7 @@ pub fn get_buffers_size(
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Nv12             | PixelFormat::Bgra [`2`]
-///   PixelFormat::Rgb              | PixelFormat::Bgra
+///   PixelFormat::Rgb              | PixelFormat::Bgra [`3`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
 ///   source image format number of planes
@@ -743,8 +743,8 @@ pub fn get_buffers_size(
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
 /// ```
 ///
-/// # Algorithm 2
-/// Conversion from RGB to BGRA using _bswap
+/// # Algorithm 3
+/// Conversion from RGB to BGRA
 ///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
@@ -754,6 +754,7 @@ pub fn get_buffers_size(
 /// [`get_buffers_size`]: ./fn.get_buffers_size.html
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
+/// [`3`]: ./fn.convert_image.html#algorithm-3
 pub fn convert_image(
     width: u32,
     height: u32,

@@ -13,7 +13,7 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support non-tightly packed data
 * Support images greater than 4GB (64 bit)
 
-## Color space conversion
+## Image format conversion
 
 The library is currenty able to convert the following pixel formats:
 
