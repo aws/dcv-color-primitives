@@ -18,9 +18,9 @@ use crate::convert_image::common::*;
 use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
-use std::arch::x86::*;
+use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+use core::arch::x86_64::*;
 
 const LANE_COUNT: usize = 16;
 const LRGB_TO_YUV_WG_SIZE: usize = 4;

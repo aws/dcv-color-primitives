@@ -19,9 +19,9 @@ use crate::convert_image::sse2;
 use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
-use std::arch::x86::*;
+use core::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+use core::arch::x86_64::*;
 
 const LANE_COUNT: usize = 32;
 const LRGB_TO_YUV_WG_SIZE: usize = 4;
@@ -110,6 +110,13 @@ macro_rules! fix_to_i16_16x {
     ($fix:expr, $frac_bits:expr) => {
         _mm256_srai_epi16($fix, $frac_bits)
     };
+}
+
+#[cfg(target_arch = "x86")]
+unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64
+{
+    let slice = std::mem::transmute::<__m256i, [i64; 4]>(a);
+    return slice[index as usize];
 }
 
 /// Convert short to 2D short vector (16-wide)
