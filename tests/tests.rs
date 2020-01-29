@@ -404,7 +404,7 @@ fn rgb_to_yuv_size_mode(
     color_space: ColorSpace,
     pixel_format: PixelFormat,
 ) {
-    const MAX_FILL_BYTES: usize = 15;
+    const MAX_FILL_BYTES: usize = 1;
 
     let w = width as usize;
     let depth: usize = match pixel_format {
@@ -607,7 +607,7 @@ fn yuv_to_rgb_size_mode_stride(
 }
 
 fn yuv_to_rgb_size_mode(num_planes: u32, width: u32, height: u32, color_space: ColorSpace) {
-    const MAX_FILL_BYTES: usize = 15;
+    const MAX_FILL_BYTES: usize = 1;
 
     let w = width as usize;
     let min_src_stride = w;
@@ -674,8 +674,8 @@ fn rgb_to_yuv_ok() {
 
 #[test]
 fn yuv_to_rgb_ok() {
-    const MAX_WIDTH: u32 = 64;
-    const MAX_HEIGHT: u32 = 64;
+    const MAX_WIDTH: u32 = 34;
+    const MAX_HEIGHT: u32 = 4;
 
     for num_planes in 1..2 {
         for width in (2..MAX_WIDTH).step_by(2) {
@@ -1079,9 +1079,9 @@ fn over_4gb() {
 fn rgb_bgra_ok() {
     bootstrap();
 
-    const MAX_WIDTH: usize = 32;
-    const MAX_HEIGHT: usize = 32;
-    const MAX_FILL_BYTES: usize = 7;
+    const MAX_WIDTH: usize = 8;
+    const MAX_HEIGHT: usize = 8;
+    const MAX_FILL_BYTES: usize = 2;
     const SRC_BPP: usize = 3;
     const DST_BPP: usize = 4;
 
