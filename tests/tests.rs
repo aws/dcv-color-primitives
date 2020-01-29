@@ -674,6 +674,8 @@ fn rgb_to_yuv_ok() {
 
 #[test]
 fn yuv_to_rgb_ok() {
+    bootstrap();
+
     const MAX_WIDTH: u32 = 34;
     const MAX_HEIGHT: u32 = 4;
 
