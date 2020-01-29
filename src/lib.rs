@@ -23,18 +23,14 @@
 //! DCV color primitives is a library to perform image color model conversion.
 //!
 //! It is able to convert the following pixel formats:
-//! * BGRA8
-//! * RGBA8
-//! * BGR8
 //!
-//! To the following destination pixel formats:
-//! * NV12 (single plane or biplanar 4:2:0)
-//!
-//! Additionally, it is possible to convert the following pixel formats:
-//! * NV12 (single plane or biplanar 4:2:0)
-//!
-//! To the following destination pixel formats:
-//! * BGRA8 (alpha is set to 255)
+//! | Source pixel format  | Destination pixel formats  |
+//! | -------------------- | -------------------------- |
+//! | ARGB                 | NV12                       |
+//! | BGRA                 | NV12                       |
+//! | BGR                  | NV12                       |
+//! | NV12                 | BGRA                       |
+//! | RGB                  | BGRA                       |
 //!
 //! The supported color models are:
 //! * YCbCr, ITU-R Recommendation BT.601 (standard video system)
@@ -309,10 +305,9 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ErrorKind::NotInitialized => write!(
-                f,
-                "Library was not initialized by calling initialize()"
-            ),
+            ErrorKind::NotInitialized => {
+                write!(f, "Library was not initialized by calling initialize()")
+            }
             ErrorKind::InvalidValue => write!(
                 f,
                 "One or more parameters have not legal values for the command"
@@ -411,6 +406,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709, bgr_lrgb_nv12_bt709);
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb, nv12_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb, nv12_bt709_bgra_lrgb);
+        set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);
     };
 }
 
@@ -696,6 +692,7 @@ pub fn get_buffers_size(
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Nv12             | PixelFormat::Bgra [`2`]
+///   PixelFormat::Rgb              | PixelFormat::Bgra [`3`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
 ///   source image format number of planes
@@ -746,6 +743,9 @@ pub fn get_buffers_size(
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
 /// ```
 ///
+/// # Algorithm 3
+/// Conversion from RGB to BGRA
+///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
@@ -754,6 +754,7 @@ pub fn get_buffers_size(
 /// [`get_buffers_size`]: ./fn.get_buffers_size.html
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
+/// [`3`]: ./fn.convert_image.html#algorithm-3
 pub fn convert_image(
     width: u32,
     height: u32,

@@ -13,25 +13,17 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support non-tightly packed data
 * Support images greater than 4GB (64 bit)
 
-## Color space conversion
+## Image format conversion
 
 The library is currenty able to convert the following pixel formats:
 
-* BGRA8
-* RGBA8
-* BGR8
-
-To the following destination pixel formats:
-
-* NV12 (single plane or biplanar 4:2:0)
-
-Additionally, it is possible to convert the following pixel formats:
-
-* NV12 (single plane or biplanar 4:2:0)
-
-To the following destination pixel formats:
-
-* BGRA8 (alpha is set to 255)
+| Source pixel format  | Destination pixel formats  |
+| -------------------- | -------------------------- |
+| ARGB                 | NV12                       |
+| BGRA                 | NV12                       |
+| BGR                  | NV12                       |
+| NV12                 | BGRA                       |
+| RGB                  | BGRA                       |
 
 ### Color models
 

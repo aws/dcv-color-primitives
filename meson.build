@@ -1,6 +1,6 @@
 project(
   'dcv-color-primitives-unit-tests', 'c',
-  version : '0.1'
+  version : '0.1.1'
 )
 
 cc = meson.get_compiler('c')
@@ -119,6 +119,7 @@ unit = executable(
 
 test('init', unit, args : ['unit_init'])
 test('get_buffers_size', unit, args : ['unit_get_buffers_size'])
+test('convert_image_rgb_to_bgra_ok', unit, args : ['unit_image_convert_rgb_to_bgra_ok'])
 test('convert_image_rgb_to_yuv_errors', unit, args : ['unit_convert_image_rgb_to_yuv_errors'])
 test('convert_image_yuv_to_rgb_errors', unit, args : ['unit_convert_image_yuv_to_rgb_errors'])
 test('convert_image_rgb_to_yuv_p1_ok', unit, args : ['unit_convert_image_rgb_to_yuv_ok', '1'])

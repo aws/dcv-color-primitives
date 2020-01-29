@@ -21,18 +21,14 @@
  * DCV color primitives is a library to perform image color model conversion.
  *
  * It is able to convert the following pixel formats:
- * - BGRA8
- * - RGBA8
- * - BGR8
  *
- * To the following destination pixel formats:
- * - NV12 (single plane or biplanar 4:2:0)
- *
- * Additionally, it is possible to convert the following pixel formats:
- * - NV12 (single plane or biplanar 4:2:0)
- *
- * To the following destination pixel formats:
- * - BGRA8 (alpha is set to 255)
+ * | Source pixel format  | Destination pixel formats  |
+ * | -------------------- | -------------------------- |
+ * | ARGB                 | NV12                       |
+ * | BGRA                 | NV12                       |
+ * | BGR                  | NV12                       |
+ * | NV12                 | BGRA                       |
+ * | RGB                  | BGRA                       |
  *
  * The supported color models are:
  * - YCbCr, ITU-R Recommendation BT.601 (standard video system)
@@ -639,6 +635,7 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
  *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
+ *   DCP_PIXEL_FORMAT_RGB              | DCP_PIXEL_FORMAT_BGRA [3][algo-3]
  *
  * # Undefined behaviour
  *
@@ -692,6 +689,10 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
  * b = 1.164 * (y - 16) + 2.115 * (cb - 128)
  * ]|
+ *
+ * # Algorithm 3 # {#algo-3}
+ *
+ * Conversion from RGB to BGRA
  */
 DcpResult           dcp_convert_image           (uint32_t               width,
                                                  uint32_t               height,
