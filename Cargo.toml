@@ -1,6 +1,6 @@
 [package]
 name = "dcv-color-primitives"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 description = "a library to perform image color model conversion"
 license = "MIT-0"
@@ -17,6 +17,7 @@ crate-type = ["staticlib", "rlib"]
 [dev-dependencies]
 criterion = "0.3.0"
 rand = "0.7.3"
+itertools = "0.8.2"
 
 [[bench]]
 name = "benches"

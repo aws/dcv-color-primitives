@@ -1,3 +1,7 @@
+News in 0.1.2
+--------------
+* Added i420 to bgra conversion
+
 News in 0.1.1
 --------------
 * Added rgb to bgra conversion

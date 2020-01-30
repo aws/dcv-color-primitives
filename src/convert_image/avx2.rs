@@ -113,8 +113,7 @@ macro_rules! fix_to_i16_16x {
 }
 
 #[cfg(target_arch = "x86")]
-unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64
-{
+unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64 {
     let slice = std::mem::transmute::<__m256i, [i64; 4]>(a);
     return slice[index as usize];
 }
@@ -127,6 +126,14 @@ unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
         _mm256_permute2x128_si256(y, z, PACK_LO_DQWORD_2X256),
         _mm256_permute2x128_si256(y, z, PACK_HI_DQWORD_2X256),
     )
+}
+
+/// Unpack 16 uchar samples into 16 short samples,
+/// stored in big endian (16-wide)
+unsafe fn unpack_ui8_i16be_16x(image: *const u8) -> __m256i {
+    let x = _mm_loadu_si128(image as *const __m128i);
+    let xx = _mm256_set_m128i(x, x);
+    _mm256_unpacklo_epi8(zero!(), xx)
 }
 
 /// Deinterleave 2 uchar samples into short samples,
@@ -628,6 +635,194 @@ fn yuv_to_lrgb(
     true
 }
 
+#[inline(always)]
+fn i420_to_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+) -> bool {
+    if last_src_plane != 2
+        || last_src_plane >= src_strides.len()
+        || last_src_plane >= src_buffers.len()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let depth = channels as usize;
+    let col_count = width as usize;
+    let line_count = height as usize;
+    let packed_rgb_stride = depth * col_count;
+
+    let y_stride = if src_strides[0] != 0 {
+        src_strides[0]
+    } else {
+        col_count
+    };
+
+    let u_stride = if src_strides[1] != 0 {
+        src_strides[1]
+    } else {
+        col_count / 2
+    };
+
+    let v_stride = if src_strides[2] != 0 {
+        src_strides[2]
+    } else {
+        col_count / 2
+    };
+
+    let rgb_stride = if dst_strides[0] == 0 {
+        packed_rgb_stride
+    } else {
+        dst_strides[0]
+    };
+
+    let rgb_plane = &mut dst_buffers[0];
+    let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
+
+    if line_count == 0 {
+        return true;
+    }
+
+    let max_stride = usize::max_value() / line_count;
+    if (y_stride > max_stride)
+        || (u_stride > max_stride)
+        || (v_stride > max_stride)
+        || (rgb_stride > max_stride)
+    {
+        return false;
+    }
+
+    let wg_height = line_count / 2;
+    if y_stride * line_count > y_plane.len()
+        || u_stride * wg_height > u_plane.len()
+        || v_stride * wg_height > v_plane.len()
+        || rgb_stride * line_count > rgb_plane.len()
+    {
+        return false;
+    }
+
+    let col = colorimetry as usize;
+    unsafe {
+        let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
+        let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
+        let gcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][2]);
+        let gcbm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][3]);
+        let bcbm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][4]);
+        let rn = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][5]);
+        let gp = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][6]);
+        let bn = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][7]);
+
+        let y_group = y_plane.as_ptr();
+        let u_group = u_plane.as_ptr();
+        let v_group = v_plane.as_ptr();
+        let rgb_group = rgb_plane.as_mut_ptr();
+        let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
+        let i420_depth = YUV_TO_LRGB_WAVES;
+        let wg_width = col_count / YUV_TO_LRGB_WAVES;
+
+        for y in 0..wg_height {
+            for x in 0..wg_width {
+                let cb =
+                    unpack_ui8_i16be_16x(u_group.add(wg_index(x, y, i420_depth / 2, u_stride)));
+                let cr =
+                    unpack_ui8_i16be_16x(v_group.add(wg_index(x, y, i420_depth / 2, v_stride)));
+
+                let sb = _mm256_sub_epi16(_mm256_mulhi_epu16(cb, bcbm), bn);
+                let sr = _mm256_sub_epi16(_mm256_mulhi_epu16(cr, rcrm), rn);
+                let sg = _mm256_sub_epi16(
+                    gp,
+                    _mm256_add_epi16(_mm256_mulhi_epu16(cb, gcbm), _mm256_mulhi_epu16(cr, gcrm)),
+                );
+
+                let (sb_lo, sb_hi) = i16_to_i16x2_16x(sb);
+                let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
+                let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
+
+                let y0 = _mm256_loadu_si256(
+                    y_group.add(wg_index(x, 2 * y, i420_depth, y_stride)) as *const __m256i
+                );
+
+                let y00 = _mm256_mulhi_epu16(
+                    _mm256_permute2x128_si256(
+                        _mm256_unpacklo_epi8(zero!(), y0),
+                        _mm256_unpackhi_epi8(zero!(), y0),
+                        PACK_LO_DQWORD_2X256,
+                    ),
+                    xxym,
+                );
+                pack_i16x3_16x(
+                    rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y00), FIX6),
+                );
+
+                let y10 = _mm256_mulhi_epu16(
+                    _mm256_permute2x128_si256(
+                        _mm256_unpacklo_epi8(zero!(), y0),
+                        _mm256_unpackhi_epi8(zero!(), y0),
+                        PACK_HI_DQWORD_2X256,
+                    ),
+                    xxym,
+                );
+                pack_i16x3_16x(
+                    rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
+                );
+
+                let y1 =
+                    _mm256_loadu_si256(
+                        y_group.add(wg_index(x, 2 * y + 1, i420_depth, y_stride)) as *const __m256i
+                    );
+
+                let y01 = _mm256_mulhi_epu16(
+                    _mm256_permute2x128_si256(
+                        _mm256_unpacklo_epi8(zero!(), y1),
+                        _mm256_unpackhi_epi8(zero!(), y1),
+                        PACK_LO_DQWORD_2X256,
+                    ),
+                    xxym,
+                );
+                pack_i16x3_16x(
+                    rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y01), FIX6),
+                );
+
+                let y11 = _mm256_mulhi_epu16(
+                    _mm256_permute2x128_si256(
+                        _mm256_unpacklo_epi8(zero!(), y1),
+                        _mm256_unpackhi_epi8(zero!(), y1),
+                        PACK_HI_DQWORD_2X256,
+                    ),
+                    xxym,
+                );
+                pack_i16x3_16x(
+                    rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y11), FIX6),
+                );
+            }
+        }
+    }
+
+    true
+}
+
 pub fn argb_lrgb_nv12_bt601(
     width: u32,
     height: u32,
@@ -950,4 +1145,78 @@ pub fn rgb_lrgb_bgra_lrgb(
         dst_strides,
         dst_buffers,
     )
+}
+
+pub fn i420_bt601_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
+        i420_to_lrgb(
+            width,
+            height,
+            last_src_plane as usize,
+            src_strides,
+            src_buffers,
+            last_dst_plane as usize,
+            dst_strides,
+            dst_buffers,
+            PixelFormatChannels::Four,
+            Colorimetry::Bt601,
+        )
+    } else {
+        sse2::i420_bt601_bgra_lrgb(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
+}
+
+pub fn i420_bt709_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
+        i420_to_lrgb(
+            width,
+            height,
+            last_src_plane as usize,
+            src_strides,
+            src_buffers,
+            last_dst_plane as usize,
+            dst_strides,
+            dst_buffers,
+            PixelFormatChannels::Four,
+            Colorimetry::Bt709,
+        )
+    } else {
+        sse2::i420_bt709_bgra_lrgb(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
 }
