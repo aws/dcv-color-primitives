@@ -18,6 +18,7 @@ use std::slice::{from_raw_parts, from_raw_parts_mut};
 use dcp::*;
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
+use rand::random;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -1581,7 +1582,7 @@ fn over_4gb() {
 fn rgb_bgra_ok() {
     bootstrap();
 
-    const MAX_WIDTH: usize = 8;
+    const MAX_WIDTH: usize = 32;
     const MAX_HEIGHT: usize = 8;
     const MAX_FILL_BYTES: usize = 2;
     const SRC_BPP: usize = 3;
