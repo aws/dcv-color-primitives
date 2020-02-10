@@ -90,22 +90,17 @@ dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
 
 thread_dep = dependency('threads')
 dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
+libdl_dep = cc.find_library('dl', required: is_win == false)
+ws2_32_dep = cc.find_library('ws2_32', required: is_win)
+userenv_dep = cc.find_library('userenv', required: is_win)
 
 dcp_deps = [
   thread_dep,
   dcv_color_primitives_dep,
+  libdl_dep,
+  ws2_32_dep,
+  userenv_dep,
 ]
-
-if is_win
-  dcp_deps += [
-    cc.find_library('ws2_32'),
-    cc.find_library('userenv')
-  ]
-else
-  dcp_deps += [
-    cc.find_library('dl'),
-  ]
-endif
 
 unit = executable(
   'unit',
