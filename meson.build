@@ -94,20 +94,20 @@ run_command('cargo', cargo_target)
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
 
 thread_dep = dependency('threads')
+dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
 
 dcp_deps = [
   thread_dep,
+  dcv_color_primitives_dep,
 ]
 
 if is_win
   dcp_deps += [
-    cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path]),
     cc.find_library('ws2_32'),
     cc.find_library('userenv')
   ]
 else
   dcp_deps += [
-    cc.find_library('libdcv_color_primitives', dirs: [dcp_lib_path]),
     cc.find_library('dl'),
   ]
 endif
