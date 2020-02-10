@@ -1,5 +1,6 @@
 project(
   'dcv-color-primitives', 'c',
+  license : 'MIT-0',
   version : run_command('build-aux' / 'getversion.py').stdout().strip()
 )
 
