@@ -1,5 +1,5 @@
 project(
-  'dcv-color-primitives-unit-tests', 'c',
+  'dcv-color-primitives', 'c',
   version : run_command('build-aux' / 'getversion.py').stdout().strip()
 )
 
