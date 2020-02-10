@@ -72,12 +72,7 @@ else
   test_cflags = []
 endif
 
-common_cflags = []
-foreach cflag: test_cflags
-  if cc.has_argument(cflag)
-    common_cflags += [ cflag ]
-  endif
-endforeach
+common_cflags = cc.get_supported_arguments(test_cflags)
 
 message('Building DCV Color Primitives')
 
