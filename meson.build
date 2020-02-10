@@ -92,7 +92,12 @@ endif
 run_command('cargo', cargo_target)
 
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
-dcp_deps = []
+
+thread_dep = dependency('threads')
+
+dcp_deps = [
+  thread_dep,
+]
 
 if is_win
   dcp_deps += [
@@ -103,7 +108,6 @@ if is_win
 else
   dcp_deps += [
     cc.find_library('libdcv_color_primitives', dirs: [dcp_lib_path]),
-    cc.find_library('pthread'),
     cc.find_library('dl'),
   ]
 endif
@@ -112,7 +116,7 @@ unit = executable(
   'unit',
   'c_tests/unit.c',
   include_directories: [
-    include_directories('include'),    
+    include_directories('include'),
   ],
   c_args: common_cflags,
   dependencies: dcp_deps
