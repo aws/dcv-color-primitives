@@ -122,3 +122,5 @@ test('convert_image_rgb_to_yuv_p2_ok', unit, args : ['unit_convert_image_rgb_to_
 test('convert_image_nv12_to_rgb_ok', unit, args : ['unit_convert_image_nv12_to_rgb_ok'])
 test('convert_image_i420_to_rgb_ok', unit, args : ['unit_convert_image_i420_to_rgb_ok'])
 test('convert_image_over_4gb_limit', unit, args : ['unit_convert_image_over_4gb_limit'], is_parallel : false)
+
+subdir('include')
