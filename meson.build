@@ -92,16 +92,15 @@ run_command('cargo', cargo_target)
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
 
 if is_win
-  install_data(
-    dcp_lib_path / 'dcv_color_primitives.lib',
-    install_dir: libdir
-  )
+  static_lib_name = 'dcv_color_primitives.lib'
 else
-  install_data(
-    dcp_lib_path / 'libdcv_color_primitives.a',
-    install_dir: libdir
-  )
+  static_lib_name = 'libdcv_color_primitives.a'
 endif
+
+install_data(
+  dcp_lib_path / static_lib_name,
+  install_dir: libdir
+)
 
 thread_dep = dependency('threads')
 dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
@@ -111,3 +110,11 @@ userenv_dep = cc.find_library('userenv', required: is_win)
 
 subdir('include')
 subdir('c_tests')
+
+# Generate pc file
+pkgg = import('pkgconfig')
+
+pkgg.generate(libraries: static_lib_name,
+              name: meson.project_name(),
+              subdirs: meson.project_name(),
+              description: 'DCV Color Primitives is a library to perform image color model conversion.')
