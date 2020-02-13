@@ -26,7 +26,7 @@ use core::arch::x86::{
     _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
     _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
     _mm_unpacklo_epi64, _mm_unpacklo_epi8, _mm_and_si128, _mm_slli_si128, _mm_shufflehi_epi16,
-    _mm_shufflelo_epi16
+    _mm_shufflelo_epi16, _mm_andnot_si128
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -38,7 +38,7 @@ use core::arch::x86_64::{
     _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
     _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
     _mm_unpacklo_epi64, _mm_unpacklo_epi8, _mm_and_si128, _mm_slli_si128, _mm_shufflehi_epi16,
-    _mm_shufflelo_epi16
+    _mm_shufflelo_epi16, _mm_andnot_si128
 };
 
 const LANE_COUNT: usize = 16;
@@ -221,6 +221,30 @@ unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i,
     };
 
     (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+}
+
+#[inline(always)]
+unsafe fn rgb_to_bgra_lane_conversion(input: __m128i, output_buffer: *mut __m128i) {
+    let alpha_mask = _mm_set_epi32(0xff, 0xff, 0xff, 0xff);
+
+    // we have b3g3r3-- b2g2r2-- b1g1r1-- b0g0r0--
+    let aligned_line = _mm_unpacklo_epi64(
+        _mm_unpacklo_epi32(_mm_slli_si128(input, 1), _mm_srli_si128(input, 2)),
+        _mm_unpacklo_epi32(_mm_srli_si128(input, 5), _mm_srli_si128(input, 8)),
+    );
+
+    let res = _mm_or_si128(aligned_line, alpha_mask);
+
+    // Byte swap 128 bit
+    let shr = _mm_srli_epi16(res, 8);
+    let shl = _mm_slli_epi16(res, 8);
+    let ored = _mm_or_si128(shl, shr);
+    let pshuf32 = _mm_shuffle_epi32(ored, 0x4e);
+    let pshufl16 = _mm_shufflelo_epi16(pshuf32, 0x1b);
+    let pshufh16 = _mm_shufflehi_epi16(pshufl16, 0x1b);
+
+    let res = _mm_shuffle_epi32(pshufh16, 0x1b);
+    _mm_storeu_si128(output_buffer, res);
 }
 
 /// Truncate int to uchar (4-wide)
@@ -1559,27 +1583,7 @@ unsafe fn rgb_to_bgra_sse2 (
         return false;
     }
 
-    const FIRST_MASK: [u8; 16] = [
-        0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-    ];
-    const SECOND_MASK: [u8; 16] = [
-        0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-    ];
-    const THIRD_MASK: [u8; 16] = [
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
-        0x00,
-    ];
-    const FOURTH_MASK: [u8; 16] = [
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-        0xff,
-    ];
-    const ALPHAS_MASK: [u8; 16] = [
-        0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00,
-        0x00,
-    ];
-    const ITEMS_PER_ITERATION: usize = 4;
+    const ITEMS_PER_ITERATION: usize = 16;
     const OUTPUT_BPP: usize = 4;
     const INPUT_BPP: usize = 3;
 
@@ -1595,11 +1599,8 @@ unsafe fn rgb_to_bgra_sse2 (
         src_strides[0] - (INPUT_BPP * w)
     };
 
-    let mask_pixel_1 = _mm_loadu_si128(FIRST_MASK.as_ptr() as *const __m128i);
-    let mask_pixel_2 = _mm_loadu_si128(SECOND_MASK.as_ptr() as *const __m128i);
-    let mask_pixel_3 = _mm_loadu_si128(THIRD_MASK.as_ptr() as *const __m128i);
-    let mask_pixel_4 = _mm_loadu_si128(FOURTH_MASK.as_ptr() as *const __m128i);
-    let mask_alphas = _mm_loadu_si128(ALPHAS_MASK.as_ptr() as *const __m128i);
+    let first_pixel_mask = _mm_set_epi32(0, 0, 0, -1);
+    let first_two_pixels_mask = _mm_set_epi32(0, 0, -1, -1);
     let output_buffer = dst_buffers[0].as_mut_ptr();
     let input_buffer = src_buffers[0].as_ptr();
     let mut ibuffer_offset = 0;
@@ -1607,28 +1608,46 @@ unsafe fn rgb_to_bgra_sse2 (
 
     for _ in 0..height {
         for _ in (0..width).step_by(ITEMS_PER_ITERATION) {
-            let input = _mm_loadu_si128(input_buffer.add(ibuffer_offset) as *const __m128i);
+            let input0 = _mm_loadu_si128(input_buffer.add(ibuffer_offset) as *const __m128i);
+            let input1 =
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + 16) as *const __m128i);
+            let input2 =
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + 32) as *const __m128i);
 
-            let pixel1 = _mm_and_si128(_mm_slli_si128(input, 1), mask_pixel_1);
-            let pixel2 = _mm_and_si128(_mm_slli_si128(input, 2), mask_pixel_2);
-            let pixel3 = _mm_and_si128(_mm_slli_si128(input, 3), mask_pixel_3);
-            let pixel4 = _mm_and_si128(_mm_slli_si128(input, 4), mask_pixel_4);
-
-            let masked = _mm_or_si128(
-                _mm_or_si128(_mm_or_si128(_mm_or_si128(pixel1, pixel2), pixel3), pixel4),
-                mask_alphas,
+            rgb_to_bgra_lane_conversion(
+                input0,
+                output_buffer.add(obuffer_offset) as *mut __m128i,
             );
 
-            // Byte swap 128 bit
-            let shr = _mm_srli_epi16(masked, 8);
-            let shl = _mm_slli_epi16(masked, 8);
-            let ored = _mm_or_si128(shl, shr);
-            let pshuf32 = _mm_shuffle_epi32(ored, 0x4e);
-            let pshufl16 = _mm_shufflelo_epi16(pshuf32, 0x1b);
-            let pshufh16 = _mm_shufflehi_epi16(pshufl16, 0x1b);
+            // second iteration is with input0,input1
+            // we should merge last 4 bytes of input0 with first 8 bytes of input1
+            let last4 = _mm_shuffle_epi32(input0, mm_shuffle(0, 0, 0, 3));
+            let first8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 1, 0, 0));
+            let input =
+                _mm_or_si128(_mm_and_si128(last4, first_pixel_mask), _mm_andnot_si128(first_pixel_mask, first8));
 
-            let res = _mm_shuffle_epi32(pshufh16, 0x1b);
-            _mm_storeu_si128(output_buffer.add(obuffer_offset) as *mut __m128i, res);
+            rgb_to_bgra_lane_conversion(
+                input,
+                output_buffer.add(obuffer_offset + 16) as *mut __m128i,
+            );
+
+            // third iteration is with input1,input2
+            // we should merge last 8 bytes of input1 with first 4 bytes of input2
+            let last8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 0, 3, 2));
+            let first8 = _mm_shuffle_epi32(input2, mm_shuffle(1, 0, 0, 0));
+            let input =
+                _mm_or_si128(_mm_and_si128(last8, first_two_pixels_mask), _mm_andnot_si128(first_two_pixels_mask, first8));
+
+            rgb_to_bgra_lane_conversion(
+                input,
+                output_buffer.add(obuffer_offset + 32) as *mut __m128i,
+            );
+
+            // fourth iteration is with input2
+            rgb_to_bgra_lane_conversion(
+                _mm_shuffle_epi32(input2, mm_shuffle(0, 3, 2, 1)),
+                output_buffer.add(obuffer_offset + 48) as *mut __m128i,
+            );
 
             ibuffer_offset += ITEMS_PER_ITERATION * INPUT_BPP;
             obuffer_offset += ITEMS_PER_ITERATION * OUTPUT_BPP;
