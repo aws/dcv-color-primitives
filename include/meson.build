@@ -3,3 +3,5 @@ headers = [
 ]
 
 install_headers(headers, subdir: meson.project_name())
+
+dcp_inc = include_directories('.')
