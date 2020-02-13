@@ -9,6 +9,9 @@ host_system = host_machine.system()
 arch = host_machine.cpu_family()
 is_win = host_system == 'windows'
 
+prefix = get_option('prefix')
+libdir = prefix / get_option('libdir')
+
 # Compiler flags
 if cc.get_id() == 'msvc'
   # Make MSVC more pedantic, this is a recommended pragma list
@@ -87,6 +90,18 @@ endif
 run_command('cargo', cargo_target)
 
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
+
+if is_win
+  install_data(
+    dcp_lib_path / 'dcv_color_primitives.lib',
+    install_dir: libdir
+  )
+else
+  install_data(
+    dcp_lib_path / 'libdcv_color_primitives.a',
+    install_dir: libdir
+  )
+endif
 
 thread_dep = dependency('threads')
 dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
