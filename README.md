@@ -401,12 +401,14 @@ See documentation for further information.
 DCV Color Primitives provides C bindings. A static library will be automatically generated for the 
 default build.
 
-API is slighter different than rust one. Check dcv_color_primitives.h for examples and further information.
+The API is slightly different than the rust one. Check dcv_color_primitives.h for examples and further information.
 
-There are also some unit tests written in C, to add some coverage also for the bindings. If you
-want to build those, you need meson build system.
+A meson build system is provided in order to build the static library and install it together
+with include file and a pkgconfig file. There are also some unit tests written in C,
+to add some coverage also for the bindings. Minimal instructions are provided below, refer to meson's
+help for further instructions:
 
-* **Windows**  
+* **Windows**
   Visual Studio is required. At least the following packages are required:
   * MSBuild
   * MSVC - C++ build tools
@@ -424,7 +426,8 @@ want to build those, you need meson build system.
      ```
 
   All build commands have to be issued from Native Tools Command Prompt for VS (x86 or x64 depending on what platform you want to build)
-* **Linux**  
+
+* **Linux**
   The following example is for Ubuntu:
 
   ```
@@ -439,7 +442,8 @@ want to build those, you need meson build system.
   ```
 
   You may require administrative privileges.
-* **Build and run**  
+
+* **Build**
   Move inside the library root directory:
   ```
   cd `dcv_color_primitives_root_dir`
@@ -447,13 +451,23 @@ want to build those, you need meson build system.
 
   Then:
   ```
-  meson --buildtype release c_bindings_test
-  cd c_bindings_test
+  meson --buildtype release builddir
+  ninja -C builddir
+  ```
+
+* **Run the tests**
+  ```
+  cd builddir
   meson test -t 10
   ```
 
   A timeout scale factor of 10 is required because some tests take longer than default
   30 seconds to complete.
+
+* **Install**
+  ```
+  ninja -C builddir install
+  ```
 
 ## License
 
