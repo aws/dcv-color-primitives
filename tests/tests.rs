@@ -1582,7 +1582,7 @@ fn over_4gb() {
 fn rgb_bgra_ok() {
     bootstrap();
 
-    const MAX_WIDTH: usize = 32;
+    const MAX_WIDTH: usize = 64;
     const MAX_HEIGHT: usize = 8;
     const MAX_FILL_BYTES: usize = 2;
     const SRC_BPP: usize = 3;

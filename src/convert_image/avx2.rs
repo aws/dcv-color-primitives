@@ -26,7 +26,8 @@ use core::arch::x86::{
     _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
     _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
     _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8,
+    _mm_prefetch, _MM_HINT_NTA
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -39,7 +40,8 @@ use core::arch::x86_64::{
     _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
     _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16,
     _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64,
-    _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8
+    _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8,
+    _mm_prefetch, _MM_HINT_NTA
 };
 
 const LANE_COUNT: usize = 32;
@@ -909,7 +911,7 @@ unsafe fn rgb_to_bgra_avx2(
         -1, 11, 10, 9, -1,
     ];
 
-    const ITEMS_PER_ITERATION: usize = 8;
+    const ITEMS_PER_ITERATION: usize = 32;
     const OUTPUT_BPP: usize = 4;
     const INPUT_BPP: usize = 3;
 
@@ -933,14 +935,41 @@ unsafe fn rgb_to_bgra_avx2(
     let mut obuffer_offset = 0;
 
     for _ in 0..height {
+        _mm_prefetch(input_buffer as *const i8, _MM_HINT_NTA);
+
         for _ in (0..width).step_by(ITEMS_PER_ITERATION) {
             let input = _mm256_loadu2_m128i(
                 input_buffer.add(ibuffer_offset + 12) as *const __m128i,
                 input_buffer.add(ibuffer_offset) as *const __m128i,
             );
 
+            let input1 = _mm256_loadu2_m128i(
+                input_buffer.add(ibuffer_offset + 24 + 12) as *const __m128i,
+                input_buffer.add(ibuffer_offset + 24) as *const __m128i,
+            );
+
+            let input2 = _mm256_loadu2_m128i(
+                input_buffer.add(ibuffer_offset + 48 + 12) as *const __m128i,
+                input_buffer.add(ibuffer_offset + 48) as *const __m128i,
+            );
+
+            let input3 = _mm256_loadu2_m128i(
+                input_buffer.add(ibuffer_offset + 72 + 12 - 4) as *const __m128i,
+                input_buffer.add(ibuffer_offset + 72) as *const __m128i,
+            );
+
+            let input3 =
+                _mm256_permutevar8x32_epi32(input3, _mm256_set_epi32(4, 7, 6, 5, 3, 2, 1, 0));
+
             let res = _mm256_or_si256(_mm256_shuffle_epi8(input, mask_shuffle), mask_alphas);
+            let res1 = _mm256_or_si256(_mm256_shuffle_epi8(input1, mask_shuffle), mask_alphas);
+            let res2 = _mm256_or_si256(_mm256_shuffle_epi8(input2, mask_shuffle), mask_alphas);
+            let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, mask_shuffle), mask_alphas);
+
             _mm256_storeu_si256(output_buffer.add(obuffer_offset) as *mut __m256i, res);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 32) as *mut __m256i, res1);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 64) as *mut __m256i, res2);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 96) as *mut __m256i, res3);
 
             ibuffer_offset += ITEMS_PER_ITERATION * INPUT_BPP;
             obuffer_offset += ITEMS_PER_ITERATION * OUTPUT_BPP;

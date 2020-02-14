@@ -1623,8 +1623,10 @@ unsafe fn rgb_to_bgra_sse2 (
             // we should merge last 4 bytes of input0 with first 8 bytes of input1
             let last4 = _mm_shuffle_epi32(input0, mm_shuffle(0, 0, 0, 3));
             let first8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 1, 0, 0));
-            let input =
-                _mm_or_si128(_mm_and_si128(last4, first_pixel_mask), _mm_andnot_si128(first_pixel_mask, first8));
+            let input = _mm_or_si128(
+                _mm_and_si128(last4, first_pixel_mask),
+                _mm_andnot_si128(first_pixel_mask, first8),
+            );
 
             rgb_to_bgra_lane_conversion(
                 input,
@@ -1635,8 +1637,10 @@ unsafe fn rgb_to_bgra_sse2 (
             // we should merge last 8 bytes of input1 with first 4 bytes of input2
             let last8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 0, 3, 2));
             let first8 = _mm_shuffle_epi32(input2, mm_shuffle(1, 0, 0, 0));
-            let input =
-                _mm_or_si128(_mm_and_si128(last8, first_two_pixels_mask), _mm_andnot_si128(first_two_pixels_mask, first8));
+            let input = _mm_or_si128(
+                _mm_and_si128(last8, first_two_pixels_mask),
+                _mm_andnot_si128(first_two_pixels_mask, first8),
+            );
 
             rgb_to_bgra_lane_conversion(
                 input,
