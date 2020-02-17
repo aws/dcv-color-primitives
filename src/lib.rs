@@ -406,6 +406,12 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt709, bgra_lrgb_nv12_bt709);
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601, bgr_lrgb_nv12_bt601);
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709, bgr_lrgb_nv12_bt709);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt601, argb_lrgb_i420_bt601);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt709, argb_lrgb_i420_bt709);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt601, bgra_lrgb_i420_bt601);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709, bgra_lrgb_i420_bt709);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601, bgr_lrgb_i420_bt601);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709, bgr_lrgb_i420_bt709);
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb, nv12_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb, nv12_bt709_bgra_lrgb);
         set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);

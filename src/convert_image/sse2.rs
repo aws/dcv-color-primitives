@@ -1361,3 +1361,135 @@ pub fn i444_bt709_bgra_lrgb(
         )
     }
 }
+
+pub fn argb_lrgb_i420_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::argb_lrgb_i420_bt601(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn argb_lrgb_i420_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::argb_lrgb_i420_bt709(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn bgra_lrgb_i420_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::bgra_lrgb_i420_bt601(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn bgra_lrgb_i420_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::bgra_lrgb_i420_bt709(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn bgr_lrgb_i420_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::bgr_lrgb_i420_bt601(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn bgr_lrgb_i420_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::bgr_lrgb_i420_bt709(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
+}
