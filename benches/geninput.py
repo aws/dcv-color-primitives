@@ -83,7 +83,8 @@ if __name__ == '__main__':
     # write decode input test source
     decode_input_nv12 = join(root_dir, 'input.nv12')
     decode_input_i420 = join(root_dir, 'input.i420')
-    if not exists(decode_input_nv12) or not exists(decode_input_i420):
+    decode_input_i444 = join(root_dir, 'input.i444')
+    if not exists(decode_input_nv12) or not exists(decode_input_i420) or not exists(decode_input_i444):
         frac_kr = frac(int(kr * 10000), 10000)
         frac_kg = frac(int(kg * 10000), 10000)
         frac_kb = frac(int(kb * 10000), 10000)
@@ -155,3 +156,41 @@ if __name__ == '__main__':
             Y.tofile(fn)
             Cb.tofile(fn)
             Cr.tofile(fn)
+
+        # i444
+        Y = array('B', [Y_MIN] * (ATLAS_WIDTH * height))
+        Cb = array('B', [C_HALF] * (ATLAS_WIDTH * height))
+        Cr = array('B', [C_HALF] * (ATLAS_WIDTH * height))
+        i = 0
+
+        # half because y has to be repeated
+        for samples in chunks(sample_list, ATLAS_WIDTH // 2):
+            for (y, cb, cr) in samples:
+                y += Y_MIN
+                cb += C_HALF
+                cr += C_HALF
+
+                Y[i] = y
+                Y[i + 1] = y
+                Y[ATLAS_WIDTH + i] = y
+                Y[ATLAS_WIDTH + i + 1] = y
+
+                Cb[i] = cb
+                Cb[i + 1] = cb
+                Cb[ATLAS_WIDTH + i] = cb
+                Cb[ATLAS_WIDTH + i + 1] = cb
+
+                Cr[i] = cr
+                Cr[i + 1] = cr
+                Cr[ATLAS_WIDTH + i] = cr
+                Cr[ATLAS_WIDTH + i + 1] = cr
+
+                i += 2
+            i += ATLAS_WIDTH
+
+        with open(decode_input_i444, 'wb') as fn:
+            fn.write(('P5\n%d %d\n255\n' % (ATLAS_WIDTH, height * 3)).encode('utf-8'))
+            Y.tofile(fn)
+            Cb.tofile(fn)
+            Cr.tofile(fn)
+

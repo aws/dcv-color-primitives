@@ -23,6 +23,7 @@ The library is currenty able to convert the following pixel formats:
 | BGR                  | NV12                       |
 | BGRA                 | NV12                       |
 | I420                 | BGRA                       |
+| I444                 | BGRA                       |
 | NV12                 | BGRA                       |
 | RGB                  | BGRA                       |
 

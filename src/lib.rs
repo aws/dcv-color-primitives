@@ -30,6 +30,7 @@
 //! | BGR                  | NV12                       |
 //! | BGRA                 | NV12                       |
 //! | I420                 | BGRA                       |
+//! | I444                 | BGRA                       |
 //! | NV12                 | BGRA                       |
 //! | RGB                  | BGRA                       |
 //!
@@ -360,7 +361,7 @@ impl error::Error for ErrorKind {
 /// PixelFormat::Bgr  | 4:4:4       |     |     | 1       | bgr:3  |        |
 /// PixelFormat::Rgba | 4:4:4       |     |     | 1       | rgba:4 |        |
 /// PixelFormat::Rgb  | 4:4:4       |     |     | 1       | rgb:3  |        |
-/// PixelFormat::I444 | 4:4:4       |     |     | 1, 3    | y:1    | u:1    | v:1
+/// PixelFormat::I444 | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
 /// PixelFormat::I422 | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
 /// PixelFormat::I420 | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
 /// PixelFormat::Nv12 | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
@@ -410,6 +411,8 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);
         set_dispatcher!($conv, $set, I420, Bt601, Bgra, Lrgb, i420_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, I420, Bt709, Bgra, Lrgb, i420_bt709_bgra_lrgb);
+        set_dispatcher!($conv, $set, I444, Bt601, Bgra, Lrgb, i444_bt601_bgra_lrgb);
+        set_dispatcher!($conv, $set, I444, Bt709, Bgra, Lrgb, i444_bt709_bgra_lrgb);
     };
 }
 
@@ -694,9 +697,10 @@ pub fn get_buffers_size(
 ///   PixelFormat::Argb             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
+///   PixelFormat::I420             | PixelFormat::Bgra [`2`]
+///   PixelFormat::I444             | PixelFormat::Bgra [`2`]
 ///   PixelFormat::Nv12             | PixelFormat::Bgra [`2`]
 ///   PixelFormat::Rgb              | PixelFormat::Bgra [`3`]
-///   PixelFormat::I420             | PixelFormat::Bgra [`2`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
 ///   source image format number of planes

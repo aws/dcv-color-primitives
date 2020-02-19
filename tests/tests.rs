@@ -11,8 +11,8 @@ use std::slice::*;
 
 use dcp::*;
 use dcv_color_primitives as dcp;
-use rand::random;
 use itertools::iproduct;
+use rand::random;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -483,6 +483,7 @@ fn yuv_to_rgb_size_format_mode_stride(
     let luma_stride = w + luma_fill_bytes;
     let chroma_height = match format {
         PixelFormat::Nv12 | PixelFormat::I420 => h / 2,
+        PixelFormat::I444 => h,
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -491,6 +492,7 @@ fn yuv_to_rgb_size_format_mode_stride(
     let u_chroma_stride = match format {
         PixelFormat::Nv12 => w + u_chroma_fill_bytes,
         PixelFormat::I420 => (w / 2) + u_chroma_fill_bytes,
+        PixelFormat::I444 => w + u_chroma_fill_bytes,
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -499,23 +501,23 @@ fn yuv_to_rgb_size_format_mode_stride(
     let v_chroma_stride = match format {
         PixelFormat::Nv12 => u_chroma_stride,
         PixelFormat::I420 => (w / 2) + v_chroma_fill_bytes,
+        PixelFormat::I444 => w + v_chroma_fill_bytes,
         _ => {
             panic!("Unsupported pixel format");
         }
     };
 
     let in_size = match format {
-        PixelFormat::I420 => {
-            (luma_stride * h)
+        PixelFormat::I444 | PixelFormat::I420 => {
+            ((luma_stride * h)
                 + (u_chroma_stride * chroma_height)
-                + (v_chroma_stride * chroma_height)
+                + (v_chroma_stride * chroma_height))
         }
-        _ => (luma_stride * h) + (u_chroma_stride * chroma_height),
+        PixelFormat::Nv12 => ((luma_stride * h) + (u_chroma_stride * chroma_height)),
+        _ => (0),
     };
-
     let dst_stride = (w * 4) + dst_fill_bytes;
     let out_size = dst_stride * h;
-
     let color_space_index: usize = match color_space {
         ColorSpace::Bt601 => 0,
         _ => 1,
@@ -593,6 +595,27 @@ fn yuv_to_rgb_size_format_mode_stride(
                 }
             }
         }
+        PixelFormat::I444 => {
+            let (u_chroma_input, v_chroma_input) =
+                test_input[(luma_stride * h)..].split_at_mut(u_chroma_stride * chroma_height);
+
+            for (u_chroma_line, v_chroma_line) in u_chroma_input
+                .chunks_exact_mut(u_chroma_stride)
+                .zip(v_chroma_input.chunks_exact_mut(v_chroma_stride))
+            {
+                let (u_data, _) = u_chroma_line.split_at_mut(u_chroma_stride - u_chroma_fill_bytes);
+                let (v_data, _) = v_chroma_line.split_at_mut(v_chroma_stride - v_chroma_fill_bytes);
+
+                let mut x = 0;
+                for (u_pixel, v_pixel) in u_data.iter_mut().zip(v_data.iter_mut()) {
+                    let index = (x >> 1) & 0x7;
+
+                    *u_pixel = CB_TO_RGB_INPUT[color_space_index][index];
+                    *v_pixel = CR_TO_RGB_INPUT[color_space_index][index];
+                    x += 1;
+                }
+            }
+        }
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -633,7 +656,7 @@ fn yuv_to_rgb_size_format_mode_stride(
                 src_buffers.push(last);
             }
         }
-        PixelFormat::I420 => {
+        PixelFormat::I420 | PixelFormat::I444 => {
             if num_planes == 3 {
                 let y_size = luma_stride * h;
                 let u_size = u_chroma_stride * chroma_height;
@@ -712,7 +735,7 @@ fn yuv_to_rgb_size_format_mode(
     color_space: ColorSpace,
     format: PixelFormat,
 ) {
-    const MAX_FILL_BYTES: usize = 1;
+    const MAX_FILL_BYTES: usize = 4;
 
     if num_planes == 1 {
         for (luma_stride, dst_stride) in iproduct!(0..MAX_FILL_BYTES, 0..MAX_FILL_BYTES) {
@@ -814,6 +837,13 @@ fn nv12_to_rgb_ok() {
 
     yuv_to_rgb_ok(PixelFormat::Nv12, 1);
     yuv_to_rgb_ok(PixelFormat::Nv12, 2);
+}
+
+#[test]
+fn i444_to_rgb_ok() {
+    bootstrap();
+
+    yuv_to_rgb_ok(PixelFormat::I444, 3);
 }
 
 #[test]
