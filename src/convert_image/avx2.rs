@@ -1482,7 +1482,7 @@ pub fn argb_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::argb_lrgb_i420_bt601(
+    sse2::argb_lrgb_i420_bt601(
         width,
         height,
         last_src_plane,
@@ -1504,7 +1504,7 @@ pub fn argb_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::argb_lrgb_i420_bt709(
+    sse2::argb_lrgb_i420_bt709(
         width,
         height,
         last_src_plane,
@@ -1526,7 +1526,7 @@ pub fn bgra_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::bgra_lrgb_i420_bt601(
+    sse2::bgra_lrgb_i420_bt601(
         width,
         height,
         last_src_plane,
@@ -1548,7 +1548,7 @@ pub fn bgra_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::bgra_lrgb_i420_bt709(
+    sse2::bgra_lrgb_i420_bt709(
         width,
         height,
         last_src_plane,
@@ -1570,7 +1570,7 @@ pub fn bgr_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::bgr_lrgb_i420_bt601(
+    sse2::bgr_lrgb_i420_bt601(
         width,
         height,
         last_src_plane,
@@ -1592,7 +1592,7 @@ pub fn bgr_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::bgr_lrgb_i420_bt709(
+    sse2::bgr_lrgb_i420_bt709(
         width,
         height,
         last_src_plane,
