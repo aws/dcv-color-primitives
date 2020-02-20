@@ -19,8 +19,11 @@ The library is currenty able to convert the following pixel formats:
 
 | Source pixel format  | Destination pixel formats  |
 | -------------------- | -------------------------- |
+| ARGB                 | I420                       |
 | ARGB                 | NV12                       |
+| BGR                  | I420                       |
 | BGR                  | NV12                       |
+| BGRA                 | I420                       |
 | BGRA                 | NV12                       |
 | I420                 | BGRA                       |
 | I444                 | BGRA                       |

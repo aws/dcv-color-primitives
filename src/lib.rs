@@ -26,8 +26,11 @@
 //!
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
+//! | ARGB                 | I420                       |
 //! | ARGB                 | NV12                       |
+//! | BGR                  | I420                       |
 //! | BGR                  | NV12                       |
+//! | BGRA                 | I420                       |
 //! | BGRA                 | NV12                       |
 //! | I420                 | BGRA                       |
 //! | I444                 | BGRA                       |
@@ -700,8 +703,11 @@ pub fn get_buffers_size(
 ///
 ///   Source image pixel format     | Supported destination image pixel formats
 ///   ------------------------------|------------------------------------------
+///   PixelFormat::Argb             | PixelFormat::I420 [`1`]
 ///   PixelFormat::Argb             | PixelFormat::Nv12 [`1`]
+///   PixelFormat::Bgra             | PixelFormat::I420 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
+///   PixelFormat::Bgr              | PixelFormat::I420 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::I420             | PixelFormat::Bgra [`2`]
 ///   PixelFormat::I444             | PixelFormat::Bgra [`2`]
