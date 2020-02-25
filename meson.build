@@ -108,6 +108,19 @@ libdl_dep = cc.find_library('dl', required: is_win == false)
 ws2_32_dep = cc.find_library('ws2_32', required: is_win)
 userenv_dep = cc.find_library('userenv', required: is_win)
 
+clock_gettime_test_code = '''
+  #include <time.h>
+  struct timespec t;
+  int main (int argc, char ** argv) {
+    return clock_gettime(CLOCK_REALTIME, &t);
+  }'''
+librt_dep = []
+if cc.links(clock_gettime_test_code, name : 'clock_gettime')
+  # nothing to link to
+elif cc.links(clock_gettime_test_code, args : '-lrt', name : 'clock_gettime in librt')
+  librt_dep = cc.find_library('rt')
+endif
+
 subdir('include')
 subdir('c_tests')
 
