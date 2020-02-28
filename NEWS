@@ -1,3 +1,10 @@
+News in 0.1.4
+--------------
+* Meson fixes
+ - Support debugoptimized
+ - Link to librt in old systems
+ - Support full path for pkgconfig
+
 News in 0.1.3
 --------------
 * Added i444 to bgra conversion
