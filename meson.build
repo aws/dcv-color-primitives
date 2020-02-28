@@ -1,7 +1,8 @@
 project(
   'dcv-color-primitives', 'c',
   license : 'MIT-0',
-  version : run_command('build-aux' / 'getversion.py').stdout().strip()
+  version : run_command('build-aux' / 'getversion.py').stdout().strip(),
+  meson_version: '>= 0.52.0'
 )
 
 cc = meson.get_compiler('c')
