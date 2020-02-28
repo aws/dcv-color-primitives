@@ -133,7 +133,7 @@ subdir('c_tests')
 # Generate pc file
 pkgg = import('pkgconfig')
 
-pkgg.generate(libraries: static_lib_name,
+pkgg.generate(libraries: '${libdir}' / static_lib_name,
               name: meson.project_name(),
               subdirs: meson.project_name(),
               description: 'DCV Color Primitives is a library to perform image color model conversion.')
