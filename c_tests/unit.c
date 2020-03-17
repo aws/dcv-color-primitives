@@ -30,7 +30,7 @@ typedef struct {
     DcpErrorKind error;
 } DcpStatus;
 
-DcpStatus dcp_status()
+static DcpStatus dcp_status(void)
 {
     DcpStatus result = {
        DCP_RESULT_OK,
