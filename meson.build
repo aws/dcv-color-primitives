@@ -80,21 +80,18 @@ common_cflags = cc.get_supported_arguments(test_cflags)
 
 message('Building DCV Color Primitives')
 
-cargo_env = {}
-
 if get_option('buildtype') == 'release'
   dcp_build_dir = 'release'
   cargo_target = ['build', '--release', ]
 elif get_option('buildtype') == 'debugoptimized'
   dcp_build_dir = 'release'
   cargo_target = ['build', '--release', ]
-  cargo_env = { 'RUSTFLAGS': '-g' }
 else
   dcp_build_dir = 'debug'
   cargo_target = ['build', ]
 endif
 
-run_command('cargo', cargo_target, env: cargo_env)
+run_command('cargo', cargo_target)
 
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
 
