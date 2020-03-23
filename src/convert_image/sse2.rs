@@ -18,9 +18,26 @@ use crate::convert_image::common::*;
 use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
-use core::arch::x86::*;
+use core::arch::x86::{
+    __m128i, _mm_add_epi16, _mm_add_epi32, _mm_cmpeq_epi32, _mm_cvtsi128_si32, _mm_loadl_epi64,
+    _mm_loadu_si128, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
+    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
+    _mm_setzero_si128, _mm_shuffle_epi32, _mm_slli_epi16, _mm_slli_epi32, _mm_srai_epi16,
+    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
+    _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
+    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+};
+
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m128i, _mm_add_epi16, _mm_add_epi32, _mm_cmpeq_epi32, _mm_cvtsi128_si32, _mm_loadl_epi64,
+    _mm_loadu_si128, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
+    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
+    _mm_setzero_si128, _mm_shuffle_epi32, _mm_slli_epi16, _mm_slli_epi32, _mm_srai_epi16,
+    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
+    _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
+    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+};
 
 const LANE_COUNT: usize = 16;
 const LRGB_TO_YUV_WG_SIZE: usize = 4;

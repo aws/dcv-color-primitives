@@ -19,9 +19,29 @@ use crate::convert_image::sse2;
 use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
-use core::arch::x86::*;
+use core::arch::x86::{
+    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_loadu2_m128i,
+    _mm256_loadu_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32,
+    _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permutevar8x32_epi32, _mm256_set1_epi16,
+    _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setzero_si256,
+    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
+    _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
+    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128,
+};
+
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::*;
+use core::arch::x86_64::{
+    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
+    _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
+    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
+    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setzero_si256, _mm256_slli_epi16,
+    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
+    _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16,
+    _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64,
+    _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128,
+};
 
 const LANE_COUNT: usize = 32;
 const LRGB_TO_YUV_WG_SIZE: usize = 4;

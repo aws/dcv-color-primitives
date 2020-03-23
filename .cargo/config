@@ -1,2 +1,2 @@
 [build]
-rustflags = ["-C", "target-cpu=native", "-g"]
+rustflags = ["-C", "target-feature=+sse2,+avx,+avx2", "-g"]
