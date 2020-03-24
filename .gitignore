@@ -8,3 +8,4 @@ target
 __pycache__
 /benches/input.*
 /output.*
+/.cargo*
