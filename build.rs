@@ -39,15 +39,13 @@ fn main() {
     // This build script generates the cargo build config file (.cargo/config)
     // The rust flags are set in order to avoid generating illegal instructions
     // on the machine on which the build is triggered.
-    let mut target_features: Vec<&str> = Vec::new();
-
     let features = &mut [0u32; 4];
     cpuid(0, features);
 
     if features[0] != 0 {
         cpuid(1, features);
         if (features[3] & (1 << 26)) != 0 {
-            target_features.push("+sse2");
+            println!("cargo:rustc-cfg=target_feature=\"sse2\"");
 
             // AVX is supported if all the following conditions hold:
             // - OS uses XSAVE/XRSTOR
@@ -62,29 +60,13 @@ fn main() {
                 };
 
             if (xcr_feature_mask & 0x6) == 0x6 {
-                target_features.push("+avx");
+                println!("cargo:rustc-cfg=target_feature=\"avx\"");
 
                 cpuid(7, features);
                 if (features[1] & (1 << 5)) != 0 {
-                    target_features.push("+avx2");
+                    println!("cargo:rustc-cfg=target_feature=\"avx2\"");
                 }
             }
         }
     }
-
-    let mut rust_flags = vec!["\"-g\"".to_string()];
-    if !target_features.is_empty() {
-        rust_flags.push("\"-C\"".to_string());
-        rust_flags.push(format!("\"target-feature={}\"", target_features.join(",")));
-    }
-
-    let build_flags = format!("[build]\nrustflags = [{}]\n", rust_flags.join(","));
-
-    let out_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
-    let dest_folder = Path::new(&out_dir).join(".cargo");
-    let dest_file = dest_folder.join("config");
-
-    // We want to abort build if configuration file is not generated properly, so the unwrap()
-    fs::create_dir_all(dest_folder).unwrap();
-    fs::write(&dest_file, build_flags).unwrap()
 }
