@@ -153,7 +153,11 @@ unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
 unsafe fn unpack_ui8_i16be_16x(image: *const u8) -> __m256i {
     let x = _mm_loadu_si128(image as *const __m128i);
     let xx = _mm256_set_m128i(x, x);
-    _mm256_unpacklo_epi8(zero!(), xx)
+
+    let hi = _mm256_unpackhi_epi8(zero!(), xx);
+    let lo = _mm256_unpacklo_epi8(zero!(), xx);
+
+    _mm256_permute2x128_si256(lo, hi, PACK_LO_DQWORD_2X256)
 }
 
 /// Deinterleave 2 uchar samples into short samples,
