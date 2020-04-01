@@ -1,3 +1,7 @@
+News in 0.1.8
+--------------
+* Fix chroma unpacking for i420_lrgb avx2 conversion
+
 News in 0.1.7
 --------------
 * Fix suboptimal performance due to a regression in 0.1.6
