@@ -87,9 +87,11 @@ pub const BN_709: i32 = 18465;
 pub const Y_MIN: i32 = 16;
 pub const C_HALF: i32 = 128;
 pub const FIX16_Y_MIN: i32 = u8_to_fix(Y_MIN, FIX16);
+pub const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
 pub const FIX18_C_HALF: i32 = u8_to_fix(C_HALF, FIX18);
 pub const Y_OFFSET: i32 = FIX16_Y_MIN + FIX16_HALF;
 pub const C_OFFSET: i32 = FIX18_C_HALF + FIX18_HALF;
+pub const C_OFFSET16: i32 = FIX16_C_HALF + FIX16_HALF;
 pub const DEFAULT_ALPHA: u8 = 255;
 
 #[derive(Copy, Clone)]

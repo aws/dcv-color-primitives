@@ -429,6 +429,127 @@ fn lrgb_to_i420(
 }
 
 #[inline(always)]
+fn lrgb_to_i444(
+    width: u32,
+    height: u32,
+    _last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+    sampler: Sampler,
+) -> bool {
+    if last_dst_plane != 2
+        || (last_dst_plane >= dst_strides.len())
+        || (last_dst_plane >= dst_buffers.len())
+        || src_strides.is_empty()
+        || src_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let depth = channels as usize;
+    let col_count = width as usize;
+    let line_count = height as usize;
+    let packed_rgb_stride = depth * col_count;
+
+    let rgb_stride = if src_strides[0] == 0 {
+        packed_rgb_stride
+    } else {
+        src_strides[0]
+    };
+
+    let y_stride = if dst_strides[0] == 0 {
+        col_count
+    } else {
+        dst_strides[0]
+    };
+
+    let u_stride = if dst_strides[1] == 0 {
+        col_count
+    } else {
+        dst_strides[1]
+    };
+
+    let v_stride = if dst_strides[2] == 0 {
+        col_count
+    } else {
+        dst_strides[2]
+    };
+
+    let rgb_plane = &src_buffers[0];
+    let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
+    let (u_plane, v_plane) = uv_plane.split_at_mut(1);
+
+    let y_plane = &mut y_plane[0][..];
+    let u_plane = &mut u_plane[0][..];
+    let v_plane = &mut v_plane[0][..];
+
+    if line_count == 0 {
+        return true;
+    }
+
+    let max_stride = usize::max_value() / line_count;
+    if (y_stride > max_stride)
+        || (u_stride > max_stride)
+        || (v_stride > max_stride)
+        || (rgb_stride > max_stride)
+    {
+        return false;
+    }
+
+    if y_stride * line_count > y_plane.len()
+        || u_stride * line_count > u_plane.len()
+        || v_stride * line_count > v_plane.len()
+        || rgb_stride * line_count > rgb_plane.len()
+    {
+        return false;
+    }
+
+    // The following constants will be automatically propagated as immediate values
+    // inside the operations by optimizing compilers.
+    let col = colorimetry as usize;
+    let xr = FORWARD_WEIGHTS[col][0];
+    let xg = FORWARD_WEIGHTS[col][1];
+    let xb = FORWARD_WEIGHTS[col][2];
+    let yr = FORWARD_WEIGHTS[col][3];
+    let yg = FORWARD_WEIGHTS[col][4];
+    let yb = FORWARD_WEIGHTS[col][5];
+    let zr = FORWARD_WEIGHTS[col][6];
+    let zg = FORWARD_WEIGHTS[col][7];
+    let zb = FORWARD_WEIGHTS[col][8];
+    unsafe {
+        let rgb_group = rgb_plane.as_ptr();
+        let y_group = y_plane.as_mut_ptr();
+        let u_group = u_plane.as_mut_ptr();
+        let v_group = v_plane.as_mut_ptr();
+
+        for y in 0..line_count {
+            for x in 0..col_count {
+                let (r, g, b) = unpack_ui8x3_i32(
+                    rgb_group.add(wg_index(x, y, depth, rgb_stride)),
+                    sampler,
+                );
+
+                let y_data = y_group.add(wg_index(x, y, 1, y_stride));
+                *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, Y_OFFSET), FIX16) as u8;
+
+                let u_data = u_group.add(wg_index(x, y, 1, u_stride));
+                *u_data = fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
+
+                let v_data = v_group.add(wg_index(x, y, 1, v_stride));
+                *v_data = fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
+            }
+        }
+    }
+
+    true
+}
+
+#[inline(always)]
 fn i444_to_lrgb(
     width: u32,
     height: u32,
@@ -1427,6 +1548,156 @@ pub fn bgr_lrgb_i420_bt709(
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
     lrgb_to_i420(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt709,
+        Sampler::Bgr,
+    )
+}
+
+pub fn argb_lrgb_i444_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601,
+        Sampler::Argb,
+    )
+}
+
+pub fn argb_lrgb_i444_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709,
+        Sampler::Argb,
+    )
+}
+
+pub fn bgra_lrgb_i444_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgra_lrgb_i444_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgr_lrgb_i444_bt601(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt601,
+        Sampler::Bgr,
+    )
+}
+
+pub fn bgr_lrgb_i444_bt709(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_to_i444(
         width,
         height,
         last_src_plane as usize,
