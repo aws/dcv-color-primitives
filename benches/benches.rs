@@ -194,7 +194,7 @@ fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     let h: usize = height as usize;
 
     // Allocate output
-    let dst_size: usize = 3 * (width as usize) * (height as usize) * 3;
+    let dst_size: usize = 3 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
 
     let input_data: &[&[u8]] = &[&input_buffer];
