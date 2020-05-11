@@ -310,10 +310,11 @@ unsafe fn lrgb_to_i420_4x(
     let srg = sum_i16x2_neighborhood_2x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_2x(bg0, bg1);
 
-    let fixed = fix_to_i32_4x!(affine_transform(srg, sbg, uv_weights), FIX18);
-
     // shuff: ******v1 ******v0 ******u1 ******u0
-    let shuff = _mm_shuffle_epi32(fixed, mm_shuffle(3, 1, 2, 0));
+    let shuff = _mm_shuffle_epi32(
+        fix_to_i32_4x!(affine_transform(srg, sbg, uv_weights), FIX18),
+        mm_shuffle(3, 1, 2, 0),
+    );
 
     // uv_res: v1v0u1u0
     let packed_to_32 = _mm_packs_epi32(shuff, shuff);

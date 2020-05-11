@@ -291,10 +291,6 @@ fn lrgb_to_i420(
     colorimetry: Colorimetry,
     sampler: Sampler,
 ) -> bool {
-    if width == 0 || height == 0 {
-        return true;
-    }
-
     if last_dst_plane != 2
         || (last_dst_plane >= dst_strides.len())
         || (last_dst_plane >= dst_buffers.len())

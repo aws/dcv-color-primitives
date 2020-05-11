@@ -329,9 +329,10 @@ unsafe fn lrgb_to_i420_8x(
     let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
 
-    let fixed = fix_to_i32_8x!(affine_transform(srg, sbg, uv_weights), FIX18);
-
-    let shuff = _mm256_permutevar8x32_epi32(fixed, _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0));
+    let shuff = _mm256_permutevar8x32_epi32(
+        fix_to_i32_8x!(affine_transform(srg, sbg, uv_weights), FIX18),
+        _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0),
+    );
 
     let packed_to_32 = _mm256_packs_epi32(shuff, shuff);
     let packed_to_16 = _mm256_packus_epi16(packed_to_32, packed_to_32);
@@ -629,7 +630,6 @@ fn lrgb_to_i420(
         ];
 
         let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-        // let nv12_depth = LRGB_TO_YUV_WAVES;
         let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
 
         let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
@@ -684,8 +684,18 @@ fn lrgb_to_i420(
                 rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
                 y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(wg_width, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(wg_width, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(wg_width, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
+                u_group.add(wg_index(
+                    wg_width,
+                    wg_height,
+                    LRGB_TO_YUV_WAVES / 2,
+                    u_stride,
+                )),
+                v_group.add(wg_index(
+                    wg_width,
+                    wg_height,
+                    LRGB_TO_YUV_WAVES / 2,
+                    v_stride,
+                )),
                 Sampler::BgrOverflow,
                 &y_weigths,
                 &uv_weights,
