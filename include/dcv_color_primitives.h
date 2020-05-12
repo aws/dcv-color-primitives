@@ -24,9 +24,9 @@
  *
  * | Source pixel format  | Destination pixel formats  |
  * | -------------------- | -------------------------- |
- * | ARGB                 | NV12                       |
- * | BGR                  | NV12                       |
- * | BGRA                 | NV12                       |
+ * | ARGB                 | I420, NV12                 |
+ * | BGR                  | I420, NV12                 |
+ * | BGRA                 | I420, NV12                 |
  * | I420                 | BGRA                       |
  * | I444                 | BGRA                       |
  * | NV12                 | BGRA                       |

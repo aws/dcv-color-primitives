@@ -121,7 +121,7 @@ const RGB_TO_YUV_INPUT: [[[u8; 4]; 8]; 8] = [
     ],
 ];
 
-const RGB_TO_YUV_BT601_OUTPUT: [[u8; 8]; 12] = [
+const RGB_TO_YUV_Y_BT601_OUTPUT: [[u8; 8]; 8] = [
     [74, 78, 101, 133, 118, 135, 87, 206],
     [93, 171, 116, 94, 102, 100, 171, 122],
     [141, 74, 200, 214, 98, 132, 65, 147],
@@ -130,13 +130,23 @@ const RGB_TO_YUV_BT601_OUTPUT: [[u8; 8]; 12] = [
     [139, 93, 110, 112, 132, 114, 157, 64],
     [113, 188, 101, 88, 105, 93, 128, 153],
     [131, 65, 48, 76, 129, 162, 117, 141],
-    [96, 171, 151, 152, 139, 153, 97, 121],
-    [119, 141, 130, 124, 135, 118, 153, 127],
-    [110, 145, 143, 132, 146, 135, 73, 117],
-    [135, 145, 152, 129, 116, 135, 140, 126],
 ];
 
-const RGB_TO_YUV_BT709_OUTPUT: [[u8; 8]; 12] = [
+const RGB_TO_YUV_CB_BT601_OUTPUT: [[u8; 4]; 4] = [
+    [96, 151, 139, 97],
+    [119, 130, 135, 153],
+    [110, 143, 146, 73],
+    [135, 152, 116, 140],
+];
+
+const RGB_TO_YUV_CR_BT601_OUTPUT: [[u8; 4]; 4] = [
+    [171, 152, 153, 121],
+    [141, 124, 118, 127],
+    [145, 132, 135, 117],
+    [145, 129, 135, 126],
+];
+
+const RGB_TO_YUV_Y_BT709_OUTPUT: [[u8; 8]; 8] = [
     [63, 84, 82, 123, 101, 137, 93, 208],
     [75, 173, 106, 103, 108, 84, 174, 132],
     [136, 84, 201, 221, 93, 121, 51, 146],
@@ -145,10 +155,20 @@ const RGB_TO_YUV_BT709_OUTPUT: [[u8; 8]; 12] = [
     [157, 80, 85, 111, 115, 133, 173, 68],
     [116, 191, 109, 68, 122, 84, 118, 155],
     [118, 56, 43, 80, 116, 166, 122, 139],
-    [100, 169, 154, 154, 142, 154, 96, 118],
-    [120, 140, 130, 124, 134, 118, 153, 129],
-    [112, 144, 144, 133, 147, 137, 71, 113],
-    [137, 146, 153, 131, 117, 135, 140, 127],
+];
+
+const RGB_TO_YUV_CB_BT709_OUTPUT: [[u8; 4]; 4] = [
+    [100, 154, 142, 96],
+    [120, 130, 134, 153],
+    [112, 144, 147, 71],
+    [137, 153, 117, 140],
+];
+
+const RGB_TO_YUV_CR_BT709_OUTPUT: [[u8; 4]; 4] = [
+    [169, 154, 154, 118],
+    [140, 124, 118, 129],
+    [144, 133, 137, 113],
+    [146, 131, 135, 127],
 ];
 
 // Largest group that uses neither avx2 nor sse2 is 62x64.
@@ -251,35 +271,60 @@ fn rgb_to_yuv_size_mode_stride(
     width: u32,
     height: u32,
     color_space: ColorSpace,
-    pixel_format: PixelFormat,
-    src_stride: usize,
-    luma_stride: usize,
-    chroma_stride: usize,
+    src_pixel_format: PixelFormat,
+    dst_pixel_format: PixelFormat,
+    src_fill_bytes: usize,
+    luma_fill_bytes: usize,
+    u_chroma_fill_bytes: usize,
+    v_chroma_fill_bytes: usize,
 ) {
-    let depth: usize = match pixel_format {
+    let depth: usize = match src_pixel_format {
         PixelFormat::Bgr => 3,
         _ => 4,
     };
 
     let w = width as usize;
     let h = height as usize;
+    let luma_stride = w + luma_fill_bytes;
+    let u_chroma_stride = match dst_pixel_format {
+        PixelFormat::Nv12 => w + u_chroma_fill_bytes,
+        PixelFormat::I420 => (w / 2) + u_chroma_fill_bytes,
+        _ => {
+            panic!("Unsupported pixel format");
+        }
+    };
 
+    let v_chroma_stride = match dst_pixel_format {
+        PixelFormat::Nv12 => u_chroma_stride,
+        PixelFormat::I420 => (w / 2) + v_chroma_fill_bytes,
+        _ => {
+            panic!("Unsupported pixel format");
+        }
+    };
+
+    let src_stride = (w * depth) + src_fill_bytes;
     let chroma_height = h / 2;
     let in_size = src_stride * h;
-    let out_size = (luma_stride * h) + (chroma_stride * chroma_height);
-    let min_src_stride = w * depth;
-    let src_fill_bytes = src_stride - min_src_stride;
-    let luma_fill_bytes = luma_stride - w;
-    let chroma_fill_bytes = chroma_stride - w;
+    let out_size = match dst_pixel_format {
+        PixelFormat::Nv12 => (luma_stride * h) + (u_chroma_stride * chroma_height),
+        PixelFormat::I420 => {
+            (luma_stride * h)
+                + (u_chroma_stride * chroma_height)
+                + (v_chroma_stride * chroma_height)
+        }
+        _ => {
+            panic!("Unsupported pixel format");
+        }
+    };
 
     let src_format = ImageFormat {
-        pixel_format,
+        pixel_format: src_pixel_format,
         color_space: ColorSpace::Lrgb,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
-        pixel_format: PixelFormat::Nv12,
+        pixel_format: dst_pixel_format,
         color_space,
         num_planes,
     };
@@ -289,7 +334,7 @@ fn rgb_to_yuv_size_mode_stride(
     for y in 0..h {
         for x in 0..w {
             let p = y * src_stride + x * depth;
-            match pixel_format {
+            match src_pixel_format {
                 PixelFormat::Argb => {
                     test_input[p] = RGB_TO_YUV_INPUT[y][x][3];
                     test_input[p + 1] = RGB_TO_YUV_INPUT[y][x][0];
@@ -321,27 +366,54 @@ fn rgb_to_yuv_size_mode_stride(
         src_stride
     };
 
-    let mut dst_strides: Vec<usize> = Vec::with_capacity(2);
+    let mut dst_strides: Vec<usize> = Vec::with_capacity(3);
     dst_strides.push(if luma_fill_bytes == 0 {
         STRIDE_AUTO
     } else {
         luma_stride
     });
 
-    let mut dst_buffers: Vec<&mut [u8]> = Vec::with_capacity(2);
+    let mut dst_buffers: Vec<&mut [u8]> = Vec::with_capacity(3);
 
-    if num_planes == 1 {
-        dst_buffers.push(&mut test_output);
-    } else {
-        dst_strides.push(if chroma_fill_bytes == 0 {
-            STRIDE_AUTO
-        } else {
-            chroma_stride
-        });
+    match dst_pixel_format {
+        PixelFormat::Nv12 => {
+            if num_planes == 1 {
+                dst_buffers.push(&mut test_output);
+            } else if num_planes == 2 {
+                dst_strides.push(if u_chroma_fill_bytes == 0 {
+                    STRIDE_AUTO
+                } else {
+                    u_chroma_stride
+                });
 
-        let (first, last) = test_output.split_at_mut(luma_stride * h);
-        dst_buffers.push(first);
-        dst_buffers.push(last);
+                let (first, last) = test_output.split_at_mut(luma_stride * h);
+                dst_buffers.push(first);
+                dst_buffers.push(last);
+            }
+        }
+        PixelFormat::I420 => {
+            let (y_plane, uv_plane) = test_output.split_at_mut(luma_stride * h);
+            let (u_plane, v_plane) = uv_plane.split_at_mut(chroma_height * u_chroma_stride);
+
+            dst_buffers.push(y_plane);
+            dst_buffers.push(u_plane);
+            dst_buffers.push(v_plane);
+
+            dst_strides.push(if u_chroma_fill_bytes == 0 {
+                STRIDE_AUTO
+            } else {
+                u_chroma_stride
+            });
+
+            dst_strides.push(if v_chroma_fill_bytes == 0 {
+                STRIDE_AUTO
+            } else {
+                v_chroma_stride
+            });
+        }
+        _ => {
+            panic!("Unsupported pixel format");
+        }
     }
 
     match convert_image(
@@ -358,15 +430,25 @@ fn rgb_to_yuv_size_mode_stride(
         Ok(_) => {
             let mut i = 0usize;
 
-            let reference = match color_space {
-                ColorSpace::Bt601 => &RGB_TO_YUV_BT601_OUTPUT,
-                _ => &RGB_TO_YUV_BT709_OUTPUT,
+            let luma_reference = match color_space {
+                ColorSpace::Bt601 => &RGB_TO_YUV_Y_BT601_OUTPUT,
+                _ => &RGB_TO_YUV_Y_BT709_OUTPUT,
+            };
+
+            let u_chroma_reference = match color_space {
+                ColorSpace::Bt601 => &RGB_TO_YUV_CB_BT601_OUTPUT,
+                _ => &RGB_TO_YUV_CB_BT709_OUTPUT,
+            };
+
+            let v_chroma_reference = match color_space {
+                ColorSpace::Bt601 => &RGB_TO_YUV_CR_BT601_OUTPUT,
+                _ => &RGB_TO_YUV_CR_BT709_OUTPUT,
             };
 
             // Check all luma samples are correct
             for y in 0..h {
                 for x in 0..w {
-                    assert!(test_output[i] == reference[y][x]);
+                    assert!(test_output[i] == luma_reference[y][x]);
                     i += 1;
                 }
 
@@ -376,23 +458,46 @@ fn rgb_to_yuv_size_mode_stride(
                 }
             }
 
-            // Check all chroma samples are correct
-            for y in 0..chroma_height {
-                for x in 0..w {
-                    assert!(test_output[i] == reference[8 + y][x]);
-                    i += 1;
-                }
+            match dst_pixel_format {
+                PixelFormat::Nv12 => {
+                    // Check all chroma samples are correct
+                    for y in 0..chroma_height {
+                        for x in 0..(w / 2) {
+                            assert!(test_output[i] == u_chroma_reference[y][x]);
+                            assert!(test_output[i + 1] == v_chroma_reference[y][x]);
+                            i += 2;
+                        }
 
-                for _x in 0..chroma_fill_bytes {
-                    assert!(test_output[i] == 0);
-                    i += 1;
-                }
-            }
+                        for _x in 0..u_chroma_fill_bytes {
+                            assert!(test_output[i] == 0);
+                            i += 1;
+                        }
+                    }
 
-            // Rest must be identically null
-            while i < out_size {
-                assert!(test_output[i] == 0);
-                i += 1;
+                    // Rest must be identically null
+                    while i < out_size {
+                        assert!(test_output[i] == 0);
+                        i += 1;
+                    }
+                }
+                PixelFormat::I420 => {
+                    let mut j = i + (chroma_height * u_chroma_stride);
+                    for y in 0..chroma_height {
+                        for x in 0..(w / 2) {
+                            assert!(test_output[i] == u_chroma_reference[y][x]);
+                            assert!(test_output[j] == v_chroma_reference[y][x]);
+
+                            i += 1;
+                            j += 1;
+                        }
+
+                        i += u_chroma_fill_bytes;
+                        j += v_chroma_fill_bytes;
+                    }
+                }
+                _ => {
+                    panic!("Unsupported pixel format");
+                }
             }
         }
     }
@@ -403,57 +508,67 @@ fn rgb_to_yuv_size_mode(
     width: u32,
     height: u32,
     color_space: ColorSpace,
-    pixel_format: PixelFormat,
+    src_format: PixelFormat,
+    dst_format: PixelFormat,
 ) {
     const MAX_FILL_BYTES: usize = 1;
 
-    let w = width as usize;
-    let depth: usize = match pixel_format {
-        PixelFormat::Bgr => 3,
-        _ => 4,
-    };
-
-    let min_src_stride = w * depth;
-    let max_src_stride = min_src_stride + MAX_FILL_BYTES;
-    let min_dst_stride = w;
-    let max_dst_stride = min_dst_stride + MAX_FILL_BYTES;
-
     if num_planes == 1 {
-        for luma_stride in min_dst_stride..=max_dst_stride {
-            for src_stride in min_src_stride..=max_src_stride {
-                rgb_to_yuv_size_mode_stride(
-                    num_planes,
-                    width,
-                    height,
-                    color_space,
-                    pixel_format,
-                    src_stride,
-                    luma_stride,
-                    luma_stride,
-                );
-            }
+        for (luma_stride, src_stride) in iproduct!(0..=MAX_FILL_BYTES, 0..=MAX_FILL_BYTES) {
+            rgb_to_yuv_size_mode_stride(
+                num_planes,
+                width,
+                height,
+                color_space,
+                src_format,
+                dst_format,
+                src_stride,
+                luma_stride,
+                luma_stride,
+                luma_stride,
+            );
         }
-    } else {
-        for luma_stride in min_dst_stride..=max_dst_stride {
-            for chroma_stride in min_dst_stride..=max_dst_stride {
-                for src_stride in min_src_stride..=max_src_stride {
-                    rgb_to_yuv_size_mode_stride(
-                        num_planes,
-                        width,
-                        height,
-                        color_space,
-                        pixel_format,
-                        src_stride,
-                        luma_stride,
-                        chroma_stride,
-                    );
-                }
-            }
+    } else if num_planes == 2 {
+        for (luma_stride, chroma_stride, src_stride) in
+            iproduct!(0..=MAX_FILL_BYTES, 0..=MAX_FILL_BYTES, 0..=MAX_FILL_BYTES)
+        {
+            rgb_to_yuv_size_mode_stride(
+                num_planes,
+                width,
+                height,
+                color_space,
+                src_format,
+                dst_format,
+                src_stride,
+                luma_stride,
+                chroma_stride,
+                chroma_stride,
+            );
+        }
+    } else if num_planes == 3 {
+        for (luma_stride, u_chroma_stride, v_chroma_stride, src_stride) in iproduct!(
+            0..=MAX_FILL_BYTES,
+            0..=MAX_FILL_BYTES,
+            0..=MAX_FILL_BYTES,
+            0..=MAX_FILL_BYTES
+        ) {
+            rgb_to_yuv_size_mode_stride(
+                num_planes,
+                width,
+                height,
+                color_space,
+                src_format,
+                dst_format,
+                src_stride,
+                luma_stride,
+                u_chroma_stride,
+                v_chroma_stride,
+            );
         }
     }
 }
 
-fn rgb_to_yuv_size(num_planes: u32, width: u32, height: u32) {
+fn rgb_to_yuv_size(num_planes: u32, width: u32, height: u32, dst_format: PixelFormat) {
     const SUPPORTED_PIXEL_FORMATS: &[PixelFormat] =
         &[PixelFormat::Argb, PixelFormat::Bgra, PixelFormat::Bgr];
 
@@ -461,7 +576,14 @@ fn rgb_to_yuv_size(num_planes: u32, width: u32, height: u32) {
 
     for color_space in SUPPORTED_COLOR_SPACES.iter() {
         for pixel_format in SUPPORTED_PIXEL_FORMATS.iter() {
-            rgb_to_yuv_size_mode(num_planes, width, height, *color_space, *pixel_format);
+            rgb_to_yuv_size_mode(
+                num_planes,
+                width,
+                height,
+                *color_space,
+                *pixel_format,
+                dst_format,
+            );
         }
     }
 }
@@ -797,18 +919,13 @@ fn yuv_to_rgb_size(num_planes: u32, width: u32, height: u32, format: PixelFormat
     }
 }
 
-#[test]
-fn rgb_to_yuv_ok() {
-    bootstrap();
-
+fn rgb_to_yuv_ok(dst_format: PixelFormat, planes: u32) {
     const MAX_WIDTH: u32 = 8;
     const MAX_HEIGHT: u32 = 8;
 
-    for planes in 1..2 {
-        for width in (2..=MAX_WIDTH).step_by(2) {
-            for height in (2..=MAX_HEIGHT).step_by(2) {
-                rgb_to_yuv_size(planes, width, height);
-            }
+    for width in (2..=MAX_WIDTH).step_by(2) {
+        for height in (2..=MAX_HEIGHT).step_by(2) {
+            rgb_to_yuv_size(planes, width, height, dst_format);
         }
     }
 }
@@ -822,6 +939,21 @@ fn yuv_to_rgb_ok(format: PixelFormat, num_planes: u32) {
             yuv_to_rgb_size(num_planes, width, height, format);
         }
     }
+}
+
+#[test]
+fn rgb_to_nv12_ok() {
+    bootstrap();
+
+    rgb_to_yuv_ok(PixelFormat::Nv12, 1);
+    rgb_to_yuv_ok(PixelFormat::Nv12, 2);
+}
+
+#[test]
+fn rgb_to_i420_ok() {
+    bootstrap();
+
+    rgb_to_yuv_ok(PixelFormat::I420, 3);
 }
 
 #[test]
