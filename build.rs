@@ -18,8 +18,8 @@ use core::arch::x86::{__cpuid, _xgetbv};
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{__cpuid, _xgetbv};
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn cpuid(functionnumber: u32, output: &mut [u32; 4]) {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         unsafe {
             let result = __cpuid(functionnumber);
@@ -31,7 +31,8 @@ fn cpuid(functionnumber: u32, output: &mut [u32; 4]) {
     }
 }
 
-fn main() {
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn get_targets() {
     // This build script generates the cargo build config file (.cargo/config)
     // The rust flags are set in order to avoid generating illegal instructions
     // on the machine on which the build is triggered.
@@ -65,4 +66,12 @@ fn main() {
             }
         }
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+fn get_targets() {
+}
+
+fn main() {
+    get_targets();
 }
