@@ -23,6 +23,34 @@ use core::arch::x86_64::_bswap;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::_bswap64;
 
+#[cfg(target_arch = "aarch64")]
+macro_rules! define_bswap {
+  ($fname:ident, $type:ty, $sizeb:expr) => {
+      fn $fname(x: $type) -> $type {
+          let mut y2:[i8; $sizeb] = [0; $sizeb];
+          let y : $type;
+          let x2:[i8; $sizeb];
+
+          unsafe {
+              x2 = transmute::<$type, [i8; $sizeb]>(x);
+
+              for i in 0..$sizeb {
+                  y2[i] = x2[$sizeb - 1 - i];
+              }
+
+              y = transmute::<[i8; $sizeb], $type>(y2);
+          }
+
+          return y;
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+define_bswap!(_bswap, i32, 4);
+#[cfg(target_arch = "aarch64")]
+define_bswap!(_bswap64, i64, 8);
+
 #[cfg(target_arch = "x86")]
 unsafe fn _bswap64(x: i64) -> i64 {
     (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
