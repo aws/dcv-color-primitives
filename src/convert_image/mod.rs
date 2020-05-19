@@ -14,7 +14,9 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod avx2;
 mod common;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub mod sse2;
 pub mod x86;
