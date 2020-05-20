@@ -466,11 +466,16 @@ pub fn initialize() {
             InstructionSet::X86 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, x86);
             }
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             InstructionSet::Sse2 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, sse2);
             }
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             InstructionSet::Avx2 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, avx2);
+            }
+            _ => {
+                set_dispatch_table!(GLOBAL_STATE.converters, x86);
             }
         }
 
