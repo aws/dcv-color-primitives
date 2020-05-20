@@ -43,9 +43,7 @@
 //! Initialize the library:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! fn main() {
-//!     dcp::initialize();
-//! }
+//! dcp::initialize();
 //! ```
 //!
 //! Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
@@ -325,9 +323,7 @@ impl fmt::Display for ErrorKind {
 
 impl error::Error for ErrorKind {
     fn cause(&self) -> Option<&dyn error::Error> {
-        match *self {
-            _ => None,
-        }
+        None
     }
 }
 

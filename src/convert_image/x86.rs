@@ -1003,9 +1003,9 @@ pub fn rgb_lrgb_bgra_lrgb(
         return false;
     }
 
-    const HIGH_MASK: u64 = 0xFFFFFFFF00000000;
-    const LOW_MASK: u64 = 0x00000000FFFFFFFF;
-    const ALPHAS_MASK: u64 = 0x000000FF000000FF;
+    const HIGH_MASK: u64 = 0xFFFF_FFFF_0000_0000;
+    const LOW_MASK: u64 = 0x0000_0000_FFFF_FFFF;
+    const ALPHAS_MASK: u64 = 0x0000_00FF_0000_00FF;
     const INPUT_BPP: usize = 3;
     const OUTPUT_BPP: usize = 4;
     const ITEMS_PER_ITERATION: usize = 8;
@@ -1089,7 +1089,7 @@ pub fn rgb_lrgb_bgra_lrgb(
             }
 
             // Retrieves the ramaining colors in the line
-            for _ in x..single_swap_iterations {
+            while x < single_swap_iterations {
                 *(obuffer.add(obuffer_offset) as *mut i32) = _bswap(
                     ((*(ibuffer.add(ibuffer_offset) as *const u32) << SHIFT_8) | 0xFF) as i32,
                 );
@@ -1102,9 +1102,9 @@ pub fn rgb_lrgb_bgra_lrgb(
             // If the input stride is not at least 1 byte it directly copies byte per byte,
             // this could happen once per line
             if x < w {
-                *obuffer.add(obuffer_offset + 0) = *ibuffer.add(ibuffer_offset + 2);
+                *obuffer.add(obuffer_offset) = *ibuffer.add(ibuffer_offset + 2);
                 *obuffer.add(obuffer_offset + 1) = *ibuffer.add(ibuffer_offset + 1);
-                *obuffer.add(obuffer_offset + 2) = *ibuffer.add(ibuffer_offset + 0);
+                *obuffer.add(obuffer_offset + 2) = *ibuffer.add(ibuffer_offset);
                 *obuffer.add(obuffer_offset + 3) = 0xFF;
 
                 ibuffer_offset += INPUT_BPP;
@@ -1115,7 +1115,8 @@ pub fn rgb_lrgb_bgra_lrgb(
             obuffer_offset += output_stride_diff;
         }
     }
-    return true;
+
+    true
 }
 
 pub fn argb_lrgb_nv12_bt601(

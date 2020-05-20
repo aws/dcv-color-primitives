@@ -736,9 +736,9 @@ fn yuv_to_rgb_size_format_mode_stride(
 
     let in_size = match format {
         PixelFormat::I444 | PixelFormat::I420 => {
-            ((luma_stride * h)
+            (luma_stride * h)
                 + (u_chroma_stride * chroma_height)
-                + (v_chroma_stride * chroma_height))
+                + (v_chroma_stride * chroma_height)
         }
         PixelFormat::Nv12 => ((luma_stride * h) + (u_chroma_stride * chroma_height)),
         _ => (0),

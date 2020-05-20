@@ -20,12 +20,12 @@ const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
 
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
     let val = (((x & 0xFFFF) as u32) << 16) | ((y & 0xFFFF) as u32);
-    (val as i32)
+    val as i32
 }
 
 pub const fn i32_to_i16(x: i32) -> i16 {
     let val = (x & 0xFFFF) as u32;
-    (val as i16)
+    val as i16
 }
 
 pub fn wg_index(x: usize, y: usize, w: usize, h: usize) -> usize {
@@ -38,8 +38,8 @@ pub fn is_wg_multiple(x: u32, w: usize) -> bool {
 
 pub const FIX16: i32 = 16;
 pub const FIX18: i32 = 18;
-pub const FIX16_HALF: i32 = (1 << (FIX16 - 1));
-pub const FIX18_HALF: i32 = (1 << (FIX16 + 1));
+pub const FIX16_HALF: i32 = 1 << (FIX16 - 1);
+pub const FIX18_HALF: i32 = 1 << (FIX16 + 1);
 pub const FIX6: i32 = 6;
 pub const SHORT_HALF: i32 = 16384;
 
