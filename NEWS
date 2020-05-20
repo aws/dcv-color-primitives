@@ -1,3 +1,7 @@
+News in 0.1.10
+--------------
+* Added argb, bgra, bgr to i444 conversion
+
 News in 0.1.9
 --------------
 * Added argb, bgra, bgr to i420 conversion
