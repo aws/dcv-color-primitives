@@ -26,9 +26,9 @@
 //!
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
-//! | ARGB                 | I420, NV12                 |
-//! | BGR                  | I420, NV12                 |
-//! | BGRA                 | I420, NV12                 |
+//! | ARGB                 | I420, I444, NV12           |
+//! | BGR                  | I420, I444, NV12           |
+//! | BGRA                 | I420, I444, NV12           |
 //! | I420                 | BGRA                       |
 //! | I444                 | BGRA                       |
 //! | NV12                 | BGRA                       |
@@ -412,6 +412,12 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709, bgra_lrgb_i420_bt709);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601, bgr_lrgb_i420_bt601);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709, bgr_lrgb_i420_bt709);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt601, argb_lrgb_i444_bt601);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt709, argb_lrgb_i444_bt709);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601, bgra_lrgb_i444_bt601);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt709, bgra_lrgb_i444_bt709);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601, bgr_lrgb_i444_bt601);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709, bgr_lrgb_i444_bt709);        
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb, nv12_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb, nv12_bt709_bgra_lrgb);
         set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);
@@ -701,10 +707,13 @@ pub fn get_buffers_size(
 ///   Source image pixel format     | Supported destination image pixel formats
 ///   ------------------------------|------------------------------------------
 ///   PixelFormat::Argb             | PixelFormat::I420 [`1`]
+///   PixelFormat::Argb             | PixelFormat::I444 [`1`]
 ///   PixelFormat::Argb             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::I420 [`1`]
+///   PixelFormat::Bgra             | PixelFormat::I444 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::I420 [`1`]
+///   PixelFormat::Bgr              | PixelFormat::I444 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
 ///   PixelFormat::I420             | PixelFormat::Bgra [`2`]
 ///   PixelFormat::I444             | PixelFormat::Bgra [`2`]

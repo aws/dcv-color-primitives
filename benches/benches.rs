@@ -17,6 +17,7 @@ const RGB_BGRA_OUTPUT: &str = &"./rgb_output.bgra";
 const I420_OUTPUT: &str = &"./i420_output.bgra";
 const I444_OUTPUT: &str = &"./i444_output.bgra";
 const BGRA_I420_OUTPUT: &str = &"./bgra_i420_output.i420";
+const BGRA_I444_OUTPUT: &str = &"./bgra_i444_output.i444";
 
 const SAMPLE_SIZE: usize = 22;
 
@@ -180,6 +181,59 @@ fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", width, height + height / 2)?;
+        buffer.write(&output_buffer)?;
+    }
+
+    Ok(elapsed)
+}
+
+fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+    width /= 4;
+    let w: usize = width as usize;
+    let h: usize = height as usize;
+
+    // Allocate output
+    let dst_size: usize = 3 * (width as usize) * (height as usize);
+    let mut output_buffer: Vec<u8> = vec![0; dst_size];
+
+    let input_data: &[&[u8]] = &[&input_buffer];
+    let (y_data, uv_data) = output_buffer.split_at_mut(w * h);
+    let (u_data, v_data) = uv_data.split_at_mut(w * h);
+    let output_data: &mut [&mut [u8]] = &mut [&mut y_data[..], &mut u_data[..], &mut v_data[..]];
+
+    let src_format = ImageFormat {
+        pixel_format: PixelFormat::Bgra,
+        color_space: ColorSpace::Lrgb,
+        num_planes: 1,
+    };
+
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::I444,
+        color_space: ColorSpace::Bt601,
+        num_planes: 3,
+    };
+
+    let start = Instant::now();
+    convert_image(
+        width,
+        height,
+        &src_format,
+        None,
+        input_data,
+        &dst_format,
+        None,
+        output_data,
+    )?;
+
+    let elapsed = start.elapsed();
+
+    if !Path::new(output_path).exists() {
+        let mut buffer = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(output_path)?;
+        write!(buffer, "P5\n{} {}\n255\n", width, height + height + height)?;
         buffer.write(&output_buffer)?;
     }
 
@@ -441,6 +495,29 @@ fn bench(c: &mut Criterion) {
                 let mut total = Duration::new(0, 0);
                 for _i in 0..iters {
                     total += bgra_i420(&mut input_file, output_path)
+                        .expect("Benchmark iteration failed");
+                }
+
+                total
+            });
+        });
+    }
+
+    {
+        let output_path = &BGRA_I444_OUTPUT;
+        if Path::new(output_path).exists() {
+            remove_file(Path::new(output_path)).expect("Unable to delete benchmark output");
+        }
+
+        let mut input_file: Cursor<&[u8]> = Cursor::new(include_bytes!("input.bgra"));
+        let (width, height) =
+            { pnm_size(&mut input_file).expect("Malformed benchmark input file") };
+        group.throughput(Throughput::Elements((width as u64) * (height as u64)));
+        group.bench_function("bgra>i444", move |b| {
+            b.iter_custom(|iters| {
+                let mut total = Duration::new(0, 0);
+                for _i in 0..iters {
+                    total += bgra_i444(&mut input_file, output_path)
                         .expect("Benchmark iteration failed");
                 }
 

@@ -132,14 +132,36 @@ const RGB_TO_YUV_Y_BT601_OUTPUT: [[u8; 8]; 8] = [
     [131, 65, 48, 76, 129, 162, 117, 141],
 ];
 
-const RGB_TO_YUV_CB_BT601_OUTPUT: [[u8; 4]; 4] = [
+const RGB_TO_YUV_CB_BT601_OUTPUT: [[u8; 8]; 8] = [
+    [116, 118, 204, 91, 136, 159, 97, 100],
+    [99, 51, 179, 130, 161, 99, 117, 75],
+    [63, 120, 143, 89, 147, 155, 184, 64],
+    [118, 174, 134, 154, 133, 104, 185, 178],
+    [192, 101, 191, 102, 192, 131, 81, 43],
+    [60, 87, 198, 81, 175, 86, 61, 108],
+    [95, 59, 122, 204, 83, 196, 124, 150],
+    [184, 203, 185, 98, 140, 47, 196, 92],
+];
+
+const RGB_TO_YUV_CR_BT601_OUTPUT: [[u8; 8]; 8] = [
+    [187, 105, 177, 198, 208, 103, 119, 135],
+    [229, 162, 147, 87, 79, 221, 118, 111],
+    [187, 86, 115, 119, 141, 163, 166, 169],
+    [164, 126, 89, 171, 84, 83, 81, 91],
+    [183, 103, 75, 82, 121, 178, 97, 165],
+    [83, 210, 212, 158, 183, 60, 88, 118],
+    [135, 155, 93, 182, 70, 132, 176, 107],
+    [157, 133, 120, 122, 186, 153, 65, 155],
+];
+
+const RGB_TO_YUV_CB2_BT601_OUTPUT: [[u8; 4]; 4] = [
     [96, 151, 139, 97],
     [119, 130, 135, 153],
     [110, 143, 146, 73],
     [135, 152, 116, 140],
 ];
 
-const RGB_TO_YUV_CR_BT601_OUTPUT: [[u8; 4]; 4] = [
+const RGB_TO_YUV_CR2_BT601_OUTPUT: [[u8; 4]; 4] = [
     [171, 152, 153, 121],
     [141, 124, 118, 127],
     [145, 132, 135, 117],
@@ -157,14 +179,36 @@ const RGB_TO_YUV_Y_BT709_OUTPUT: [[u8; 8]; 8] = [
     [118, 56, 43, 80, 116, 166, 122, 139],
 ];
 
-const RGB_TO_YUV_CB_BT709_OUTPUT: [[u8; 4]; 4] = [
+const RGB_TO_YUV_CB_BT709_OUTPUT: [[u8; 8]; 8] = [
+    [123, 115, 211, 98, 145, 156, 95, 100],
+    [110, 53, 182, 126, 156, 109, 116, 72],
+    [68, 115, 141, 87, 149, 160, 189, 67],
+    [122, 174, 130, 160, 128, 98, 181, 174],
+    [200, 97, 186, 96, 192, 136, 77, 46],
+    [53, 95, 209, 84, 182, 78, 56, 107],
+    [95, 60, 118, 212, 76, 197, 129, 148],
+    [189, 205, 185, 97, 147, 48, 190, 94],
+];
+
+const RGB_TO_YUV_CR_BT709_OUTPUT: [[u8; 8]; 8] = [
+    [187, 103, 184, 197, 211, 104, 116, 133],
+    [229, 157, 151, 86, 80, 221, 117, 106],
+    [184, 84, 116, 115, 143, 166, 171, 165],
+    [164, 130, 89, 174, 83, 80, 84, 94],
+    [189, 100, 79, 78, 125, 180, 92, 160],
+    [77, 209, 219, 155, 188, 56, 82, 117],
+    [132, 151, 92, 189, 66, 137, 176, 108],
+    [162, 139, 124, 120, 189, 148, 69, 153],
+];
+
+const RGB_TO_YUV_CB2_BT709_OUTPUT: [[u8; 4]; 4] = [
     [100, 154, 142, 96],
     [120, 130, 134, 153],
     [112, 144, 147, 71],
     [137, 153, 117, 140],
 ];
 
-const RGB_TO_YUV_CR_BT709_OUTPUT: [[u8; 4]; 4] = [
+const RGB_TO_YUV_CR2_BT709_OUTPUT: [[u8; 4]; 4] = [
     [169, 154, 154, 118],
     [140, 124, 118, 129],
     [144, 133, 137, 113],
@@ -287,6 +331,7 @@ fn rgb_to_yuv_size_mode_stride(
     let h = height as usize;
     let luma_stride = w + luma_fill_bytes;
     let u_chroma_stride = match dst_pixel_format {
+        PixelFormat::I444 |
         PixelFormat::Nv12 => w + u_chroma_fill_bytes,
         PixelFormat::I420 => (w / 2) + u_chroma_fill_bytes,
         _ => {
@@ -295,6 +340,7 @@ fn rgb_to_yuv_size_mode_stride(
     };
 
     let v_chroma_stride = match dst_pixel_format {
+        PixelFormat::I444 => w + v_chroma_fill_bytes,
         PixelFormat::Nv12 => u_chroma_stride,
         PixelFormat::I420 => (w / 2) + v_chroma_fill_bytes,
         _ => {
@@ -312,6 +358,7 @@ fn rgb_to_yuv_size_mode_stride(
                 + (u_chroma_stride * chroma_height)
                 + (v_chroma_stride * chroma_height)
         }
+        PixelFormat::I444 => (luma_stride * h) + (u_chroma_stride * h ) + (v_chroma_stride * h),
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -411,6 +458,26 @@ fn rgb_to_yuv_size_mode_stride(
                 v_chroma_stride
             });
         }
+        PixelFormat::I444 => {
+            let (y_plane, uv_plane) = test_output.split_at_mut(luma_stride * h);
+            let (u_plane, v_plane) = uv_plane.split_at_mut(u_chroma_stride * h);
+
+            dst_buffers.push(y_plane);
+            dst_buffers.push(u_plane);
+            dst_buffers.push(v_plane);
+
+            dst_strides.push(if u_chroma_fill_bytes == 0 {
+                STRIDE_AUTO
+            } else {
+                u_chroma_stride
+            });
+
+            dst_strides.push(if v_chroma_fill_bytes == 0 {
+                STRIDE_AUTO
+            } else {
+                v_chroma_stride
+            });
+        }
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -435,16 +502,6 @@ fn rgb_to_yuv_size_mode_stride(
                 _ => &RGB_TO_YUV_Y_BT709_OUTPUT,
             };
 
-            let u_chroma_reference = match color_space {
-                ColorSpace::Bt601 => &RGB_TO_YUV_CB_BT601_OUTPUT,
-                _ => &RGB_TO_YUV_CB_BT709_OUTPUT,
-            };
-
-            let v_chroma_reference = match color_space {
-                ColorSpace::Bt601 => &RGB_TO_YUV_CR_BT601_OUTPUT,
-                _ => &RGB_TO_YUV_CR_BT709_OUTPUT,
-            };
-
             // Check all luma samples are correct
             for y in 0..h {
                 for x in 0..w {
@@ -459,44 +516,93 @@ fn rgb_to_yuv_size_mode_stride(
             }
 
             match dst_pixel_format {
-                PixelFormat::Nv12 => {
-                    // Check all chroma samples are correct
-                    for y in 0..chroma_height {
-                        for x in 0..(w / 2) {
+                PixelFormat::I444 => {
+                    let u_chroma_reference =  match color_space {
+                        ColorSpace::Bt601 => &RGB_TO_YUV_CB_BT601_OUTPUT,
+                        _ => &RGB_TO_YUV_CB_BT709_OUTPUT,
+                    };
+        
+                    let v_chroma_reference = match color_space {
+                        ColorSpace::Bt601 => &RGB_TO_YUV_CR_BT601_OUTPUT,
+                        _ => &RGB_TO_YUV_CR_BT709_OUTPUT,
+                    };
+        
+                    for y in 0..h {
+                        for x in 0..w {
                             assert!(test_output[i] == u_chroma_reference[y][x]);
-                            assert!(test_output[i + 1] == v_chroma_reference[y][x]);
-                            i += 2;
+                            i += 1;
                         }
-
+        
                         for _x in 0..u_chroma_fill_bytes {
                             assert!(test_output[i] == 0);
                             i += 1;
                         }
                     }
 
-                    // Rest must be identically null
-                    while i < out_size {
-                        assert!(test_output[i] == 0);
-                        i += 1;
-                    }
-                }
-                PixelFormat::I420 => {
-                    let mut j = i + (chroma_height * u_chroma_stride);
-                    for y in 0..chroma_height {
-                        for x in 0..(w / 2) {
-                            assert!(test_output[i] == u_chroma_reference[y][x]);
-                            assert!(test_output[j] == v_chroma_reference[y][x]);
-
+                    for y in 0..h {
+                        for x in 0..w {
+                            assert!(test_output[i] == v_chroma_reference[y][x]);
                             i += 1;
-                            j += 1;
                         }
-
-                        i += u_chroma_fill_bytes;
-                        j += v_chroma_fill_bytes;
+        
+                        for _x in 0..v_chroma_fill_bytes {
+                            assert!(test_output[i] == 0);
+                            i += 1;
+                        }
                     }
-                }
+                },
                 _ => {
-                    panic!("Unsupported pixel format");
+                    let u_chroma_reference =  match color_space {
+                        ColorSpace::Bt601 => &RGB_TO_YUV_CB2_BT601_OUTPUT,
+                        _ => &RGB_TO_YUV_CB2_BT709_OUTPUT,
+                    };
+        
+                    let v_chroma_reference = match color_space {
+                        ColorSpace::Bt601 => &RGB_TO_YUV_CR2_BT601_OUTPUT,
+                        _ => &RGB_TO_YUV_CR2_BT709_OUTPUT,
+                    };
+        
+                    match dst_pixel_format {
+                        PixelFormat::Nv12 => {
+                            // Check all chroma samples are correct
+                            for y in 0..chroma_height {
+                                for x in 0..(w / 2) {
+                                    assert!(test_output[i] == u_chroma_reference[y][x]);
+                                    assert!(test_output[i + 1] == v_chroma_reference[y][x]);
+                                    i += 2;
+                                }
+        
+                                for _x in 0..u_chroma_fill_bytes {
+                                    assert!(test_output[i] == 0);
+                                    i += 1;
+                                }
+                            }
+        
+                            // Rest must be identically null
+                            while i < out_size {
+                                assert!(test_output[i] == 0);
+                                i += 1;
+                            }
+                        }
+                        PixelFormat::I420 => {
+                            let mut j = i + (chroma_height * u_chroma_stride);
+                            for y in 0..chroma_height {
+                                for x in 0..(w / 2) {
+                                    assert!(test_output[i] == u_chroma_reference[y][x]);
+                                    assert!(test_output[j] == v_chroma_reference[y][x]);
+        
+                                    i += 1;
+                                    j += 1;
+                                }
+        
+                                i += u_chroma_fill_bytes;
+                                j += v_chroma_fill_bytes;
+                            }
+                        }
+                        _ => {
+                            panic!("Unsupported pixel format");
+                        }
+                    }
                 }
             }
         }
@@ -954,6 +1060,13 @@ fn rgb_to_i420_ok() {
     bootstrap();
 
     rgb_to_yuv_ok(PixelFormat::I420, 3);
+}
+
+#[test]
+fn rgb_to_i444_ok() {
+    bootstrap();
+
+    rgb_to_yuv_ok(PixelFormat::I444, 3);
 }
 
 #[test]

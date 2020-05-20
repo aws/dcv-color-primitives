@@ -172,7 +172,7 @@ static const rgba rgb_to_yuv_input[8][8] = {
     }
 };
 
-static const uint8_t rgb_to_yuv_bt601_output[12][8] = {
+static const uint8_t rgb_to_yuv_y_bt601_output[8][8] = {
     { 74, 78, 101, 133, 118, 135, 87, 206 },
     { 93, 171, 116, 94, 102, 100, 171, 122 },
     { 141, 74, 200, 214, 98, 132, 65, 147 },
@@ -181,14 +181,45 @@ static const uint8_t rgb_to_yuv_bt601_output[12][8] = {
     { 139, 93, 110, 112, 132, 114, 157, 64 },
     { 113, 188, 101, 88, 105, 93, 128, 153 },
     { 131, 65, 48, 76, 129, 162, 117, 141 },
-
-    { 96, 171, 151, 152, 139, 153, 97, 121 },
-    { 119, 141, 130, 124, 135, 118, 153, 127 },
-    { 110, 145, 143, 132, 146, 135, 73, 117 },
-    { 135, 145, 152, 129, 116, 135, 140, 126 }
 };
 
-static const uint8_t rgb_to_yuv_bt709_output[12][8] = {
+static const uint8_t rgb_to_yuv_cb_bt601_output[8][8] = {
+    { 125, 125, 147, 119, 130, 136, 120, 121 },
+    { 121, 109, 141, 129, 136, 121, 125, 115 },
+    { 112, 126, 132, 118, 133, 135, 142, 112 },
+    { 126, 139, 130, 135, 129, 122, 142, 140 },
+    { 144, 121, 144, 122, 144, 129, 116, 107 },
+    { 111, 118, 146, 116, 140, 118, 111, 123 },
+    { 120, 111, 127, 147, 117, 145, 127, 133 },
+    { 142, 147, 142, 121, 131, 108, 145, 119 },
+};
+
+static const uint8_t rgb_to_yuv_cr_bt601_output[8][8] = {
+    { 143, 122, 140, 145, 148, 122, 126, 130 },
+    { 153, 137, 133, 118, 116, 151, 125, 124 },
+    { 143, 117, 125, 126, 131, 137, 138, 138 },
+    { 137, 128, 118, 139, 117, 117, 116, 119 },
+    { 142, 122, 115, 116, 126, 141, 120, 137 },
+    { 117, 148, 149, 135, 142, 111, 118, 126 },
+    { 130, 135, 119, 141, 114, 129, 140, 123 },
+    { 135, 129, 126, 127, 143, 134, 112, 135 },
+};
+
+static const uint8_t rgb_to_yuv_cb2_bt601_output[4][4] = {
+    { 96, 151, 139, 97 },
+    { 119, 130, 135, 153 },
+    { 110, 143, 146, 73 },
+    { 135, 152, 116, 140 },
+};
+
+static const uint8_t rgb_to_yuv_cr2_bt601_output[4][4] = {
+    { 171, 152, 153, 121 },
+    { 141, 124, 118, 127 },
+    { 145, 132, 135, 117 },
+    { 145, 129, 135, 126 },
+};
+
+static const uint8_t rgb_to_yuv_y_bt709_output[8][8] = {
     { 63, 84, 82, 123, 101, 137, 93, 208 },
     { 75, 173, 106, 103, 108, 84, 174, 132 },
     { 136, 84, 201, 221, 93, 121, 51, 146 },
@@ -197,11 +228,42 @@ static const uint8_t rgb_to_yuv_bt709_output[12][8] = {
     { 157, 80, 85, 111, 115, 133, 173, 68 },
     { 116, 191, 109, 68, 122, 84, 118, 155 },
     { 118, 56, 43, 80, 116, 166, 122, 139 },
+};
 
-    { 100, 169, 154, 154, 142, 154, 96, 118 },
-    { 120, 140, 130, 124, 134, 118, 153, 129 },
-    { 112, 144, 144, 133, 147, 137, 71, 113 },
-    { 137, 146, 153, 131, 117, 135, 140, 127 }
+static const uint8_t rgb_to_yuv_cb_bt709_output[8][8] = {
+    { 127, 125, 149, 121, 132, 135, 120, 121 },
+    { 124, 109, 141, 127, 135, 123, 125, 114 },
+    { 113, 125, 131, 118, 133, 136, 143, 113 },
+    { 127, 140, 128, 136, 128, 121, 141, 140 },
+    { 146, 120, 142, 120, 144, 130, 115, 107 },
+    { 109, 120, 148, 117, 142, 115, 110, 123 },
+    { 120, 111, 125, 149, 115, 145, 128, 133 },
+    { 143, 147, 142, 120, 133, 108, 144, 120 },
+};
+
+static const uint8_t rgb_to_yuv_cr_bt709_output[8][8] = {
+    { 143, 122, 142, 145, 149, 122, 125, 129 },
+    { 153, 135, 134, 117, 116, 151, 125, 123 },
+    { 142, 117, 125, 125, 132, 137, 139, 137 },
+    { 137, 128, 118, 140, 117, 116, 117, 120 },
+    { 143, 121, 116, 116, 127, 141, 119, 136 },
+    { 115, 148, 151, 135, 143, 110, 117, 125 },
+    { 129, 134, 119, 143, 112, 130, 140, 123 },
+    { 137, 131, 127, 126, 143, 133, 113, 134 },
+};
+
+static const uint8_t rgb_to_yuv_cb2_bt709_output[4][4] = {
+    { 100, 154, 142, 96 },
+    { 120, 130, 134, 153 },
+    { 112, 144, 147, 71 },
+    { 137, 153, 117, 140 },
+};
+
+static const uint8_t rgb_to_yuv_cr2_bt709_output[4][4] = {
+    { 169, 154, 154, 118 },
+    { 140, 124, 118, 129 },
+    { 144, 133, 137, 113 },
+    { 146, 131, 135, 127 },
 };
 
 #define MAX_NUMBER_OF_PLANES 3
@@ -330,38 +392,39 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
                                           uint32_t       width,
                                           uint32_t       height,
                                           DcpColorSpace  color_space,
-                                          DcpPixelFormat pixel_format,
+                                          DcpPixelFormat src_pixel_format,
+                                          DcpPixelFormat dst_pixel_format,
                                           size_t         src_stride,
                                           size_t         luma_stride,
                                           size_t         chroma_stride)
 {
-    const uint32_t chroma_height = (height / 2);
     const size_t in_size = src_stride * height;
-    const size_t out_size = (luma_stride * height) + (chroma_stride * chroma_height);
-    const size_t min_src_stride = (size_t)width * ((pixel_format == DCP_PIXEL_FORMAT_BGR) ? 3 : 4);
+    const size_t min_src_stride = (size_t)width * ((src_pixel_format == DCP_PIXEL_FORMAT_BGR) ? 3 : 4);
     const size_t src_fill_bytes = src_stride - min_src_stride;
     const size_t luma_fill_bytes = luma_stride - width;
-    const size_t chroma_fill_bytes = chroma_stride - width;
 
     uint8_t *test_input;
     uint8_t *test_output;
     uint8_t *input;
     const uint8_t *output;
-    size_t dst_strides[2];
-    uint8_t *dst_buffers[2];
+    size_t dst_strides[3];
+    uint8_t *dst_buffers[3];
     uint32_t y;
     size_t count;
+    size_t out_size;
+    uint32_t chroma_height;
+    size_t chroma_fill_bytes;
 
     DcpStatus status = dcp_status();
 
     DcpImageFormat src_format = {
-        pixel_format,
+        src_pixel_format,
         DCP_COLOR_SPACE_LRGB,
         1
     };
 
     DcpImageFormat dst_format = {
-        DCP_PIXEL_FORMAT_NV12,
+        dst_pixel_format,
         color_space,
         num_planes
     };
@@ -374,12 +437,12 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
         uint32_t x;
 
         for (x = 0; x < width; x++) {
-            if (pixel_format == DCP_PIXEL_FORMAT_ARGB) {
+            if (src_pixel_format == DCP_PIXEL_FORMAT_ARGB) {
                 *input++ = rgb_to_yuv_input[y][x].a;
                 *input++ = rgb_to_yuv_input[y][x].r;
                 *input++ = rgb_to_yuv_input[y][x].g;
                 *input++ = rgb_to_yuv_input[y][x].b;
-            } else if (pixel_format == DCP_PIXEL_FORMAT_BGRA) {
+            } else if (src_pixel_format == DCP_PIXEL_FORMAT_BGRA) {
                 *input++ = rgb_to_yuv_input[y][x].b;
                 *input++ = rgb_to_yuv_input[y][x].g;
                 *input++ = rgb_to_yuv_input[y][x].r;
@@ -393,18 +456,49 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
     }
 
     /* Allocate and initialize output */
+    switch (dst_pixel_format)
+    {
+        case DCP_PIXEL_FORMAT_NV12:
+            chroma_fill_bytes = chroma_stride - width;
+            chroma_height = height / 2;
+            out_size = (luma_stride * height) + (chroma_stride * chroma_height);
+            break;
+        case DCP_PIXEL_FORMAT_I420:
+            chroma_fill_bytes = chroma_stride - width / 2;
+            chroma_height = height / 2;
+            out_size = (luma_stride * height) + 2 * (chroma_stride * chroma_height);
+            break;
+        case DCP_PIXEL_FORMAT_I444:
+            chroma_fill_bytes = chroma_stride - width;
+            chroma_height = height;
+            out_size = (luma_stride * height) + 2 * (chroma_stride * chroma_height);
+            break;
+    }
+
     test_output = (uint8_t *)stack_alloc(out_size);
 
     /* Compute strides */
     src_stride = src_fill_bytes == 0 ? DCP_STRIDE_AUTO : src_stride;
-    if (num_planes == 1) {
-        dst_strides[0] = luma_fill_bytes == 0 ? DCP_STRIDE_AUTO : luma_stride;
-        dst_buffers[0] = test_output;
-    } else { /* 2 */
+
+    if (dst_pixel_format == DCP_PIXEL_FORMAT_NV12) {
+        if (num_planes == 1) {
+            dst_strides[0] = luma_fill_bytes == 0 ? DCP_STRIDE_AUTO : luma_stride;
+            dst_buffers[0] = test_output;
+        } else { /* 2 */
+            dst_strides[0] = luma_fill_bytes == 0 ? DCP_STRIDE_AUTO : luma_stride;
+            dst_strides[1] = chroma_fill_bytes == 0 ? DCP_STRIDE_AUTO : chroma_stride;
+
+            dst_buffers[0] = test_output;
+            dst_buffers[1] = &test_output[luma_stride * height];
+        }
+    } else {
         dst_strides[0] = luma_fill_bytes == 0 ? DCP_STRIDE_AUTO : luma_stride;
         dst_strides[1] = chroma_fill_bytes == 0 ? DCP_STRIDE_AUTO : chroma_stride;
+        dst_strides[2] = chroma_fill_bytes == 0 ? DCP_STRIDE_AUTO : chroma_stride;
+
         dst_buffers[0] = test_output;
         dst_buffers[1] = &test_output[luma_stride * height];
+        dst_buffers[2] = &test_output[luma_stride * height + chroma_stride * chroma_height];
     }
 
     /* Perform conversion */
@@ -423,7 +517,7 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
         size_t x;
 
         for (x = 0; x < width; x++, count++, output++) {
-            TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_bt601_output : rgb_to_yuv_bt709_output)[y][x]);
+            TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_y_bt601_output : rgb_to_yuv_y_bt709_output)[y][x]);
         }
 
         for (x = 0; x < luma_fill_bytes; x++, count++, output++) {
@@ -431,18 +525,79 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
         }
     }
 
-    /* Check all chroma samples are correct */
-    for (y = 0; y < chroma_height; y++) {
-        size_t x;
+    switch (dst_pixel_format)
+    {
+    case DCP_PIXEL_FORMAT_NV12:
+        {
+            for (y = 0; y < chroma_height; y++) {
+                size_t x;
 
-        for (x = 0; x < width; x++, count++, output++) {
-            TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_bt601_output : rgb_to_yuv_bt709_output)[8 + y][x]);
-        }
+                for (x = 0; x < width / 2; x++, count+=2, output+=2) {
+                    TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb2_bt601_output : rgb_to_yuv_cb2_bt709_output)[y][x]);
+                    TEST_ASSERT_EQ(*(output + 1), (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr2_bt601_output : rgb_to_yuv_cr2_bt709_output)[y][x]);
+                }
 
-        for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
-            TEST_ASSERT_EQ(*output, 0);
+                for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, 0);
+                }
+            }
         }
-    }
+        break;
+    case DCP_PIXEL_FORMAT_I420:
+        {
+            for (y = 0; y < chroma_height; y++) {
+                size_t x;
+
+                for (x = 0; x < width / 2; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb2_bt601_output : rgb_to_yuv_cb2_bt709_output)[y][x]);
+                }
+
+                for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, 0);
+                }
+            }
+
+            for (y = 0; y < chroma_height; y++) {
+                size_t x;
+
+                for (x = 0; x < width / 2; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr2_bt601_output : rgb_to_yuv_cr2_bt709_output)[y][x]);
+                }
+
+                for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, 0);
+                }
+            }
+        }
+        break;
+    case DCP_PIXEL_FORMAT_I444:
+        {
+            for (y = 0; y < height; y++) {
+                size_t x;
+
+                for (x = 0; x < width; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb_bt601_output : rgb_to_yuv_cb_bt709_output)[y][x]);
+                }
+
+                for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, 0);
+                }
+            }
+
+            for (y = 0; y < height; y++) {
+                size_t x;
+
+                for (x = 0; x < width; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr_bt601_output : rgb_to_yuv_cr_bt709_output)[y][x]);
+                }
+
+                for (x = 0; x < chroma_fill_bytes; x++, count++, output++) {
+                    TEST_ASSERT_EQ(*output, 0);
+                }
+            }
+        }
+        break;
+    } 
 
     /* Rest must be identically null */
     for (; count < out_size; count++, output++) {
@@ -457,15 +612,16 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       num_planes,
                                    uint32_t       width,
                                    uint32_t       height,
                                    DcpColorSpace  color_space,
-                                   DcpPixelFormat pixel_format)
+                                   DcpPixelFormat src_pixel_format,
+                                   DcpPixelFormat dst_pixel_format)
 {
     const size_t max_fill_bytes = 15;
-    const size_t min_src_stride = (size_t)width * (pixel_format == DCP_PIXEL_FORMAT_BGR ? 3 : 4);
+    const size_t min_src_stride = (size_t)width * (src_pixel_format == DCP_PIXEL_FORMAT_BGR ? 3 : 4);
     const size_t max_src_stride = min_src_stride + max_fill_bytes;
     const size_t min_dst_stride = width;
     const size_t max_dst_stride = min_dst_stride + max_fill_bytes;
 
-    TEST_BEGIN_GROUP("cs=%d,pf=%d", color_space, pixel_format);
+    TEST_BEGIN_GROUP("cs=%d,spf=%d,dpf=%d", color_space, src_pixel_format, dst_pixel_format);
 
     if (num_planes == 1) {
         size_t luma_stride;
@@ -476,7 +632,7 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       num_planes,
             TEST_BEGIN("D=%llu", luma_stride);
 
             for (src_stride = min_src_stride; src_stride <= max_src_stride; src_stride++) {
-                convert_image_rgb_to_yuv_size_mode_stride(num_planes, width, height, color_space, pixel_format, src_stride, luma_stride, luma_stride);
+                convert_image_rgb_to_yuv_size_mode_stride(num_planes, width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, luma_stride);
             }
 
             TEST_END();
@@ -493,7 +649,7 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       num_planes,
                 TEST_BEGIN("Y=%llu,C=%llu", luma_stride, chroma_stride);
 
                 for (src_stride = min_src_stride; src_stride <= max_src_stride; src_stride++) {
-                    convert_image_rgb_to_yuv_size_mode_stride(num_planes, width, height, color_space, pixel_format, src_stride, luma_stride, chroma_stride);
+                    convert_image_rgb_to_yuv_size_mode_stride(num_planes, width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, chroma_stride);
                 }
 
                 TEST_END();
@@ -505,9 +661,10 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       num_planes,
 }
 
 static void
-convert_image_rgb_to_yuv_size(uint32_t num_planes,
-                              uint32_t width,
-                              uint32_t height)
+convert_image_rgb_to_yuv_size(uint32_t       num_planes,
+                              uint32_t       width,
+                              uint32_t       height,
+                              DcpPixelFormat dst_pixel_format)
 {
     static const DcpPixelFormat supported_pixel_formats[] = {
         DCP_PIXEL_FORMAT_ARGB,
@@ -525,7 +682,7 @@ convert_image_rgb_to_yuv_size(uint32_t num_planes,
         size_t i;
 
         for (i = 0; i < supported_pixel_formats_count; i++) {
-            convert_image_rgb_to_yuv_size_mode(num_planes, width, height, color_space, supported_pixel_formats[i]);
+            convert_image_rgb_to_yuv_size_mode(num_planes, width, height, color_space, supported_pixel_formats[i], dst_pixel_format);
         }
     }
 
@@ -533,7 +690,8 @@ convert_image_rgb_to_yuv_size(uint32_t num_planes,
 }
 
 static void
-unit_convert_image_rgb_to_yuv(uint32_t num_planes)
+unit_convert_image_rgb_to_yuv(DcpPixelFormat dst_pixel_format,
+                              uint32_t       num_planes)
 {
     const uint32_t max_width = 8;
     const uint32_t max_height = 8;
@@ -546,7 +704,7 @@ unit_convert_image_rgb_to_yuv(uint32_t num_planes)
         uint32_t height;
 
         for (height = 2; height <= max_height; height += 2) {
-            convert_image_rgb_to_yuv_size(num_planes, width, height);
+            convert_image_rgb_to_yuv_size(num_planes, width, height, dst_pixel_format);
         }
     }
 
@@ -1441,9 +1599,13 @@ main(int   argc,
         unit_init();
     } else if (strcmp(test_name, "unit_get_buffers_size") == 0) {
         unit_get_buffers_size();
-    } else if (strcmp(test_name, "unit_convert_image_rgb_to_yuv_ok") == 0) {
+    } else if (strcmp(test_name, "unit_convert_image_rgb_to_nv12_ok") == 0) {
         int32_t planes = *(argv[2]) - '0';
-        unit_convert_image_rgb_to_yuv(planes);
+        unit_convert_image_rgb_to_yuv(DCP_PIXEL_FORMAT_NV12, planes);
+    } else if (strcmp(test_name, "unit_convert_image_rgb_to_i420_ok") == 0) {
+        unit_convert_image_rgb_to_yuv(DCP_PIXEL_FORMAT_I420, 3);
+    } else if (strcmp(test_name, "unit_convert_image_rgb_to_i444_ok") == 0) {
+        unit_convert_image_rgb_to_yuv(DCP_PIXEL_FORMAT_I444, 3);
     } else if (strcmp(test_name, "unit_convert_image_nv12_to_rgb_ok") == 0) {
         unit_convert_image_yuv_to_rgb(DCP_PIXEL_FORMAT_NV12);
     } else if (strcmp(test_name, "unit_convert_image_i420_to_rgb_ok") == 0) {
