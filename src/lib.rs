@@ -417,7 +417,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601, bgra_lrgb_i444_bt601);
         set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt709, bgra_lrgb_i444_bt709);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601, bgr_lrgb_i444_bt601);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709, bgr_lrgb_i444_bt709);        
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709, bgr_lrgb_i444_bt709);
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb, nv12_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb, nv12_bt709_bgra_lrgb);
         set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb, rgb_lrgb_bgra_lrgb);

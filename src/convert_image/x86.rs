@@ -529,19 +529,19 @@ fn lrgb_to_i444(
 
         for y in 0..line_count {
             for x in 0..col_count {
-                let (r, g, b) = unpack_ui8x3_i32(
-                    rgb_group.add(wg_index(x, y, depth, rgb_stride)),
-                    sampler,
-                );
+                let (r, g, b) =
+                    unpack_ui8x3_i32(rgb_group.add(wg_index(x, y, depth, rgb_stride)), sampler);
 
                 let y_data = y_group.add(wg_index(x, y, 1, y_stride));
                 *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, Y_OFFSET), FIX16) as u8;
 
                 let u_data = u_group.add(wg_index(x, y, 1, u_stride));
-                *u_data = fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
+                *u_data =
+                    fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
 
                 let v_data = v_group.add(wg_index(x, y, 1, v_stride));
-                *v_data = fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
+                *v_data =
+                    fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
             }
         }
     }

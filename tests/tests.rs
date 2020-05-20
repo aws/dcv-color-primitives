@@ -331,8 +331,7 @@ fn rgb_to_yuv_size_mode_stride(
     let h = height as usize;
     let luma_stride = w + luma_fill_bytes;
     let u_chroma_stride = match dst_pixel_format {
-        PixelFormat::I444 |
-        PixelFormat::Nv12 => w + u_chroma_fill_bytes,
+        PixelFormat::I444 | PixelFormat::Nv12 => w + u_chroma_fill_bytes,
         PixelFormat::I420 => (w / 2) + u_chroma_fill_bytes,
         _ => {
             panic!("Unsupported pixel format");
@@ -358,7 +357,7 @@ fn rgb_to_yuv_size_mode_stride(
                 + (u_chroma_stride * chroma_height)
                 + (v_chroma_stride * chroma_height)
         }
-        PixelFormat::I444 => (luma_stride * h) + (u_chroma_stride * h ) + (v_chroma_stride * h),
+        PixelFormat::I444 => (luma_stride * h) + (u_chroma_stride * h) + (v_chroma_stride * h),
         _ => {
             panic!("Unsupported pixel format");
         }
@@ -517,22 +516,22 @@ fn rgb_to_yuv_size_mode_stride(
 
             match dst_pixel_format {
                 PixelFormat::I444 => {
-                    let u_chroma_reference =  match color_space {
+                    let u_chroma_reference = match color_space {
                         ColorSpace::Bt601 => &RGB_TO_YUV_CB_BT601_OUTPUT,
                         _ => &RGB_TO_YUV_CB_BT709_OUTPUT,
                     };
-        
+
                     let v_chroma_reference = match color_space {
                         ColorSpace::Bt601 => &RGB_TO_YUV_CR_BT601_OUTPUT,
                         _ => &RGB_TO_YUV_CR_BT709_OUTPUT,
                     };
-        
+
                     for y in 0..h {
                         for x in 0..w {
                             assert!(test_output[i] == u_chroma_reference[y][x]);
                             i += 1;
                         }
-        
+
                         for _x in 0..u_chroma_fill_bytes {
                             assert!(test_output[i] == 0);
                             i += 1;
@@ -544,24 +543,24 @@ fn rgb_to_yuv_size_mode_stride(
                             assert!(test_output[i] == v_chroma_reference[y][x]);
                             i += 1;
                         }
-        
+
                         for _x in 0..v_chroma_fill_bytes {
                             assert!(test_output[i] == 0);
                             i += 1;
                         }
                     }
-                },
+                }
                 _ => {
-                    let u_chroma_reference =  match color_space {
+                    let u_chroma_reference = match color_space {
                         ColorSpace::Bt601 => &RGB_TO_YUV_CB2_BT601_OUTPUT,
                         _ => &RGB_TO_YUV_CB2_BT709_OUTPUT,
                     };
-        
+
                     let v_chroma_reference = match color_space {
                         ColorSpace::Bt601 => &RGB_TO_YUV_CR2_BT601_OUTPUT,
                         _ => &RGB_TO_YUV_CR2_BT709_OUTPUT,
                     };
-        
+
                     match dst_pixel_format {
                         PixelFormat::Nv12 => {
                             // Check all chroma samples are correct
@@ -571,13 +570,13 @@ fn rgb_to_yuv_size_mode_stride(
                                     assert!(test_output[i + 1] == v_chroma_reference[y][x]);
                                     i += 2;
                                 }
-        
+
                                 for _x in 0..u_chroma_fill_bytes {
                                     assert!(test_output[i] == 0);
                                     i += 1;
                                 }
                             }
-        
+
                             // Rest must be identically null
                             while i < out_size {
                                 assert!(test_output[i] == 0);
@@ -590,11 +589,11 @@ fn rgb_to_yuv_size_mode_stride(
                                 for x in 0..(w / 2) {
                                     assert!(test_output[i] == u_chroma_reference[y][x]);
                                     assert!(test_output[j] == v_chroma_reference[y][x]);
-        
+
                                     i += 1;
                                     j += 1;
                                 }
-        
+
                                 i += u_chroma_fill_bytes;
                                 j += v_chroma_fill_bytes;
                             }
