@@ -122,6 +122,7 @@ macro_rules! fix_to_i16_8x {
 /// x:   --x7--x6 --x5--x4 --x3--x2 --x1--x0
 /// y0:  --x3--x3 --x2--x2 --x1--x1 --x0--x0
 /// y1:  --x7--x7 --x6--x6 --x5--x5 --x4--x4
+#[inline(always)]
 unsafe fn i16_to_i16x2_8x(x: __m128i) -> (__m128i, __m128i) {
     (_mm_unpacklo_epi16(x, x), _mm_unpackhi_epi16(x, x))
 }
@@ -131,6 +132,7 @@ unsafe fn i16_to_i16x2_8x(x: __m128i) -> (__m128i, __m128i) {
 ///
 /// image: g15g14g13g12 g11g10g9g18 g7g6g5g4 g3g2g1g0
 /// res:   g7--g6-- g5--g4-- g3--g2-- g1--g0--
+#[inline(always)]
 unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
     let x = _mm_set1_epi64x(*(image as *const i64));
     _mm_unpacklo_epi8(zero!(), x)
@@ -142,6 +144,7 @@ unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
 /// image: g7r7g6r6 g5r5g4r4 g3r3g2r2 g1r1g0r0
 /// red:   r7--r6-- r5--r4-- r3--r2-- r1--r0--
 /// green: g7--g6-- g5--g4-- g3--g2-- g1--g0--
+#[inline(always)]
 unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
     let x = _mm_loadu_si128(image as *const __m128i);
     (
@@ -158,6 +161,7 @@ unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
 /// blue:     --r7--r6 --r5--r4 --r3--r2 --r1--r0
 /// image[0]: ffr3g3b3 ffr2g2b2 ffr1g1b1 ffr0g0b0
 /// image[1]: ffr7g7b7 ffr6g6b6 ffr5g5b5 ffr4g4b4
+#[inline(always)]
 unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m128i) {
     let x = _mm_packus_epi16(blue, red);
     let y = _mm_packus_epi16(green, _mm_srli_epi16(_mm_cmpeq_epi32(zero!(), zero!()), 8));
@@ -181,6 +185,7 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 ///
 /// green_red:         --g3--r3 --g2--r2 --g1--r1 --g0--r0
 /// green_blue:        --g3--b3 --g2--b2 --g1--b1 --g0--b0
+#[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i, __m128i) {
     let line = match sampler {
         Sampler::BgrOverflow => _mm_set_epi32(
@@ -220,12 +225,14 @@ unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i,
 ///
 /// red:      ******r3 ******r2 ******r1 ******r0
 /// image[0]: r3r2r1r0
+#[inline(always)]
 unsafe fn pack_i32_4x(image: *mut u8, red: __m128i) {
     let y = _mm_packs_epi32(red, red);
     let z = _mm_packus_epi16(y, y);
     *(image as *mut i32) = _mm_cvtsi128_si32(z);
 }
 
+#[inline(always)]
 unsafe fn affine_transform(xy: __m128i, zy: __m128i, weights: &[__m128i; 3]) -> __m128i {
     _mm_add_epi32(
         _mm_add_epi32(
@@ -246,6 +253,7 @@ unsafe fn affine_transform(xy: __m128i, zy: __m128i, weights: &[__m128i; 3]) -> 
 /// xs1 = x20 + x30 + x21 + x31
 /// ys0 = y00 + y10 + y01 + y11
 /// ys1 = y20 + y30 + y21 + y31
+#[inline(always)]
 unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
     _mm_add_epi16(
         _mm_add_epi16(xy0, _mm_shuffle_epi32(xy0, xcgh_odd_even_words!())),
@@ -254,6 +262,7 @@ unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
 }
 
 /// Convert linear rgb to yuv colorspace (4-wide)
+#[inline(always)]
 unsafe fn lrgb_to_yuv_4x(
     rgb0: *const u8,
     rgb1: *const u8,
@@ -284,6 +293,7 @@ unsafe fn lrgb_to_yuv_4x(
     );
 }
 
+#[inline(always)]
 unsafe fn lrgb_to_i420_4x(
     rgb0: *const u8,
     rgb1: *const u8,
@@ -325,6 +335,7 @@ unsafe fn lrgb_to_i420_4x(
     *(v as *mut u16) = (uv_res >> 16) as u16;
 }
 
+#[inline(always)]
 unsafe fn lrgb_to_i444_4x(
     rgb: *const u8,
     y: *mut u8,
@@ -354,6 +365,38 @@ unsafe fn lrgb_to_i444_4x(
 
 #[inline(always)]
 fn lrgb_to_yuv(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+    sampler: Sampler,
+) -> bool {
+    unsafe {
+        lrgb_to_yuv_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+            sampler,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn lrgb_to_yuv_sse2(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -429,88 +472,87 @@ fn lrgb_to_yuv(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let y_weigths = [
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
-            _mm_set1_epi32(Y_OFFSET),
-        ];
 
-        let uv_weights = [
-            _mm_set_epi32(
-                FORWARD_WEIGHTS[col][2],
-                FORWARD_WEIGHTS[col][3],
-                FORWARD_WEIGHTS[col][2],
-                FORWARD_WEIGHTS[col][3],
-            ),
-            _mm_set_epi32(
-                FORWARD_WEIGHTS[col][4],
-                FORWARD_WEIGHTS[col][5],
-                FORWARD_WEIGHTS[col][4],
-                FORWARD_WEIGHTS[col][5],
-            ),
-            _mm_set1_epi32(C_OFFSET),
-        ];
+    let y_weigths = [
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(Y_OFFSET),
+    ];
 
-        let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-        let nv12_depth = LRGB_TO_YUV_WAVES;
-        let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let uv_weights = [
+        _mm_set_epi32(
+            FORWARD_WEIGHTS[col][2],
+            FORWARD_WEIGHTS[col][3],
+            FORWARD_WEIGHTS[col][2],
+            FORWARD_WEIGHTS[col][3],
+        ),
+        _mm_set_epi32(
+            FORWARD_WEIGHTS[col][4],
+            FORWARD_WEIGHTS[col][5],
+            FORWARD_WEIGHTS[col][4],
+            FORWARD_WEIGHTS[col][5],
+        ),
+        _mm_set1_epi32(C_OFFSET),
+    ];
 
-        let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
-            line_count
-        } else {
-            line_count - 2
-        };
+    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let nv12_depth = LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
 
-        let rgb_group = rgb_plane.as_ptr();
-        let y_group = y_plane.as_mut_ptr();
-        let uv_group = uv_plane.as_mut_ptr();
-        let wg_width = col_count / LRGB_TO_YUV_WAVES;
-        let wg_height = y_start / 2;
+    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
+        line_count
+    } else {
+        line_count - 2
+    };
 
-        for y in 0..wg_height {
-            for x in 0..wg_width {
-                lrgb_to_yuv_4x(
-                    rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
-                    rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
-                    y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)),
-                    y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)),
-                    uv_group.add(wg_index(x, y, nv12_depth, uv_stride)),
-                    sampler,
-                    &y_weigths,
-                    &uv_weights,
-                );
-            }
-        }
+    let rgb_group = rgb_plane.as_ptr();
+    let y_group = y_plane.as_mut_ptr();
+    let uv_group = uv_plane.as_mut_ptr();
+    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_height = y_start / 2;
 
-        // Handle leftover line
-        if y_start != line_count {
-            let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
-            for x in 0..wg_width {
-                lrgb_to_yuv_4x(
-                    rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
-                    rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
-                    y_group.add(wg_index(x, y_start, nv12_depth, y_stride)),
-                    y_group.add(wg_index(x, y_start + 1, nv12_depth, y_stride)),
-                    uv_group.add(wg_index(x, wg_height, nv12_depth, uv_stride)),
-                    sampler,
-                    &y_weigths,
-                    &uv_weights,
-                );
-            }
-
-            // Handle leftover pixels
+    for y in 0..wg_height {
+        for x in 0..wg_width {
             lrgb_to_yuv_4x(
-                rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
-                y_group.add(wg_index(wg_width, y_start, nv12_depth, y_stride)),
-                y_group.add(wg_index(wg_width, y_start + 1, nv12_depth, y_stride)),
-                uv_group.add(wg_index(wg_width, wg_height, nv12_depth, uv_stride)),
-                Sampler::BgrOverflow,
+                rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
+                rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)),
+                y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)),
+                uv_group.add(wg_index(x, y, nv12_depth, uv_stride)),
+                sampler,
                 &y_weigths,
                 &uv_weights,
             );
         }
+    }
+
+    // Handle leftover line
+    if y_start != line_count {
+        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..wg_width {
+            lrgb_to_yuv_4x(
+                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
+                rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, y_start, nv12_depth, y_stride)),
+                y_group.add(wg_index(x, y_start + 1, nv12_depth, y_stride)),
+                uv_group.add(wg_index(x, wg_height, nv12_depth, uv_stride)),
+                sampler,
+                &y_weigths,
+                &uv_weights,
+            );
+        }
+
+        // Handle leftover pixels
+        lrgb_to_yuv_4x(
+            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
+            rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
+            y_group.add(wg_index(wg_width, y_start, nv12_depth, y_stride)),
+            y_group.add(wg_index(wg_width, y_start + 1, nv12_depth, y_stride)),
+            uv_group.add(wg_index(wg_width, wg_height, nv12_depth, uv_stride)),
+            Sampler::BgrOverflow,
+            &y_weigths,
+            &uv_weights,
+        );
     }
 
     true
@@ -518,6 +560,38 @@ fn lrgb_to_yuv(
 
 #[inline(always)]
 fn lrgb_to_i420(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+    sampler: Sampler,
+) -> bool {
+    unsafe {
+        lrgb_to_i420_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+            sampler,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn lrgb_to_i420_sse2(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -599,101 +673,100 @@ fn lrgb_to_i420(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let y_weigths = [
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
-            _mm_set1_epi32(Y_OFFSET),
-        ];
 
-        let uv_weights = [
-            _mm_set_epi32(
-                FORWARD_WEIGHTS[col][2],
-                FORWARD_WEIGHTS[col][3],
-                FORWARD_WEIGHTS[col][2],
-                FORWARD_WEIGHTS[col][3],
-            ),
-            _mm_set_epi32(
-                FORWARD_WEIGHTS[col][4],
-                FORWARD_WEIGHTS[col][5],
-                FORWARD_WEIGHTS[col][4],
-                FORWARD_WEIGHTS[col][5],
-            ),
-            _mm_set1_epi32(C_OFFSET),
-        ];
+    let y_weigths = [
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(Y_OFFSET),
+    ];
 
-        let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-        let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let uv_weights = [
+        _mm_set_epi32(
+            FORWARD_WEIGHTS[col][2],
+            FORWARD_WEIGHTS[col][3],
+            FORWARD_WEIGHTS[col][2],
+            FORWARD_WEIGHTS[col][3],
+        ),
+        _mm_set_epi32(
+            FORWARD_WEIGHTS[col][4],
+            FORWARD_WEIGHTS[col][5],
+            FORWARD_WEIGHTS[col][4],
+            FORWARD_WEIGHTS[col][5],
+        ),
+        _mm_set1_epi32(C_OFFSET),
+    ];
 
-        let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
-            line_count
-        } else {
-            line_count - 2
-        };
+    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
 
-        let rgb_group = rgb_plane.as_ptr();
-        let y_group = y_plane.as_mut_ptr();
-        let u_group = u_plane.as_mut_ptr();
-        let v_group = v_plane.as_mut_ptr();
-        let wg_width = col_count / LRGB_TO_YUV_WAVES;
-        let wg_height = y_start / 2;
+    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
+        line_count
+    } else {
+        line_count - 2
+    };
 
-        for y in 0..wg_height {
-            for x in 0..wg_width {
-                lrgb_to_i420_4x(
-                    rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
-                    rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
-                    y_group.add(wg_index(x, 2 * y, LRGB_TO_YUV_WAVES, y_stride)),
-                    y_group.add(wg_index(x, 2 * y + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                    u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, u_stride)),
-                    v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, v_stride)),
-                    sampler,
-                    &y_weigths,
-                    &uv_weights,
-                );
-            }
-        }
+    let rgb_group = rgb_plane.as_ptr();
+    let y_group = y_plane.as_mut_ptr();
+    let u_group = u_plane.as_mut_ptr();
+    let v_group = v_plane.as_mut_ptr();
+    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_height = y_start / 2;
 
-        // Handle leftover line
-        if y_start != line_count {
-            let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
-            for x in 0..wg_width {
-                lrgb_to_i420_4x(
-                    rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
-                    rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
-                    y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-                    y_group.add(wg_index(x, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                    u_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
-                    v_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
-                    sampler,
-                    &y_weigths,
-                    &uv_weights,
-                );
-            }
-
-            // Handle leftover pixels
+    for y in 0..wg_height {
+        for x in 0..wg_width {
             lrgb_to_i420_4x(
-                rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
-                y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-                y_group.add(wg_index(wg_width, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(
-                    wg_width,
-                    wg_height,
-                    LRGB_TO_YUV_WAVES / 2,
-                    u_stride,
-                )),
-                v_group.add(wg_index(
-                    wg_width,
-                    wg_height,
-                    LRGB_TO_YUV_WAVES / 2,
-                    v_stride,
-                )),
-                Sampler::BgrOverflow,
+                rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
+                rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, 2 * y, LRGB_TO_YUV_WAVES, y_stride)),
+                y_group.add(wg_index(x, 2 * y + 1, LRGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, u_stride)),
+                v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, v_stride)),
+                sampler,
                 &y_weigths,
                 &uv_weights,
             );
         }
+    }
+
+    // Handle leftover line
+    if y_start != line_count {
+        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..wg_width {
+            lrgb_to_i420_4x(
+                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
+                rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+                y_group.add(wg_index(x, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
+                v_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
+                sampler,
+                &y_weigths,
+                &uv_weights,
+            );
+        }
+
+        // Handle leftover pixels
+        lrgb_to_i420_4x(
+            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
+            rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
+            y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+            y_group.add(wg_index(wg_width, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(
+                wg_width,
+                wg_height,
+                LRGB_TO_YUV_WAVES / 2,
+                u_stride,
+            )),
+            v_group.add(wg_index(
+                wg_width,
+                wg_height,
+                LRGB_TO_YUV_WAVES / 2,
+                v_stride,
+            )),
+            Sampler::BgrOverflow,
+            &y_weigths,
+            &uv_weights,
+        );
     }
 
     true
@@ -701,6 +774,38 @@ fn lrgb_to_i420(
 
 #[inline(always)]
 fn lrgb_to_i444(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+    sampler: Sampler,
+) -> bool {
+    unsafe {
+        lrgb_to_i444_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+            sampler,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn lrgb_to_i444_sse2(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -781,46 +886,45 @@ fn lrgb_to_i444(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let y_weights = [
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
-            _mm_set1_epi32(Y_OFFSET),
-        ];
 
-        let u_weights = [
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][3]),
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][5]),
-            _mm_set1_epi32(C_OFFSET16),
-        ];
+    let y_weights = [
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(Y_OFFSET),
+    ];
 
-        let v_weights = [
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][2]),
-            _mm_set1_epi32(FORWARD_WEIGHTS[col][4]),
-            _mm_set1_epi32(C_OFFSET16),
-        ];
+    let u_weights = [
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][3]),
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][5]),
+        _mm_set1_epi32(C_OFFSET16),
+    ];
 
-        let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-        let rgb_group = rgb_plane.as_ptr();
-        let y_group = y_plane.as_mut_ptr();
-        let u_group = u_plane.as_mut_ptr();
-        let v_group = v_plane.as_mut_ptr();
-        let wg_width = col_count / LRGB_TO_YUV_WAVES;
-        let wg_height = line_count;
+    let v_weights = [
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][2]),
+        _mm_set1_epi32(FORWARD_WEIGHTS[col][4]),
+        _mm_set1_epi32(C_OFFSET16),
+    ];
 
-        for y in 0..wg_height {
-            for x in 0..wg_width {
-                lrgb_to_i444_4x(
-                    rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
-                    y_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, y_stride)),
-                    u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, u_stride)),
-                    v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, v_stride)),
-                    sampler,
-                    &y_weights,
-                    &u_weights,
-                    &v_weights,
-                );
-            }
+    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let rgb_group = rgb_plane.as_ptr();
+    let y_group = y_plane.as_mut_ptr();
+    let u_group = u_plane.as_mut_ptr();
+    let v_group = v_plane.as_mut_ptr();
+    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_height = line_count;
+
+    for y in 0..wg_height {
+        for x in 0..wg_width {
+            lrgb_to_i444_4x(
+                rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, u_stride)),
+                v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, v_stride)),
+                sampler,
+                &y_weights,
+                &u_weights,
+                &v_weights,
+            );
         }
     }
 
@@ -829,6 +933,36 @@ fn lrgb_to_i444(
 
 #[inline(always)]
 fn yuv_to_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+) -> bool {
+    unsafe {
+        yuv_to_lrgb_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn yuv_to_lrgb_sse2(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -903,79 +1037,78 @@ fn yuv_to_lrgb(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-        let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-        let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-        let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-        let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-        let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-        let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-        let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        let y_group = y_plane.as_ptr();
-        let uv_group = uv_plane.as_ptr();
-        let rgb_group = rgb_plane.as_mut_ptr();
-        let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
-        let nv12_depth = YUV_TO_LRGB_WAVES;
-        let wg_width = col_count / YUV_TO_LRGB_WAVES;
+    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
+    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
+    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
+    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
+    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
+    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
+    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
+    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        for y in 0..wg_height {
-            for x in 0..wg_width {
-                let (cb, cr) =
-                    unpack_ui8x2_i16be_8x(uv_group.add(wg_index(x, y, nv12_depth, uv_stride)));
+    let y_group = y_plane.as_ptr();
+    let uv_group = uv_plane.as_ptr();
+    let rgb_group = rgb_plane.as_mut_ptr();
+    let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
+    let nv12_depth = YUV_TO_LRGB_WAVES;
+    let wg_width = col_count / YUV_TO_LRGB_WAVES;
 
-                let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
-                let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
-                let sg = _mm_sub_epi16(
-                    gp,
-                    _mm_add_epi16(_mm_mulhi_epu16(cb, gcbm), _mm_mulhi_epu16(cr, gcrm)),
-                );
+    for y in 0..wg_height {
+        for x in 0..wg_width {
+            let (cb, cr) =
+                unpack_ui8x2_i16be_8x(uv_group.add(wg_index(x, y, nv12_depth, uv_stride)));
 
-                let (sb_lo, sb_hi) = i16_to_i16x2_8x(sb);
-                let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
-                let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
+            let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
+            let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
+            let sg = _mm_sub_epi16(
+                gp,
+                _mm_add_epi16(_mm_mulhi_epu16(cb, gcbm), _mm_mulhi_epu16(cr, gcrm)),
+            );
 
-                let y0 = _mm_loadu_si128(
-                    y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)) as *const __m128i
-                );
+            let (sb_lo, sb_hi) = i16_to_i16x2_8x(sb);
+            let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
+            let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
-                let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
-                );
+            let y0 = _mm_loadu_si128(
+                y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)) as *const __m128i
+            );
 
-                let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
-                );
+            let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
+            );
 
-                let y1 = _mm_loadu_si128(
-                    y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)) as *const __m128i
-                );
+            let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
+            );
 
-                let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
-                );
+            let y1 = _mm_loadu_si128(
+                y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)) as *const __m128i
+            );
 
-                let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
-                );
-            }
+            let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
+            );
+
+            let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
+            );
         }
     }
 
@@ -984,6 +1117,36 @@ fn yuv_to_lrgb(
 
 #[inline(always)]
 fn i420_to_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+) -> bool {
+    unsafe {
+        i420_to_lrgb_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn i420_to_lrgb_sse2(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1059,80 +1222,79 @@ fn i420_to_lrgb(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-        let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-        let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-        let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-        let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-        let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-        let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-        let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        let y_group = y_plane.as_ptr();
-        let u_group = u_plane.as_ptr();
-        let v_group = v_plane.as_ptr();
-        let rgb_group = rgb_plane.as_mut_ptr();
-        let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
-        let i420_depth = YUV_TO_LRGB_WAVES;
-        let wg_width = col_count / YUV_TO_LRGB_WAVES;
+    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
+    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
+    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
+    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
+    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
+    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
+    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
+    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        for y in 0..wg_height {
-            for x in 0..wg_width {
-                let cb = unpack_ui8_i16be_8x(u_group.add(wg_index(x, y, i420_depth / 2, u_stride)));
-                let cr = unpack_ui8_i16be_8x(v_group.add(wg_index(x, y, i420_depth / 2, v_stride)));
+    let y_group = y_plane.as_ptr();
+    let u_group = u_plane.as_ptr();
+    let v_group = v_plane.as_ptr();
+    let rgb_group = rgb_plane.as_mut_ptr();
+    let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
+    let i420_depth = YUV_TO_LRGB_WAVES;
+    let wg_width = col_count / YUV_TO_LRGB_WAVES;
 
-                let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
-                let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
-                let sg = _mm_sub_epi16(
-                    gp,
-                    _mm_add_epi16(_mm_mulhi_epu16(cb, gcbm), _mm_mulhi_epu16(cr, gcrm)),
-                );
+    for y in 0..wg_height {
+        for x in 0..wg_width {
+            let cb = unpack_ui8_i16be_8x(u_group.add(wg_index(x, y, i420_depth / 2, u_stride)));
+            let cr = unpack_ui8_i16be_8x(v_group.add(wg_index(x, y, i420_depth / 2, v_stride)));
 
-                let (sb_lo, sb_hi) = i16_to_i16x2_8x(sb);
-                let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
-                let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
+            let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
+            let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
+            let sg = _mm_sub_epi16(
+                gp,
+                _mm_add_epi16(_mm_mulhi_epu16(cb, gcbm), _mm_mulhi_epu16(cr, gcrm)),
+            );
 
-                let y0 = _mm_loadu_si128(
-                    y_group.add(wg_index(x, 2 * y, i420_depth, y_stride)) as *const __m128i
-                );
+            let (sb_lo, sb_hi) = i16_to_i16x2_8x(sb);
+            let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
+            let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
-                let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
-                );
+            let y0 = _mm_loadu_si128(
+                y_group.add(wg_index(x, 2 * y, i420_depth, y_stride)) as *const __m128i
+            );
 
-                let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
-                );
+            let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
+            );
 
-                let y1 = _mm_loadu_si128(
-                    y_group.add(wg_index(x, 2 * y + 1, i420_depth, y_stride)) as *const __m128i
-                );
+            let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
+            );
 
-                let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
-                );
+            let y1 = _mm_loadu_si128(
+                y_group.add(wg_index(x, 2 * y + 1, i420_depth, y_stride)) as *const __m128i
+            );
 
-                let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
-                );
-            }
+            let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
+            );
+
+            let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
+            );
         }
     }
 
@@ -1141,6 +1303,36 @@ fn i420_to_lrgb(
 
 #[inline(always)]
 fn i444_to_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: Colorimetry,
+) -> bool {
+    unsafe {
+        i444_to_lrgb_sse2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+            channels,
+            colorimetry,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn i444_to_lrgb_sse2(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1215,54 +1407,53 @@ fn i444_to_lrgb(
     }
 
     let col = colorimetry as usize;
-    unsafe {
-        let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-        let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-        let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-        let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-        let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-        let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-        let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-        let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        let y_group = y_plane.as_ptr();
-        let u_group = u_plane.as_ptr();
-        let v_group = v_plane.as_ptr();
-        let rgb_group = rgb_plane.as_mut_ptr();
-        let rgb_depth = YUV_TO_LRGB_WAVES * 2;
-        let group_width = YUV_TO_LRGB_WAVES / 2;
-        let wg_width = col_count / group_width;
+    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
+    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
+    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
+    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
+    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
+    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
+    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
+    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
 
-        for y in 0..line_count {
-            for x in 0..wg_width {
-                let cb0 = _mm_loadl_epi64(
-                    u_group.add(wg_index(x, y, group_width, u_stride)) as *const __m128i
-                );
-                let cr0 = _mm_loadl_epi64(
-                    v_group.add(wg_index(x, y, group_width, v_stride)) as *const __m128i
-                );
-                let y0 = _mm_loadl_epi64(
-                    y_group.add(wg_index(x, y, group_width, y_stride)) as *const __m128i
-                );
+    let y_group = y_plane.as_ptr();
+    let u_group = u_plane.as_ptr();
+    let v_group = v_plane.as_ptr();
+    let rgb_group = rgb_plane.as_mut_ptr();
+    let rgb_depth = YUV_TO_LRGB_WAVES * 2;
+    let group_width = YUV_TO_LRGB_WAVES / 2;
+    let wg_width = col_count / group_width;
 
-                let cb_lo = _mm_unpacklo_epi8(zero!(), cb0);
-                let cr_lo = _mm_unpacklo_epi8(zero!(), cr0);
-                let y_lo = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
+    for y in 0..line_count {
+        for x in 0..wg_width {
+            let cb0 = _mm_loadl_epi64(
+                u_group.add(wg_index(x, y, group_width, u_stride)) as *const __m128i
+            );
+            let cr0 = _mm_loadl_epi64(
+                v_group.add(wg_index(x, y, group_width, v_stride)) as *const __m128i
+            );
+            let y0 = _mm_loadl_epi64(
+                y_group.add(wg_index(x, y, group_width, y_stride)) as *const __m128i
+            );
 
-                let sb_lo = _mm_sub_epi16(_mm_mulhi_epu16(cb_lo, bcbm), bn);
-                let sr_lo = _mm_sub_epi16(_mm_mulhi_epu16(cr_lo, rcrm), rn);
-                let sg_lo = _mm_sub_epi16(
-                    gp,
-                    _mm_add_epi16(_mm_mulhi_epu16(cb_lo, gcbm), _mm_mulhi_epu16(cr_lo, gcrm)),
-                );
+            let cb_lo = _mm_unpacklo_epi8(zero!(), cb0);
+            let cr_lo = _mm_unpacklo_epi8(zero!(), cr0);
+            let y_lo = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
 
-                pack_i16x3_8x(
-                    rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
-                    fix_to_i16_8x!(_mm_add_epi16(sr_lo, y_lo), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sg_lo, y_lo), FIX6),
-                    fix_to_i16_8x!(_mm_add_epi16(sb_lo, y_lo), FIX6),
-                );
-            }
+            let sb_lo = _mm_sub_epi16(_mm_mulhi_epu16(cb_lo, bcbm), bn);
+            let sr_lo = _mm_sub_epi16(_mm_mulhi_epu16(cr_lo, rcrm), rn);
+            let sg_lo = _mm_sub_epi16(
+                gp,
+                _mm_add_epi16(_mm_mulhi_epu16(cb_lo, gcbm), _mm_mulhi_epu16(cr_lo, gcrm)),
+            );
+
+            pack_i16x3_8x(
+                rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
+                fix_to_i16_8x!(_mm_add_epi16(sr_lo, y_lo), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sg_lo, y_lo), FIX6),
+                fix_to_i16_8x!(_mm_add_epi16(sb_lo, y_lo), FIX6),
+            );
         }
     }
 
