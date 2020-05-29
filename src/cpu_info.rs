@@ -72,10 +72,7 @@ pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
         }
 
         // This ensures we always use hardware intrinsics and we do not use software emulation
-        #[cfg(all(
-            any(target_arch = "x86", target_arch = "x86_64"),
-            target_feature = "sse2"
-        ))]
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             cpuid(1, features);
             if (features[3] & (1 << 26)) != 0 {
@@ -87,10 +84,7 @@ pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
                         features[1] = 0;
                     }
                     _ => {
-                        #[cfg(all(
-                            any(target_arch = "x86", target_arch = "x86_64"),
-                            target_feature = "avx2"
-                        ))]
+                        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                         cpuid(7, features);
                     }
                 }
