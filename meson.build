@@ -91,7 +91,14 @@ else
   cargo_target = ['build', ]
 endif
 
-run_command('cargo', cargo_target)
+cargo_result = run_command('cargo', cargo_target)
+
+message(cargo_result.stdout())
+message(cargo_result.stderr())
+
+if cargo_result.returncode() != 0
+    error('-- cargo build failed')
+endif
 
 dcp_lib_path = meson.source_root() / 'target' / dcp_build_dir
 
