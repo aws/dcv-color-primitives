@@ -18,11 +18,13 @@ const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
     x << frac_bits
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
     let val = (((x & 0xFFFF) as u32) << 16) | ((y & 0xFFFF) as u32);
     val as i32
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub const fn i32_to_i16(x: i32) -> i16 {
     let val = (x & 0xFFFF) as u32;
     val as i16
@@ -32,6 +34,7 @@ pub fn wg_index(x: usize, y: usize, w: usize, h: usize) -> usize {
     (h * y) + (x * w)
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn is_wg_multiple(x: u32, w: usize) -> bool {
     ((x as usize) & (w - 1)) == 0
 }
@@ -41,6 +44,7 @@ pub const FIX18: i32 = 18;
 pub const FIX16_HALF: i32 = 1 << (FIX16 - 1);
 pub const FIX18_HALF: i32 = 1 << (FIX16 + 1);
 pub const FIX6: i32 = 6;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub const SHORT_HALF: i32 = 16384;
 
 // Cooefficient table for 601
