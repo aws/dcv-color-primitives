@@ -12,6 +12,10 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support data coming from a single buffer or coming from multiple image planes
 * Support non-tightly packed data
 * Support images greater than 4GB (64 bit)
+* Support ARM (aarch64)[*]
+* Support WebAssembly[*]
+
+[*]: Supplemental cpu extension sets not yet supported.
 
 ## Image format conversion
 
@@ -81,6 +85,23 @@ Run benchmark:
 ```
 python benches/geninput.py
 cargo bench
+```
+
+## WebAssembly
+
+Install the needed dependencies:
+```
+rustup target add wasm32-unknown-unknown
+```
+
+To build for debug experience:
+```
+cargo build --target wasm32-unknown-unknown
+```
+
+To test, ensure you have installed [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/). Then:
+```
+wasm-pack test --node
 ```
 
 ## Usage
@@ -399,7 +420,7 @@ See documentation for further information.
 
 ## C bindings
 
-DCV Color Primitives provides C bindings. A static library will be automatically generated for the 
+DCV Color Primitives provides C bindings. A static library will be automatically generated for the
 default build.
 
 The API is slightly different than the rust one. Check dcv_color_primitives.h for examples and further information.
@@ -473,4 +494,4 @@ help for further instructions:
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
-  
+
