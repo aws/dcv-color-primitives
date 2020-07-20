@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "dcv-color-primitives"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "criterion 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
