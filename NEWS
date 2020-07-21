@@ -1,3 +1,12 @@
+News in 0.1.12
+--------------
+* Handle overflow in bgr to i444 conversion
+* Handle zero-width images
+* Avoid triggering panic in get_buffers_size
+* Avoid triggering panic in avx2 rgb to nv12 conversion (and viceversa)
+* Synchronized C unit tests with rust ones
+* Benchmark: ensure fair comparison between algorithms and operating systems
+
 News in 0.1.11
 --------------
 * Add support for ARM platform
