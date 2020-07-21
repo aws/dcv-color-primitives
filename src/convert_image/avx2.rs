@@ -473,7 +473,7 @@ unsafe fn lrgb_to_yuv_avx2(
         (&mut first[0][..], &mut last[0][..])
     };
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -677,7 +677,7 @@ unsafe fn lrgb_to_i420_avx2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -899,7 +899,7 @@ unsafe fn lrgb_to_i444_avx2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1091,7 +1091,7 @@ unsafe fn yuv_to_lrgb_avx2(
         (first[0], last[0])
     };
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1299,7 +1299,7 @@ unsafe fn i420_to_lrgb_avx2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1513,7 +1513,7 @@ unsafe fn i444_to_lrgb_avx2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
