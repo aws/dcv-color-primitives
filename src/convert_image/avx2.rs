@@ -461,17 +461,11 @@ unsafe fn lrgb_to_yuv_avx2(
     };
 
     let rgb_plane = &src_buffers[0];
-    let (first, last) = dst_buffers.split_at_mut(last_dst_plane);
-    let interplane_split = y_stride * line_count;
-    if last_dst_plane == 0 && interplane_split > last[0].len() {
+
+    let yuv_planes = split_planes_mut(last_dst_plane, y_stride * line_count, dst_buffers);
+    if yuv_planes.is_none() {
         return false;
     }
-
-    let (y_plane, uv_plane) = if last_dst_plane == 0 {
-        last[0].split_at_mut(interplane_split)
-    } else {
-        (&mut first[0][..], &mut last[0][..])
-    };
 
     if line_count == 0 || col_count == 0 {
         return true;
@@ -482,6 +476,7 @@ unsafe fn lrgb_to_yuv_avx2(
         return false;
     }
 
+    let (y_plane, uv_plane) = yuv_planes.unwrap();
     let wg_height = line_count / 2;
     if y_stride * line_count > y_plane.len()
         || uv_stride * wg_height > uv_plane.len()
@@ -491,6 +486,9 @@ unsafe fn lrgb_to_yuv_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weigths = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -700,6 +698,9 @@ unsafe fn lrgb_to_i420_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weigths = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -921,6 +922,9 @@ unsafe fn lrgb_to_i444_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weights = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -1079,17 +1083,11 @@ unsafe fn yuv_to_lrgb_avx2(
     };
 
     let rgb_plane = &mut dst_buffers[0];
-    let (first, last) = src_buffers.split_at(last_src_plane);
-    let interplane_split = y_stride * line_count;
-    if last_src_plane == 0 && interplane_split > last[0].len() {
+
+    let yuv_planes = split_planes(last_src_plane, y_stride * line_count, src_buffers);
+    if yuv_planes.is_none() {
         return false;
     }
-
-    let (y_plane, uv_plane) = if last_src_plane == 0 {
-        last[0].split_at(interplane_split)
-    } else {
-        (first[0], last[0])
-    };
 
     if line_count == 0 || col_count == 0 {
         return true;
@@ -1100,6 +1098,7 @@ unsafe fn yuv_to_lrgb_avx2(
         return false;
     }
 
+    let (y_plane, uv_plane) = yuv_planes.unwrap();
     let wg_height = line_count / 2;
     if y_stride * line_count > y_plane.len()
         || uv_stride * wg_height > uv_plane.len()
@@ -1109,6 +1108,9 @@ unsafe fn yuv_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
@@ -1322,6 +1324,9 @@ unsafe fn i420_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
@@ -1535,6 +1540,9 @@ unsafe fn i444_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
