@@ -148,13 +148,8 @@ fn split_planes<'a>(
     src_buffers
         .split_first()
         .and_then(|(y, uv)| match last_src_plane {
-            0 => {
-                if interplane_split <= y.len() {
-                    Some(y.split_at(interplane_split))
-                } else {
-                    None
-                }
-            }
+            0 if interplane_split <= y.len() => Some(y.split_at(interplane_split)),
+            0 => None,
             _ => uv.split_first().map(|(uv, _)| (&y[..], &uv[..])),
         })
 }
@@ -168,13 +163,8 @@ fn split_planes_mut<'a>(
     src_buffers
         .split_first_mut()
         .and_then(|(y, uv)| match last_src_plane {
-            0 => {
-                if interplane_split <= y.len() {
-                    Some(y.split_at_mut(interplane_split))
-                } else {
-                    None
-                }
-            }
+            0 if interplane_split <= y.len() => Some(y.split_at_mut(interplane_split)),
+            0 => None,
             _ => uv
                 .split_first_mut()
                 .map(move |(uv, _)| (&mut y[..], &mut uv[..])),
