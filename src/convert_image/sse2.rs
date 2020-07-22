@@ -454,7 +454,7 @@ unsafe fn lrgb_to_yuv_sse2(
         (&mut first[0][..], &mut last[0][..])
     };
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -650,7 +650,7 @@ unsafe fn lrgb_to_i420_sse2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -864,7 +864,7 @@ unsafe fn lrgb_to_i444_sse2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -906,12 +906,20 @@ unsafe fn lrgb_to_i444_sse2(
     ];
 
     let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+
+    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
+        line_count
+    } else {
+        line_count - 1
+    };
+
     let rgb_group = rgb_plane.as_ptr();
     let y_group = y_plane.as_mut_ptr();
     let u_group = u_plane.as_mut_ptr();
     let v_group = v_plane.as_mut_ptr();
     let wg_width = col_count / LRGB_TO_YUV_WAVES;
-    let wg_height = line_count;
+    let wg_height = y_start;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
@@ -926,6 +934,35 @@ unsafe fn lrgb_to_i444_sse2(
                 &v_weights,
             );
         }
+    }
+
+    // Handle leftover line
+    if y_start != line_count {
+        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..wg_width {
+            lrgb_to_i444_4x(
+                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, u_stride)),
+                v_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+                sampler,
+                &y_weights,
+                &u_weights,
+                &v_weights,
+            );
+        }
+
+        // Handle leftover pixels
+        lrgb_to_i444_4x(
+            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
+            y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, u_stride)),
+            v_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+            Sampler::BgrOverflow,
+            &y_weights,
+            &u_weights,
+            &v_weights,
+        );
     }
 
     true
@@ -1019,7 +1056,7 @@ unsafe fn yuv_to_lrgb_sse2(
         (first[0], last[0])
     };
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1199,7 +1236,7 @@ unsafe fn i420_to_lrgb_sse2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1385,7 +1422,7 @@ unsafe fn i444_to_lrgb_sse2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 

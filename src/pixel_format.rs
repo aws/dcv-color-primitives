@@ -179,8 +179,13 @@ pub fn get_buffers_size(
             + ((stride[2] * get_plane_spec(height, height_spec, 2))
                 + (stride[3] * get_plane_spec(height, height_spec, 3)));
     } else {
-        for i in 0..=last_plane {
-            buffers_size[i] = stride[i] * get_plane_spec(height, height_spec, i as u32);
+        let buffer_array = &mut buffers_size[..last_plane + 1];
+        let stride_array = &stride[..last_plane + 1];
+
+        for (buffer_size, (i, stride)) in
+            buffer_array.iter_mut().zip(stride_array.iter().enumerate())
+        {
+            *buffer_size = *stride * get_plane_spec(height, height_spec, i as u32);
         }
     }
 

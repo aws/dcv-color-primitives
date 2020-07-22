@@ -139,6 +139,48 @@ unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64 {
     return slice[index as usize];
 }
 
+#[inline]
+fn split_planes<'a>(
+    last_src_plane: usize,
+    interplane_split: usize,
+    src_buffers: &[&'a [u8]],
+) -> Option<(&'a [u8], &'a [u8])> {
+    src_buffers
+        .split_first()
+        .and_then(|(y, uv)| match last_src_plane {
+            0 => {
+                if interplane_split <= y.len() {
+                    Some(y.split_at(interplane_split))
+                } else {
+                    None
+                }
+            }
+            _ => uv.split_first().map(|(uv, _)| (&y[..], &uv[..])),
+        })
+}
+
+#[inline]
+fn split_planes_mut<'a>(
+    last_src_plane: usize,
+    interplane_split: usize,
+    src_buffers: &'a mut [&mut [u8]],
+) -> Option<(&'a mut [u8], &'a mut [u8])> {
+    src_buffers
+        .split_first_mut()
+        .and_then(|(y, uv)| match last_src_plane {
+            0 => {
+                if interplane_split <= y.len() {
+                    Some(y.split_at_mut(interplane_split))
+                } else {
+                    None
+                }
+            }
+            _ => uv
+                .split_first_mut()
+                .map(move |(uv, _)| (&mut y[..], &mut uv[..])),
+        })
+}
+
 /// Convert short to 2D short vector (16-wide)
 #[inline(always)]
 unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
@@ -461,19 +503,13 @@ unsafe fn lrgb_to_yuv_avx2(
     };
 
     let rgb_plane = &src_buffers[0];
-    let (first, last) = dst_buffers.split_at_mut(last_dst_plane);
-    let interplane_split = y_stride * line_count;
-    if last_dst_plane == 0 && interplane_split > last[0].len() {
+
+    let yuv_planes = split_planes_mut(last_dst_plane, y_stride * line_count, dst_buffers);
+    if yuv_planes.is_none() {
         return false;
     }
 
-    let (y_plane, uv_plane) = if last_dst_plane == 0 {
-        last[0].split_at_mut(interplane_split)
-    } else {
-        (&mut first[0][..], &mut last[0][..])
-    };
-
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -482,6 +518,7 @@ unsafe fn lrgb_to_yuv_avx2(
         return false;
     }
 
+    let (y_plane, uv_plane) = yuv_planes.unwrap();
     let wg_height = line_count / 2;
     if y_stride * line_count > y_plane.len()
         || uv_stride * wg_height > uv_plane.len()
@@ -491,6 +528,9 @@ unsafe fn lrgb_to_yuv_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weigths = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -677,7 +717,7 @@ unsafe fn lrgb_to_i420_avx2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -700,6 +740,9 @@ unsafe fn lrgb_to_i420_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weigths = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -899,7 +942,7 @@ unsafe fn lrgb_to_i444_avx2(
     let u_plane = &mut u_plane[0][..];
     let v_plane = &mut v_plane[0][..];
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -921,6 +964,9 @@ unsafe fn lrgb_to_i444_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let y_weights = [
         _mm256_set1_epi32(FORWARD_WEIGHTS[col][0]),
@@ -941,12 +987,20 @@ unsafe fn lrgb_to_i444_avx2(
     ];
 
     let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+
+    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
+        line_count
+    } else {
+        line_count - 1
+    };
+
     let rgb_group = rgb_plane.as_ptr();
     let y_group = y_plane.as_mut_ptr();
     let u_group = u_plane.as_mut_ptr();
     let v_group = v_plane.as_mut_ptr();
     let wg_width = col_count / LRGB_TO_YUV_WAVES;
-    let wg_height = line_count;
+    let wg_height = y_start;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
@@ -961,6 +1015,35 @@ unsafe fn lrgb_to_i444_avx2(
                 &v_weights,
             );
         }
+    }
+
+    // Handle leftover line
+    if y_start != line_count {
+        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..wg_width {
+            lrgb_to_i444_8x(
+                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
+                y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, u_stride)),
+                v_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+                sampler,
+                &y_weights,
+                &u_weights,
+                &v_weights,
+            );
+        }
+
+        // Handle leftover pixels
+        lrgb_to_i444_8x(
+            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
+            y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, u_stride)),
+            v_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+            Sampler::BgrOverflow,
+            &y_weights,
+            &u_weights,
+            &v_weights,
+        );
     }
 
     true
@@ -1042,19 +1125,13 @@ unsafe fn yuv_to_lrgb_avx2(
     };
 
     let rgb_plane = &mut dst_buffers[0];
-    let (first, last) = src_buffers.split_at(last_src_plane);
-    let interplane_split = y_stride * line_count;
-    if last_src_plane == 0 && interplane_split > last[0].len() {
+
+    let yuv_planes = split_planes(last_src_plane, y_stride * line_count, src_buffers);
+    if yuv_planes.is_none() {
         return false;
     }
 
-    let (y_plane, uv_plane) = if last_src_plane == 0 {
-        last[0].split_at(interplane_split)
-    } else {
-        (first[0], last[0])
-    };
-
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1063,6 +1140,7 @@ unsafe fn yuv_to_lrgb_avx2(
         return false;
     }
 
+    let (y_plane, uv_plane) = yuv_planes.unwrap();
     let wg_height = line_count / 2;
     if y_stride * line_count > y_plane.len()
         || uv_stride * wg_height > uv_plane.len()
@@ -1072,6 +1150,9 @@ unsafe fn yuv_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
@@ -1262,7 +1343,7 @@ unsafe fn i420_to_lrgb_avx2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1285,6 +1366,9 @@ unsafe fn i420_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);
@@ -1476,7 +1560,7 @@ unsafe fn i444_to_lrgb_avx2(
     let rgb_plane = &mut dst_buffers[0];
     let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
 
-    if line_count == 0 {
+    if line_count == 0 || col_count == 0 {
         return true;
     }
 
@@ -1498,6 +1582,9 @@ unsafe fn i444_to_lrgb_avx2(
     }
 
     let col = colorimetry as usize;
+    if col > 1 {
+        return false;
+    }
 
     let xxym = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][0]);
     let rcrm = _mm256_set1_epi16(BACKWARD_WEIGHTS[col][1]);

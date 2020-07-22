@@ -20,6 +20,7 @@ const BGRA_I420_OUTPUT: &str = &"./bgra_i420_output.i420";
 const BGRA_I444_OUTPUT: &str = &"./bgra_i444_output.i444";
 
 const SAMPLE_SIZE: usize = 22;
+const PAGE_SIZE: usize = 4096;
 
 #[derive(Debug, Clone)]
 struct BenchmarkError;
@@ -92,6 +93,9 @@ fn bgra_nv12(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     // Allocate output
     let dst_size: usize = 3 * (width as usize) * (height as usize) / 2;
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[&input_buffer];
     let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
@@ -143,6 +147,9 @@ fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     // Allocate output
     let dst_size: usize = 3 * (width as usize) * (height as usize) / 2;
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[&input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(w * h);
@@ -196,6 +203,9 @@ fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     // Allocate output
     let dst_size: usize = 3 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[&input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(w * h);
@@ -247,6 +257,9 @@ fn nv12_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     // Allocate output
     let dst_size: usize = 4 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[&input_buffer];
     let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
@@ -297,6 +310,9 @@ fn rgb_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkR
     // Allocate output
     let dst_size: usize = 4 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[&input_buffer];
     let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
@@ -349,6 +365,9 @@ fn i420_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     let y_plane_size: usize = (width as usize) * (height as usize);
     let u_plane_size: usize = y_plane_size / 4;
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let input_data: &[&[u8]] = &[
         &input_buffer[0..y_plane_size],
@@ -403,6 +422,9 @@ fn i444_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     // Allocate output
     let dst_size: usize = 4 * (width as usize) * (height as usize);
     let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
 
     let y_size = (width as usize) * (height as usize);
     let input_data: &[&[u8]] = &[

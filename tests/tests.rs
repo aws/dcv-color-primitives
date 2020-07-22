@@ -736,12 +736,10 @@ fn yuv_to_rgb_size_format_mode_stride(
 
     let in_size = match format {
         PixelFormat::I444 | PixelFormat::I420 => {
-            (luma_stride * h)
-                + (u_chroma_stride * chroma_height)
-                + (v_chroma_stride * chroma_height)
+            luma_stride * h + u_chroma_stride * chroma_height + v_chroma_stride * chroma_height
         }
-        PixelFormat::Nv12 => ((luma_stride * h) + (u_chroma_stride * chroma_height)),
-        _ => (0),
+        PixelFormat::Nv12 => luma_stride * h + u_chroma_stride * chroma_height,
+        _ => 0,
     };
     let dst_stride = (w * 4) + dst_fill_bytes;
     let out_size = dst_stride * h;
@@ -764,83 +762,78 @@ fn yuv_to_rgb_size_format_mode_stride(
 
     // Allocate and initialize input
     let mut test_input: Box<[u8]> = vec![0u8; in_size].into_boxed_slice();
-    let luma_input = &mut test_input[0..(luma_stride * h)];
-
-    for luma_line in luma_input.chunks_exact_mut(luma_stride) {
-        let (data_line, _) = luma_line.split_at_mut(luma_stride - luma_fill_bytes);
-
-        let mut x = 0;
-        for in_pixel in data_line.chunks_exact_mut(2) {
+    let mut i = 0;
+    while i < luma_stride * h {
+        for x in (0..w).step_by(2) {
             let index = (x >> 1) & 7;
             let luma = Y_TO_RGB_INPUT[color_space_index][index];
 
-            in_pixel[0] = luma;
-            in_pixel[1] = luma;
-
-            x += 2;
+            test_input[i + x] = luma;
+            test_input[i + x + 1] = luma;
         }
+
+        i += luma_stride;
     }
 
     match format {
         PixelFormat::Nv12 => {
-            let chroma_input = &mut test_input[(luma_stride * h)..];
-
-            for chroma_line in chroma_input.chunks_exact_mut(u_chroma_stride) {
-                let (data_line, _) =
-                    chroma_line.split_at_mut(u_chroma_stride - u_chroma_fill_bytes);
-                let mut x = 0;
-
-                for in_pixel in data_line.chunks_exact_mut(2) {
+            let mut i = luma_stride * h;
+            while i < in_size {
+                for x in (0..w).step_by(2) {
                     let index = (x >> 1) & 0x7;
-
-                    in_pixel[0] = CB_TO_RGB_INPUT[color_space_index][index];
-                    in_pixel[1] = CR_TO_RGB_INPUT[color_space_index][index];
-                    x += 2;
+                    test_input[i + x] = CB_TO_RGB_INPUT[color_space_index][index];
+                    test_input[i + x + 1] = CR_TO_RGB_INPUT[color_space_index][index];
                 }
+
+                i += u_chroma_stride;
             }
         }
         PixelFormat::I420 => {
-            let (u_chroma_input, v_chroma_input) =
-                test_input[luma_stride * h..].split_at_mut(u_chroma_stride * chroma_height);
-
-            for (u_chroma_line, v_chroma_line) in u_chroma_input
-                .chunks_exact_mut(u_chroma_stride)
-                .zip(v_chroma_input.chunks_exact_mut(v_chroma_stride))
-            {
-                let (u_data_line, _) =
-                    u_chroma_line.split_at_mut(u_chroma_stride - u_chroma_fill_bytes);
-                let (v_data_line, _) =
-                    v_chroma_line.split_at_mut(v_chroma_stride - v_chroma_fill_bytes);
-                let mut x = 0;
-
-                for (u_pixel, v_pixel) in u_data_line.iter_mut().zip(v_data_line.iter_mut()) {
-                    let index = (x >> 1) & 0x7;
-
-                    *u_pixel = CB_TO_RGB_INPUT[color_space_index][index];
-                    *v_pixel = CR_TO_RGB_INPUT[color_space_index][index];
-                    x += 2;
+            let p0 = luma_stride * h;
+            let p1 = p0 + u_chroma_stride * chroma_height;
+            let mut i = p0;
+            while i < p1 {
+                for x in (0..w).step_by(2) {
+                    let pos = x >> 1;
+                    let index = pos & 0x7;
+                    test_input[i + pos] = CB_TO_RGB_INPUT[color_space_index][index];
                 }
+
+                i += u_chroma_stride;
+            }
+
+            i = p1;
+            while i < in_size {
+                for x in (0..w).step_by(2) {
+                    let pos = x >> 1;
+                    let index = pos & 0x7;
+                    test_input[i + pos] = CR_TO_RGB_INPUT[color_space_index][index];
+                }
+
+                i += v_chroma_stride;
             }
         }
         PixelFormat::I444 => {
-            let (u_chroma_input, v_chroma_input) =
-                test_input[(luma_stride * h)..].split_at_mut(u_chroma_stride * chroma_height);
-
-            for (u_chroma_line, v_chroma_line) in u_chroma_input
-                .chunks_exact_mut(u_chroma_stride)
-                .zip(v_chroma_input.chunks_exact_mut(v_chroma_stride))
-            {
-                let (u_data, _) = u_chroma_line.split_at_mut(u_chroma_stride - u_chroma_fill_bytes);
-                let (v_data, _) = v_chroma_line.split_at_mut(v_chroma_stride - v_chroma_fill_bytes);
-
-                let mut x = 0;
-                for (u_pixel, v_pixel) in u_data.iter_mut().zip(v_data.iter_mut()) {
+            let p0 = luma_stride * h;
+            let p1 = p0 + u_chroma_stride * chroma_height;
+            let mut i = p0;
+            while i < p1 {
+                for x in 0..w {
                     let index = (x >> 1) & 0x7;
-
-                    *u_pixel = CB_TO_RGB_INPUT[color_space_index][index];
-                    *v_pixel = CR_TO_RGB_INPUT[color_space_index][index];
-                    x += 1;
+                    test_input[i + x] = CB_TO_RGB_INPUT[color_space_index][index];
                 }
+
+                i += u_chroma_stride;
+            }
+
+            i = p1;
+            while i < in_size {
+                for x in 0..w {
+                    let index = (x >> 1) & 0x7;
+                    test_input[i + x] = CR_TO_RGB_INPUT[color_space_index][index];
+                }
+
+                i += v_chroma_stride;
             }
         }
         _ => {
@@ -936,20 +929,27 @@ fn yuv_to_rgb_size_format_mode_stride(
     ) {
         Err(_) => assert!(false),
         Ok(_) => {
-            for in_line in test_output.chunks_exact((4 * w) + dst_fill_bytes) {
-                let (data_line, padding) = in_line.split_at(4 * w);
-                for (in_pixel, exp_pixel) in
-                    data_line.chunks_exact(4).zip(expected_row.chunks_exact(3))
-                {
+            let mut i = 0;
+
+            while i < out_size {
+                let s = 4 * w;
+
+                for j in 0..w {
+                    let s = 4 * j;
+                    let d = 3 * j;
                     assert!(
-                        ((in_pixel[0] as i32) - exp_pixel[0]).abs() <= 2
-                            && ((in_pixel[1] as i32) - exp_pixel[1]).abs() <= 2
-                            && ((in_pixel[2] as i32) - exp_pixel[2]).abs() <= 2
-                            && in_pixel[3] == 255
+                        ((test_output[i + s] as i32) - expected_row[d]).abs() <= 2
+                            && ((test_output[i + s + 1] as i32) - expected_row[d + 1]).abs() <= 2
+                            && ((test_output[i + s + 2] as i32) - expected_row[d + 2]).abs() <= 2
+                            && test_output[i + s + 3] == 255
                     );
                 }
 
-                assert_eq!(true, padding.iter().all(|&y| y == 0));
+                for j in 0..dst_fill_bytes {
+                    assert_eq!(true, test_output[i + s + j] == 0);
+                }
+
+                i += s + dst_fill_bytes;
             }
         }
     }
@@ -1028,8 +1028,13 @@ fn rgb_to_yuv_ok(dst_format: PixelFormat, planes: u32) {
     const MAX_WIDTH: u32 = 8;
     const MAX_HEIGHT: u32 = 8;
 
-    for width in (2..=MAX_WIDTH).step_by(2) {
-        for height in (2..=MAX_HEIGHT).step_by(2) {
+    let step = match dst_format {
+        PixelFormat::I444 => 1,
+        _ => 2,
+    };
+
+    for width in (0..=MAX_WIDTH).step_by(step) {
+        for height in (0..=MAX_HEIGHT).step_by(step) {
             rgb_to_yuv_size(planes, width, height, dst_format);
         }
     }
@@ -1039,8 +1044,13 @@ fn yuv_to_rgb_ok(format: PixelFormat, num_planes: u32) {
     const MAX_WIDTH: u32 = 34;
     const MAX_HEIGHT: u32 = 4;
 
-    for width in (2..=MAX_WIDTH).step_by(2) {
-        for height in (2..=MAX_HEIGHT).step_by(2) {
+    let step = match format {
+        PixelFormat::I444 => 1,
+        _ => 2,
+    };
+
+    for width in (0..=MAX_WIDTH).step_by(step) {
+        for height in (0..=MAX_HEIGHT).step_by(step) {
             yuv_to_rgb_size(num_planes, width, height, format);
         }
     }
