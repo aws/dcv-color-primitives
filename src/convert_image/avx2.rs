@@ -139,6 +139,48 @@ unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64 {
     return slice[index as usize];
 }
 
+#[inline]
+fn split_planes<'a>(
+    last_src_plane: usize,
+    interplane_split: usize,
+    src_buffers: &[&'a [u8]],
+) -> Option<(&'a [u8], &'a [u8])> {
+    src_buffers
+        .split_first()
+        .and_then(|(y, uv)| match last_src_plane {
+            0 => {
+                if interplane_split <= y.len() {
+                    Some(y.split_at(interplane_split))
+                } else {
+                    None
+                }
+            }
+            _ => uv.split_first().map(|(uv, _)| (&y[..], &uv[..])),
+        })
+}
+
+#[inline]
+fn split_planes_mut<'a>(
+    last_src_plane: usize,
+    interplane_split: usize,
+    src_buffers: &'a mut [&mut [u8]],
+) -> Option<(&'a mut [u8], &'a mut [u8])> {
+    src_buffers
+        .split_first_mut()
+        .and_then(|(y, uv)| match last_src_plane {
+            0 => {
+                if interplane_split <= y.len() {
+                    Some(y.split_at_mut(interplane_split))
+                } else {
+                    None
+                }
+            }
+            _ => uv
+                .split_first_mut()
+                .map(move |(uv, _)| (&mut y[..], &mut uv[..])),
+        })
+}
+
 /// Convert short to 2D short vector (16-wide)
 #[inline(always)]
 unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
