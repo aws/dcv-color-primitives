@@ -1,3 +1,7 @@
+News in 0.1.13
+--------------
+* Fixed all compilation errors and warnings on the C unit tests
+
 News in 0.1.12
 --------------
 * Handle overflow in bgr to i444 conversion
