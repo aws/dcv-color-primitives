@@ -116,7 +116,7 @@ alloc_free(Allocator *alloc)
 
 #define TEST_ASSERT_EQ(val, x)                                                                   \
     if (val != x) {                                                                              \
-        fprintf(stderr, "%s: FAIL; Unexpected status: was %zd, expected %zd at line %d\n",       \
+        fprintf(stderr, "%s: FAIL; Unexpected status: was %lld, expected %lld at line %d\n",     \
             line_buffer, (int64_t)val, (int64_t)x, __LINE__);                                    \
         alloc_free(&alloc);                                                                      \
         exit(EXIT_FAILURE);                                                                      \
@@ -124,7 +124,7 @@ alloc_free(Allocator *alloc)
 
 #define TEST_ASSERT_EQ_T(val, x, t)                                                              \
     if (abs((int32_t)val - (int32_t)x) > t) {                                                    \
-        fprintf(stderr, "%s: FAIL; Unexpected status: was %zd, expected %zd at line %d\n",       \
+        fprintf(stderr, "%s: FAIL; Unexpected status: was %lld, expected %lld at line %d\n",     \
             line_buffer, (int64_t)val, (int64_t)x, __LINE__);                                    \
         alloc_free(&alloc);                                                                      \
         exit(EXIT_FAILURE);                                                                      \
@@ -401,7 +401,7 @@ static void
 unit_init(void)
 {
     char *desc;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     TEST_BEGIN_GROUP(__FUNCTION__);
 
@@ -463,7 +463,7 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
     size_t dst_strides[3];
     uint8_t *dst_buffers[3];
     size_t count;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     luma_stride = width + luma_fill_bytes;
     u_chroma_stride = (dst_pixel_format == DCP_PIXEL_FORMAT_I444 || dst_pixel_format == DCP_PIXEL_FORMAT_NV12) ?
@@ -540,7 +540,7 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
 
     /* Perform conversion */
     status.result = dcp_convert_image(width, height,
-                                      &src_format, &src_stride, &test_input,
+                                      &src_format, &src_stride, (const uint8_t * const *)&test_input,
                                       &dst_format, dst_strides, dst_buffers, &status.error);
 
     TEST_ASSERT(DCP_RESULT_OK, -1);
@@ -815,7 +815,7 @@ convert_image_yuv_to_rgb_size_mode_stride(uint32_t       num_planes,
     uint32_t y;
     size_t count;
     int32_t color_space_index = color_space - DCP_COLOR_SPACE_BT601;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     DcpImageFormat src_format = {
         format,
@@ -927,8 +927,8 @@ convert_image_yuv_to_rgb_size_mode_stride(uint32_t       num_planes,
 
     /* Perform conversion */
     status.result = dcp_convert_image(width, height,
-                               &src_format, src_strides, src_buffers,
-                               &dst_format, &dst_stride, &test_output, &status.error);
+                                      &src_format, src_strides, (const uint8_t * const *)src_buffers,
+                                      &dst_format, &dst_stride, &test_output, &status.error);
 
     TEST_ASSERT(DCP_RESULT_OK, -1);
 
@@ -1125,7 +1125,7 @@ unit_convert_image_rgb_to_yuv_errors(void)
     const size_t out_size = (size_t)width * ((size_t)height + chroma_height);
     uint8_t *test_input;
     uint8_t *test_output;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     TEST_BEGIN_GROUP(__FUNCTION__);
     init();
@@ -1185,20 +1185,20 @@ unit_convert_image_rgb_to_yuv_errors(void)
 
                         /* Test image convert */
                         status.result = dcp_convert_image(width, height,
-                                                   NULL, &src_stride, &src_buffer,
-                                                   &dst_format, dst_strides, dst_buffers, &status.error);
+                                                          NULL, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                          &dst_format, dst_strides, dst_buffers, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
                         status.result = dcp_convert_image(width, height,
-                                                   &src_format, &src_stride, &src_buffer,
-                                                   NULL, dst_strides, dst_buffers, &status.error);
+                                                          &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                          NULL, dst_strides, dst_buffers, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
                         status.result = dcp_convert_image(width, height,
-                                                   NULL, &src_stride, &src_buffer,
-                                                   NULL, dst_strides, dst_buffers, &status.error);
+                                                          NULL, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                          NULL, dst_strides, dst_buffers, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
@@ -1228,8 +1228,8 @@ unit_convert_image_rgb_to_yuv_errors(void)
                         SET_EXPECTED(src_color_space != DCP_COLOR_SPACE_LRGB, DCP_ERROR_KIND_INVALID_OPERATION);
 
                         status.result = dcp_convert_image(width, height,
-                                                   &src_format, &src_stride, &src_buffer,
-                                                   &dst_format, dst_strides, dst_buffers, &status.error);
+                                                          &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                          &dst_format, dst_strides, dst_buffers, &status.error);
 
                         TEST_ASSERT(expected.result, expected.error);
 
@@ -1256,7 +1256,7 @@ unit_convert_image_yuv_to_rgb_errors(void)
     const size_t out_size = dst_stride * height;
     uint8_t *test_input;
     uint8_t *test_output;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     TEST_BEGIN_GROUP(__FUNCTION__);
     init();
@@ -1316,20 +1316,20 @@ unit_convert_image_yuv_to_rgb_errors(void)
 
                         /* Test image convert */
                         status.result = dcp_convert_image(width, height,
-                                                   NULL, src_strides, src_buffers,
-                                                   &dst_format, &dst_stride, &dst_buffer, &status.error);
+                                                          NULL, src_strides, (const uint8_t * const *)src_buffers,
+                                                          &dst_format, &dst_stride, &dst_buffer, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
                         status.result = dcp_convert_image(width, height,
-                                                   &src_format, src_strides, src_buffers,
-                                                   NULL, &dst_stride, &dst_buffer, &status.error);
+                                                          &src_format, src_strides, (const uint8_t * const *)src_buffers,
+                                                          NULL, &dst_stride, &dst_buffer, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
                         status.result = dcp_convert_image(width, height,
-                                                   NULL, src_strides, src_buffers,
-                                                   NULL, &dst_stride, &dst_buffer, &status.error);
+                                                          NULL, src_strides, (const uint8_t * const *)src_buffers,
+                                                          NULL, &dst_stride, &dst_buffer, &status.error);
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
@@ -1356,8 +1356,8 @@ unit_convert_image_yuv_to_rgb_errors(void)
                         SET_EXPECTED(dst_color_space != DCP_COLOR_SPACE_LRGB, DCP_ERROR_KIND_INVALID_OPERATION);
 
                         status.result = dcp_convert_image(width, height,
-                                                   &src_format, src_strides, src_buffers,
-                                                   &dst_format, &dst_stride, &dst_buffer, &status.error);
+                                                          &src_format, src_strides, (const uint8_t * const *)src_buffers,
+                                                          &dst_format, &dst_stride, &dst_buffer, &status.error);
 
                         TEST_ASSERT(expected.result, expected.error);
 
@@ -1374,14 +1374,81 @@ unit_convert_image_yuv_to_rgb_errors(void)
 }
 
 static void
-unit_get_buffers_size(void)
+unit_get_buffers_plane(int32_t num_planes)
 {
     static const uint32_t valid_width = 4098;
     static const uint32_t valid_height = 258;
+    Allocator alloc = {};
+    int32_t pf;
 
+    for (pf = DCP_PIXEL_FORMAT_ARGB - 1; pf <= DCP_PIXEL_FORMAT_NV12 + 1; pf++) {
+        size_t buffers_size[MAX_NUMBER_OF_PLANES];
+        uint32_t max_number_of_planes;
+        DcpStatus expected;
+        DcpStatus status;
+        uint8_t is_pf_valid = (pf >= DCP_PIXEL_FORMAT_ARGB && pf <= DCP_PIXEL_FORMAT_NV12);
+
+        DcpImageFormat format = {
+            pf,
+            0xDEADBEEF,
+            num_planes
+        };
+
+        TEST_BEGIN("pixel_format=%d", pf);
+
+        /* Compute valid number of planes. */
+        if (is_pf_valid) {
+            for (max_number_of_planes = 0; max_number_of_planes < MAX_NUMBER_OF_PLANES; max_number_of_planes++) {
+                if (num_log2_den_per_plane[pf][2 * max_number_of_planes] == 0) {
+                    break;
+                }
+            }
+        }
+
+        /* Invalid width */
+        expected = dcp_status();
+        SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I422, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        status.result = dcp_get_buffers_size(1, valid_height, &format, NULL, buffers_size, &status.error);
+        TEST_ASSERT(expected.result, expected.error);
+
+        /* Invalid height */
+        expected = dcp_status();
+        SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I420, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        status.result = dcp_get_buffers_size(valid_width, 1, &format, NULL, buffers_size, &status.error);
+        TEST_ASSERT(expected.result, expected.error);
+
+        /* Test size is valid */
+        expected = dcp_status();
+        SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        status.result = dcp_get_buffers_size(valid_width, valid_height, &format, NULL, buffers_size, &status.error);
+        TEST_ASSERT(expected.result, expected.error);
+        if (expected.result == DCP_RESULT_OK) {
+            if (num_planes == 1) {
+                TEST_ASSERT_EQ(buffers_size[0], (((size_t)valid_width * (size_t)valid_height * num_log2_den[pf][0]) >> num_log2_den[pf][1]));
+            } else {
+                uint32_t i;
+
+                for (i = 0; i < num_planes; i++) {
+                    TEST_ASSERT_EQ(buffers_size[i], (((size_t)valid_width * (size_t)valid_height * num_log2_den_per_plane[pf][2 * i]) >> num_log2_den_per_plane[pf][2 * i + 1]));
+                }
+            }
+        }
+
+        TEST_END();
+    }
+}
+
+static void
+unit_get_buffers_size(void)
+{
     DcpStatus status = dcp_status();
     int32_t num_planes;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     TEST_BEGIN_GROUP(__FUNCTION__);
     init();
@@ -1403,71 +1470,8 @@ unit_get_buffers_size(void)
     TEST_END();
 
     for (num_planes = -1; num_planes <= MAX_NUMBER_OF_PLANES + 1; num_planes++) {
-        int32_t pf;
-
         TEST_BEGIN_GROUP("num_planes=%d", num_planes);
-
-        for (pf = DCP_PIXEL_FORMAT_ARGB - 1; pf <= DCP_PIXEL_FORMAT_NV12 + 1; pf++) {
-            size_t buffers_size[MAX_NUMBER_OF_PLANES];
-            uint32_t max_number_of_planes;
-            DcpStatus expected;
-            DcpStatus status;
-            uint8_t is_pf_valid = (pf >= DCP_PIXEL_FORMAT_ARGB && pf <= DCP_PIXEL_FORMAT_NV12);
-
-            DcpImageFormat format = {
-                pf,
-                0xDEADBEEF,
-                num_planes
-            };
-
-            TEST_BEGIN("pixel_format=%d", pf);
-
-            /* Compute valid number of planes. */
-            if (is_pf_valid) {
-                for (max_number_of_planes = 0; max_number_of_planes < MAX_NUMBER_OF_PLANES; max_number_of_planes++) {
-                    if (num_log2_den_per_plane[pf][2 * max_number_of_planes] == 0) {
-                        break;
-                    }
-                }
-            }
-
-            /* Invalid width */
-            expected = dcp_status();
-            SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-            SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I422, DCP_ERROR_KIND_INVALID_VALUE);
-            SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
-            status.result = dcp_get_buffers_size(1, valid_height, &format, NULL, buffers_size, &status.error);
-            TEST_ASSERT(expected.result, expected.error);
-
-            /* Invalid height */
-            expected = dcp_status();
-            SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-            SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I420, DCP_ERROR_KIND_INVALID_VALUE);
-            SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
-            status.result = dcp_get_buffers_size(valid_width, 1, &format, NULL, buffers_size, &status.error);
-            TEST_ASSERT(expected.result, expected.error);
-
-            /* Test size is valid */
-            expected = dcp_status();
-            SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-            SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
-            status.result = dcp_get_buffers_size(valid_width, valid_height, &format, NULL, buffers_size, &status.error);
-            TEST_ASSERT(expected.result, expected.error);
-            if (expected.result == DCP_RESULT_OK) {
-                if (num_planes == 1) {
-                    TEST_ASSERT_EQ(buffers_size[0], (((size_t)valid_width * (size_t)valid_height * num_log2_den[pf][0]) >> num_log2_den[pf][1]));
-                } else {
-                    uint32_t i;
-
-                    for (i = 0; i < num_planes; i++) {
-                        TEST_ASSERT_EQ(buffers_size[i], (((size_t)valid_width * (size_t)valid_height * num_log2_den_per_plane[pf][2 * i]) >> num_log2_den_per_plane[pf][2 * i + 1]));
-                    }
-                }
-            }
-
-            TEST_END();
-        }
-
+        unit_get_buffers_plane(num_planes);
         TEST_END_GROUP();
     }
 
@@ -1508,7 +1512,7 @@ unit_convert_image_over_4gb_limit(void)
         1
     };
 
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     TEST_BEGIN_GROUP(__FUNCTION__);
     init();
@@ -1538,8 +1542,8 @@ unit_convert_image_over_4gb_limit(void)
     }
 
     status.result = dcp_convert_image(width, height,
-                               &src_format, NULL, &src_image,
-                               &dst_format, NULL, &dst_image, &status.error);
+                                      &src_format, NULL, (const uint8_t * const *)&src_image,
+                                      &dst_format, NULL, &dst_image, &status.error);
 
     TEST_ASSERT(DCP_RESULT_OK, -1);
 
@@ -1580,7 +1584,7 @@ unit_image_convert_rgb_to_bgra_ok(void)
     uint32_t dst_stride_diff;
     size_t src_stride_param;
     size_t dst_stride_param;
-    Allocator alloc = { 0 };
+    Allocator alloc = {};
 
     DcpImageFormat src_format = {
         DCP_PIXEL_FORMAT_RGB,
@@ -1621,7 +1625,9 @@ unit_image_convert_rgb_to_bgra_ok(void)
                         }
                     }
 
-                    status.result = dcp_convert_image(width, height, &src_format, &src_stride_param, src_buffers, &dst_format, &dst_stride_param, dst_buffers, &status.error);
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, &src_stride_param, (const uint8_t * const *)src_buffers,
+                                                      &dst_format, &dst_stride_param, dst_buffers, &status.error);
                     TEST_ASSERT(DCP_RESULT_OK, -1);
 
                     for (h = 0; h < height; h++) {
