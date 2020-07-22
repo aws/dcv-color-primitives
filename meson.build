@@ -59,7 +59,6 @@ elif cc.get_id() == 'gcc' or cc.get_id() == 'clang'
     '-Werror=nonnull',
     '-Werror=init-self',
     '-Werror=main',
-    '-Werror=missing-braces',
     '-Werror=sequence-point',
     '-Werror=return-type',
     '-Werror=trigraphs',
@@ -69,8 +68,10 @@ elif cc.get_id() == 'gcc' or cc.get_id() == 'clang'
     '-Werror=int-to-pointer-cast',
     '-Werror=pointer-to-int-cast',
     '-Werror=empty-body',
+    '-Wsign-compare',
     '-fno-strict-aliasing',
     '-Wno-int-conversion',
+    '-Wno-missing-braces',
   ]
 else
   test_cflags = []
