@@ -5,14 +5,19 @@
 #![deny(unstable_features)]
 #![deny(unused_import_braces)]
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as test;
+
+#[cfg(target_arch = "x86_64")]
 use std::alloc::{alloc, alloc_zeroed, dealloc, Layout};
+#[cfg(target_arch = "x86_64")]
 use std::ptr::write_bytes;
-use std::slice::*;
+#[cfg(target_arch = "x86_64")]
+use std::slice::{from_raw_parts, from_raw_parts_mut};
 
 use dcp::*;
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
-use rand::random;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -37,6 +42,89 @@ const COLOR_SPACE_LRGB: u32 = ColorSpace::Lrgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
 const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
 const PIXEL_FORMAT_BGR: u32 = PixelFormat::Bgr as u32;
+
+const RGB_TO_BGRA_INPUT: [[[u8; 3]; 8]; 8] = [
+    [
+        [184, 141, 125],
+        [68, 233, 235],
+        [21, 170, 81],
+        [130, 29, 207],
+        [206, 27, 19],
+        [95, 39, 205],
+        [199, 221, 2],
+        [3, 206, 222],
+    ],
+    [
+        [158, 39, 160],
+        [223, 117, 223],
+        [201, 27, 31],
+        [180, 51, 190],
+        [20, 23, 243],
+        [0, 202, 59],
+        [12, 20, 82],
+        [135, 121, 50],
+    ],
+    [
+        [252, 154, 47],
+        [73, 173, 221],
+        [15, 47, 1],
+        [45, 50, 36],
+        [138, 249, 179],
+        [179, 19, 47],
+        [82, 253, 41],
+        [162, 151, 153],
+    ],
+    [
+        [129, 73, 109],
+        [211, 188, 135],
+        [167, 247, 64],
+        [193, 16, 16],
+        [88, 187, 158],
+        [209, 20, 195],
+        [183, 3, 190],
+        [22, 150, 234],
+    ],
+    [
+        [92, 174, 173],
+        [16, 67, 214],
+        [115, 190, 122],
+        [127, 195, 80],
+        [255, 48, 150],
+        [10, 90, 119],
+        [118, 236, 216],
+        [248, 118, 230],
+    ],
+    [
+        [115, 36, 192],
+        [107, 6, 35],
+        [81, 253, 161],
+        [102, 3, 202],
+        [169, 44, 151],
+        [47, 24, 100],
+        [38, 86, 5],
+        [100, 77, 244],
+    ],
+    [
+        [140, 58, 124],
+        [185, 110, 242],
+        [40, 248, 15],
+        [246, 17, 82],
+        [122, 74, 60],
+        [241, 205, 106],
+        [3, 78, 40],
+        [161, 175, 109],
+    ],
+    [
+        [31, 33, 72],
+        [185, 206, 221],
+        [94, 248, 16],
+        [114, 106, 53],
+        [83, 59, 223],
+        [80, 234, 248],
+        [201, 142, 147],
+        [84, 49, 32],
+    ],
+];
 
 const RGB_TO_YUV_INPUT: [[[u8; 4]; 8]; 8] = [
     [
@@ -1538,12 +1626,10 @@ fn rgb_bgra_ok() {
 
                     for h_iter in 0..height {
                         for w_iter in 0..width {
-                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 0] =
-                                random::<u8>();
-                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 1] =
-                                random::<u8>();
-                            test_input[(h_iter * src_stride) + (w_iter * SRC_BPP) + 2] =
-                                random::<u8>();
+                            let offset = (h_iter * src_stride) + (w_iter * SRC_BPP);
+
+                            test_input[offset..offset + 3]
+                                .clone_from_slice(&RGB_TO_BGRA_INPUT[w_iter][h_iter]);
                         }
                     }
                     src_buffers.push(&test_input);

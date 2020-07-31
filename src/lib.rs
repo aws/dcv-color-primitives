@@ -462,21 +462,23 @@ pub fn initialize() {
     let (manufacturer, set) = get_cpu_info();
 
     unsafe {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         match set {
             InstructionSet::X86 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, x86);
             }
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             InstructionSet::Sse2 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, sse2);
             }
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             InstructionSet::Avx2 => {
                 set_dispatch_table!(GLOBAL_STATE.converters, avx2);
             }
-            _ => {
-                set_dispatch_table!(GLOBAL_STATE.converters, x86);
-            }
+        }
+
+        // This is the default for arm and wasm32 targets
+        #[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
+        {
+            set_dispatch_table!(GLOBAL_STATE.converters, x86);
         }
 
         GLOBAL_STATE.manufacturer = manufacturer;

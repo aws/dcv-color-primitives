@@ -23,12 +23,12 @@ use core::arch::x86_64::_bswap;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::_bswap64;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
 #[inline(always)]
-fn _bswap (x: i32) -> i32 {
-    let mut y2:[i8; 4] = [0; 4];
-    let y : i32;
-    let x2:[i8; 4];
+fn _bswap(x: i32) -> i32 {
+    let mut y2: [i8; 4] = [0; 4];
+    let y: i32;
+    let x2: [i8; 4];
 
     unsafe {
         x2 = std::mem::transmute::<i32, [i8; 4]>(x);
@@ -43,7 +43,7 @@ fn _bswap (x: i32) -> i32 {
     return y;
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "aarch64"))]
+#[cfg(not(target_arch = "x86_64"))]
 unsafe fn _bswap64(x: i64) -> i64 {
     (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
 }
