@@ -901,17 +901,13 @@ unsafe fn rgb_to_bgra_avx2(
         return false;
     }
 
-    const ALPHAS_MASK: [u8; 32] = [
-        0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
-        0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00,
-        0x00, 0xff,
-    ];
     const SHUFFLE_MASK: [i8; 32] = [
         2, 1, 0, -1, 5, 4, 3, -1, 8, 7, 6, -1, 11, 10, 9, -1, 2, 1, 0, -1, 5, 4, 3, -1, 8, 7, 6,
         -1, 11, 10, 9, -1,
     ];
 
-    const ITEMS_PER_ITERATION: usize = 32;
+    const ALPHAS_MASK: u32 = 0xFF000000;
+    const GROUP_SIZE: usize = 4;
     const OUTPUT_BPP: usize = 4;
     const INPUT_BPP: usize = 3;
 
@@ -927,7 +923,7 @@ unsafe fn rgb_to_bgra_avx2(
         src_strides[0] - (INPUT_BPP * w)
     };
 
-    let mask_alphas = _mm256_loadu_si256(ALPHAS_MASK.as_ptr() as *const __m256i);
+    let mask_alphas =  _mm256_set1_epi32(ALPHAS_MASK as i32);
     let mask_shuffle = _mm256_loadu_si256(SHUFFLE_MASK.as_ptr() as *const __m256i);
     let output_buffer = dst_buffers[0].as_mut_ptr();
     let input_buffer = src_buffers[0].as_ptr();
@@ -937,25 +933,37 @@ unsafe fn rgb_to_bgra_avx2(
     for _ in 0..height {
         _mm_prefetch(input_buffer as *const i8, _MM_HINT_NTA);
 
-        for _ in (0..width).step_by(ITEMS_PER_ITERATION) {
+        for _ in (0..width).step_by(LANE_COUNT) {
+            // In order to avoid out of bound read, 4 bytes are substracted from the offset 
+            // of last read which goes in the first lane of input3, can be seen from schema.
+            // bFgFrFbE gErEbDgD rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0 bFgFrFbE gErEbDgD rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+            //                                                                                                                                                                                     ^----------------0----------------^
+            //                                                                                                                                                          ^---------------12----------------^
+            //                                                                                                                               ^---------------24----------------^
+            //                                                                                                    ^---------------36----------------^
+            //                                                                         ^---------------48----------------^
+            //                                              ^---------------60----------------^
+            //                   ^---------------72----------------^
+            // ^---------------80----------------^
+
             let input = _mm256_loadu2_m128i(
-                input_buffer.add(ibuffer_offset + 12) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP)) as *const __m128i,
                 input_buffer.add(ibuffer_offset) as *const __m128i,
             );
 
             let input1 = _mm256_loadu2_m128i(
-                input_buffer.add(ibuffer_offset + 24 + 12) as *const __m128i,
-                input_buffer.add(ibuffer_offset + 24) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 3)) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 2)) as *const __m128i,
             );
 
             let input2 = _mm256_loadu2_m128i(
-                input_buffer.add(ibuffer_offset + 48 + 12) as *const __m128i,
-                input_buffer.add(ibuffer_offset + 48) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 5)) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 4)) as *const __m128i,
             );
 
             let input3 = _mm256_loadu2_m128i(
-                input_buffer.add(ibuffer_offset + 72 + 12 - 4) as *const __m128i,
-                input_buffer.add(ibuffer_offset + 72) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 7) - 4) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 6)) as *const __m128i,
             );
 
             let input3 =
@@ -967,12 +975,12 @@ unsafe fn rgb_to_bgra_avx2(
             let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, mask_shuffle), mask_alphas);
 
             _mm256_storeu_si256(output_buffer.add(obuffer_offset) as *mut __m256i, res);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 32) as *mut __m256i, res1);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 64) as *mut __m256i, res2);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + 96) as *mut __m256i, res3);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + LANE_COUNT) as *mut __m256i, res1);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + (LANE_COUNT * 2)) as *mut __m256i, res2);
+            _mm256_storeu_si256(output_buffer.add(obuffer_offset + (LANE_COUNT * 3)) as *mut __m256i, res3);
 
-            ibuffer_offset += ITEMS_PER_ITERATION * INPUT_BPP;
-            obuffer_offset += ITEMS_PER_ITERATION * OUTPUT_BPP;
+            ibuffer_offset += LANE_COUNT * INPUT_BPP;
+            obuffer_offset += LANE_COUNT * OUTPUT_BPP;
         }
 
         ibuffer_offset += input_stride_diff;

@@ -224,8 +224,8 @@ unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i,
 }
 
 #[inline(always)]
-unsafe fn rgb_to_bgra_lane_conversion(input: __m128i, output_buffer: *mut __m128i) {
-    let alpha_mask = _mm_set_epi32(0xff, 0xff, 0xff, 0xff);
+unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
+    let alpha_mask = _mm_set1_epi32(0xff);
 
     // we have b3g3r3-- b2g2r2-- b1g1r1-- b0g0r0--
     let aligned_line = _mm_unpacklo_epi64(
@@ -239,11 +239,11 @@ unsafe fn rgb_to_bgra_lane_conversion(input: __m128i, output_buffer: *mut __m128
     let shr = _mm_srli_epi16(res, 8);
     let shl = _mm_slli_epi16(res, 8);
     let ored = _mm_or_si128(shl, shr);
-    let pshuf32 = _mm_shuffle_epi32(ored, 0x4e);
-    let pshufl16 = _mm_shufflelo_epi16(pshuf32, 0x1b);
-    let pshufh16 = _mm_shufflehi_epi16(pshufl16, 0x1b);
+    let pshuf32 = _mm_shuffle_epi32(ored, mm_shuffle(1, 0, 3, 2));
+    let pshufl16 = _mm_shufflelo_epi16(pshuf32, mm_shuffle(0, 1, 2, 3));
+    let pshufh16 = _mm_shufflehi_epi16(pshufl16, mm_shuffle(0, 1, 2, 3));
 
-    let res = _mm_shuffle_epi32(pshufh16, 0x1b);
+    let res = _mm_shuffle_epi32(pshufh16, mm_shuffle(0, 1, 2, 3));
     _mm_storeu_si128(output_buffer, res);
 }
 
@@ -1583,7 +1583,6 @@ unsafe fn rgb_to_bgra_sse2 (
         return false;
     }
 
-    const ITEMS_PER_ITERATION: usize = 16;
     const OUTPUT_BPP: usize = 4;
     const INPUT_BPP: usize = 3;
 
@@ -1607,14 +1606,14 @@ unsafe fn rgb_to_bgra_sse2 (
     let mut obuffer_offset = 0;
 
     for _ in 0..height {
-        for _ in (0..width).step_by(ITEMS_PER_ITERATION) {
+        for _ in (0..width).step_by(LANE_COUNT) {
             let input0 = _mm_loadu_si128(input_buffer.add(ibuffer_offset) as *const __m128i);
             let input1 =
-                _mm_loadu_si128(input_buffer.add(ibuffer_offset + 16) as *const __m128i);
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + LANE_COUNT) as *const __m128i);
             let input2 =
-                _mm_loadu_si128(input_buffer.add(ibuffer_offset + 32) as *const __m128i);
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + (LANE_COUNT * 2)) as *const __m128i);
 
-            rgb_to_bgra_lane_conversion(
+            rgb_to_bgra_4x(
                 input0,
                 output_buffer.add(obuffer_offset) as *mut __m128i,
             );
@@ -1628,7 +1627,7 @@ unsafe fn rgb_to_bgra_sse2 (
                 _mm_andnot_si128(first_pixel_mask, first8),
             );
 
-            rgb_to_bgra_lane_conversion(
+            rgb_to_bgra_4x(
                 input,
                 output_buffer.add(obuffer_offset + 16) as *mut __m128i,
             );
@@ -1642,19 +1641,19 @@ unsafe fn rgb_to_bgra_sse2 (
                 _mm_andnot_si128(first_two_pixels_mask, first8),
             );
 
-            rgb_to_bgra_lane_conversion(
+            rgb_to_bgra_4x(
                 input,
                 output_buffer.add(obuffer_offset + 32) as *mut __m128i,
             );
 
             // fourth iteration is with input2
-            rgb_to_bgra_lane_conversion(
+            rgb_to_bgra_4x(
                 _mm_shuffle_epi32(input2, mm_shuffle(0, 3, 2, 1)),
                 output_buffer.add(obuffer_offset + 48) as *mut __m128i,
             );
 
-            ibuffer_offset += ITEMS_PER_ITERATION * INPUT_BPP;
-            obuffer_offset += ITEMS_PER_ITERATION * OUTPUT_BPP;
+            ibuffer_offset += LANE_COUNT * INPUT_BPP;
+            obuffer_offset += LANE_COUNT * OUTPUT_BPP;
         }
 
         ibuffer_offset += input_stride_diff;

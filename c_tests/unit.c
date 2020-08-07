@@ -1567,7 +1567,7 @@ unit_convert_image_over_4gb_limit(void)
 static void
 unit_image_convert_rgb_to_bgra_ok(void)
 {
-    const uint32_t MAX_WIDTH = 8;
+    const uint32_t MAX_WIDTH = 32;
     const uint32_t MAX_HEIGHT = 8;
     const uint32_t MAX_FILL_BYTES = 2;
     const uint32_t auto_stride = DCP_STRIDE_AUTO;
@@ -1602,8 +1602,8 @@ unit_image_convert_rgb_to_bgra_ok(void)
     DcpStatus status = dcp_status();
     TEST_BEGIN_GROUP(__FUNCTION__);
     init();
-    for (width = 0; width < MAX_WIDTH; width++) {
-        for (height = 0; height < MAX_HEIGHT; height++) {
+    for (width = 0; width <= MAX_WIDTH; width++) {
+        for (height = 0; height <= MAX_HEIGHT; height++) {
             for (src_stride_diff = 0; src_stride_diff <= MAX_FILL_BYTES; src_stride_diff++) {
                 for (dst_stride_diff = 0; dst_stride_diff <= MAX_FILL_BYTES; dst_stride_diff++) {
                     uint32_t h;
