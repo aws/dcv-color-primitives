@@ -25,7 +25,8 @@ use core::arch::x86::{
     _mm_setzero_si128, _mm_shuffle_epi32, _mm_slli_epi16, _mm_slli_epi32, _mm_srai_epi16,
     _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
     _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
-    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_unpacklo_epi64, _mm_unpacklo_epi8, _mm_and_si128, _mm_slli_si128, _mm_shufflehi_epi16,
+    _mm_shufflelo_epi16, _mm_andnot_si128
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -36,7 +37,8 @@ use core::arch::x86_64::{
     _mm_setzero_si128, _mm_shuffle_epi32, _mm_slli_epi16, _mm_slli_epi32, _mm_srai_epi16,
     _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
     _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
-    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_unpacklo_epi64, _mm_unpacklo_epi8, _mm_and_si128, _mm_slli_si128, _mm_shufflehi_epi16,
+    _mm_shufflelo_epi16, _mm_andnot_si128
 };
 
 const LANE_COUNT: usize = 16;
@@ -219,6 +221,30 @@ unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i,
     };
 
     (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+}
+
+#[inline(always)]
+unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
+    let alpha_mask = _mm_set1_epi32(0xff);
+
+    // we have b3g3r3-- b2g2r2-- b1g1r1-- b0g0r0--
+    let aligned_line = _mm_unpacklo_epi64(
+        _mm_unpacklo_epi32(_mm_slli_si128(input, 1), _mm_srli_si128(input, 2)),
+        _mm_unpacklo_epi32(_mm_srli_si128(input, 5), _mm_srli_si128(input, 8)),
+    );
+
+    let res = _mm_or_si128(aligned_line, alpha_mask);
+
+    // Byte swap 128 bit
+    let shr = _mm_srli_epi16(res, 8);
+    let shl = _mm_slli_epi16(res, 8);
+    let ored = _mm_or_si128(shl, shr);
+    let pshuf32 = _mm_shuffle_epi32(ored, mm_shuffle(1, 0, 3, 2));
+    let pshufl16 = _mm_shufflelo_epi16(pshuf32, mm_shuffle(0, 1, 2, 3));
+    let pshufh16 = _mm_shufflehi_epi16(pshufl16, mm_shuffle(0, 1, 2, 3));
+
+    let res = _mm_shuffle_epi32(pshufh16, mm_shuffle(0, 1, 2, 3));
+    _mm_storeu_si128(output_buffer, res);
 }
 
 /// Truncate int to uchar (4-wide)
@@ -1497,6 +1523,146 @@ unsafe fn i444_to_lrgb_sse2(
     true
 }
 
+#[inline(always)]
+fn rgb_to_bgra(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    unsafe {
+        rgb_to_bgra_sse2 (
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse2")]
+unsafe fn rgb_to_bgra_sse2 (
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    if dst_buffers.is_empty()
+        || dst_strides.is_empty()
+        || src_buffers.is_empty()
+        || src_strides.is_empty()
+    {
+        return false;
+    }
+
+    let max_stride = usize::max_value() / height as usize;
+    if (src_strides[0] > max_stride) || (dst_strides[0] > max_stride) {
+        return false;
+    }
+
+    if src_strides[0] * height as usize > src_buffers[0].len()
+        || dst_strides[0] * height as usize > dst_buffers[0].len()
+    {
+        return false;
+    }
+
+    const OUTPUT_BPP: usize = 4;
+    const INPUT_BPP: usize = 3;
+
+    let w = width as usize;
+    let output_stride_diff = if dst_strides[0] == 0 {
+        0
+    } else {
+        dst_strides[0] - (OUTPUT_BPP * w)
+    };
+    let input_stride_diff = if src_strides[0] == 0 {
+        0
+    } else {
+        src_strides[0] - (INPUT_BPP * w)
+    };
+
+    let first_pixel_mask = _mm_set_epi32(0, 0, 0, -1);
+    let first_two_pixels_mask = _mm_set_epi32(0, 0, -1, -1);
+    let output_buffer = dst_buffers[0].as_mut_ptr();
+    let input_buffer = src_buffers[0].as_ptr();
+    let mut ibuffer_offset = 0;
+    let mut obuffer_offset = 0;
+
+    for _ in 0..height {
+        for _ in (0..width).step_by(LANE_COUNT) {
+            let input0 = _mm_loadu_si128(input_buffer.add(ibuffer_offset) as *const __m128i);
+            let input1 =
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + LANE_COUNT) as *const __m128i);
+            let input2 =
+                _mm_loadu_si128(input_buffer.add(ibuffer_offset + (LANE_COUNT * 2)) as *const __m128i);
+
+            rgb_to_bgra_4x(
+                input0,
+                output_buffer.add(obuffer_offset) as *mut __m128i,
+            );
+
+            // second iteration is with input0,input1
+            // we should merge last 4 bytes of input0 with first 8 bytes of input1
+            let last4 = _mm_shuffle_epi32(input0, mm_shuffle(0, 0, 0, 3));
+            let first8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 1, 0, 0));
+            let input = _mm_or_si128(
+                _mm_and_si128(last4, first_pixel_mask),
+                _mm_andnot_si128(first_pixel_mask, first8),
+            );
+
+            rgb_to_bgra_4x(
+                input,
+                output_buffer.add(obuffer_offset + 16) as *mut __m128i,
+            );
+
+            // third iteration is with input1,input2
+            // we should merge last 8 bytes of input1 with first 4 bytes of input2
+            let last8 = _mm_shuffle_epi32(input1, mm_shuffle(0, 0, 3, 2));
+            let first8 = _mm_shuffle_epi32(input2, mm_shuffle(1, 0, 0, 0));
+            let input = _mm_or_si128(
+                _mm_and_si128(last8, first_two_pixels_mask),
+                _mm_andnot_si128(first_two_pixels_mask, first8),
+            );
+
+            rgb_to_bgra_4x(
+                input,
+                output_buffer.add(obuffer_offset + 32) as *mut __m128i,
+            );
+
+            // fourth iteration is with input2
+            rgb_to_bgra_4x(
+                _mm_shuffle_epi32(input2, mm_shuffle(0, 3, 2, 1)),
+                output_buffer.add(obuffer_offset + 48) as *mut __m128i,
+            );
+
+            ibuffer_offset += LANE_COUNT * INPUT_BPP;
+            obuffer_offset += LANE_COUNT * OUTPUT_BPP;
+        }
+
+        ibuffer_offset += input_stride_diff;
+        obuffer_offset += output_stride_diff;
+    }
+
+    true
+}
+
 pub fn argb_lrgb_nv12_bt601(
     width: u32,
     height: u32,
@@ -1809,16 +1975,29 @@ pub fn rgb_lrgb_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::rgb_lrgb_bgra_lrgb(
-        width,
-        height,
-        last_src_plane,
-        src_strides,
-        src_buffers,
-        last_dst_plane,
-        dst_strides,
-        dst_buffers,
-    )
+    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
+        rgb_to_bgra(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    } else {
+        x86::rgb_lrgb_bgra_lrgb(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
 }
 
 pub fn i420_bt601_bgra_lrgb(
