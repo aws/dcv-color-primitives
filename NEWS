@@ -1,3 +1,7 @@
+News in 0.1.15
+--------------
+* Improved rgb to bgra conversion
+
 News in 0.1.14
 --------------
 * Add support for wasm32 target
