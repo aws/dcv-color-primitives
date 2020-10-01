@@ -28,7 +28,7 @@
 //! | -------------------- | -------------------------- |
 //! | ARGB                 | I420, I444, NV12           |
 //! | BGR                  | I420, I444, NV12           |
-//! | BGRA                 | I420, I444, NV12           |
+//! | BGRA                 | I420, I444, NV12, RGB      |
 //! | I420                 | BGRA                       |
 //! | I444                 | BGRA                       |
 //! | NV12                 | BGRA                       |
@@ -421,6 +421,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, I420, Bt709, Bgra, Lrgb, i420_bt709_bgra_lrgb);
         set_dispatcher!($conv, $set, I444, Bt601, Bgra, Lrgb, i444_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, I444, Bt709, Bgra, Lrgb, i444_bt709_bgra_lrgb);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, Rgb, Lrgb, bgra_lrgb_rgb_lrgb);
     };
 }
 
@@ -715,6 +716,7 @@ pub fn get_buffers_size(
 ///   PixelFormat::Bgra             | PixelFormat::I420 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::I444 [`1`]
 ///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
+///   PixelFormat::Bgra             | PixelFormat::Rgb  [`4`]
 ///   PixelFormat::Bgr              | PixelFormat::I420 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::I444 [`1`]
 ///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
@@ -775,6 +777,9 @@ pub fn get_buffers_size(
 /// # Algorithm 3
 /// Conversion from RGB to BGRA
 ///
+/// # Algorithm 4
+/// Conversion from BGRA to RGB
+/// 
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation

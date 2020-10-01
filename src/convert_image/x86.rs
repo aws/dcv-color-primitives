@@ -990,6 +990,100 @@ fn i420_to_lrgb(
     true
 }
 
+#[inline(always)]
+unsafe fn bgra_to_rgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    if dst_buffers.is_empty()
+        || dst_strides.is_empty()
+        || src_buffers.is_empty()
+        || src_strides.is_empty()
+    {
+        return false;
+    }
+
+    const OUTPUT_BPP: usize = 3;
+    const INPUT_BPP: usize = 4;
+    const BGRA_RGB_ITEMS_PER_ITERATION_4X: usize = 8;
+    const HIGH_MASK: u64 = 0xFFFF_FF00_0000_0000;
+    const LOW_MASK: u64 = 0x0000_00FF_FFFF_0000;
+
+    let w = width as usize;
+    let output_stride_diff = if dst_strides[0] == 0 {
+        0
+    } else {
+        dst_strides[0] - (OUTPUT_BPP * w)
+    };
+    let input_stride_diff = if src_strides[0] == 0 {
+        0
+    } else {
+        src_strides[0] - (INPUT_BPP * w)
+    };
+
+    let limit_4x = w & !(BGRA_RGB_ITEMS_PER_ITERATION_4X - 1);
+    let output_buffer = dst_buffers[0].as_mut_ptr();
+    let input_buffer = src_buffers[0].as_ptr();
+    let mut obuffer_offset;
+    let mut ibuffer_offset;
+
+    for i in 0..height as usize {
+        let mut y = 0;
+        obuffer_offset = ((OUTPUT_BPP * w) + output_stride_diff) * i;
+        ibuffer_offset = ((INPUT_BPP * w) + input_stride_diff) * i;
+
+        while y < limit_4x {
+            let bgra0 = *(input_buffer.add(ibuffer_offset) as *const u64);
+            let bgra1 = *(input_buffer.add(ibuffer_offset + 8) as *const u64);
+            let bgra2 = *(input_buffer.add(ibuffer_offset + 16) as *const u64);
+            let bgra3 = *(input_buffer.add(ibuffer_offset + 24) as *const u64);
+
+            let rgb0 =
+                _bswap64((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64) as u64;
+            let rgb1 =
+                _bswap64((((bgra1 << 40) & HIGH_MASK) | ((bgra1 >> 16) & LOW_MASK)) as i64) as u64;
+            let rgb2 =
+                _bswap64((((bgra2 << 40) & HIGH_MASK) | ((bgra2 >> 16) & LOW_MASK)) as i64) as u64;
+            let rgb3 =
+                _bswap64((((bgra3 << 40) & HIGH_MASK) | ((bgra3 >> 16) & LOW_MASK)) as i64) as u64;
+
+            let lane1 = (rgb1 << 48) | rgb0;
+            let lane2 = (rgb1 >> 16) | (rgb2 << 32);
+            let lane3 = (rgb2 >> 32) | (rgb3 << 16);
+
+            *(output_buffer.add(obuffer_offset) as *mut u64) = lane1;
+            *(output_buffer.add(obuffer_offset + 8) as *mut u64) = lane2;
+            *(output_buffer.add(obuffer_offset + 16) as *mut u64) = lane3;
+
+            ibuffer_offset += INPUT_BPP * BGRA_RGB_ITEMS_PER_ITERATION_4X;
+            obuffer_offset += OUTPUT_BPP * BGRA_RGB_ITEMS_PER_ITERATION_4X;
+            y += BGRA_RGB_ITEMS_PER_ITERATION_4X;
+        }
+
+        while y < w {
+            *output_buffer.add(obuffer_offset + 0) = *input_buffer.add(ibuffer_offset + 2);
+            *output_buffer.add(obuffer_offset + 1) = *input_buffer.add(ibuffer_offset + 1);
+            *output_buffer.add(obuffer_offset + 2) = *input_buffer.add(ibuffer_offset + 0);
+
+            ibuffer_offset += INPUT_BPP;
+            obuffer_offset += OUTPUT_BPP;
+            y += 1;
+        }
+    }
+
+    true
+}
+
 pub fn rgb_lrgb_bgra_lrgb(
     width: u32,
     height: u32,
@@ -1731,4 +1825,28 @@ pub fn bgr_lrgb_i444_bt709(
         Colorimetry::Bt709,
         Sampler::Bgr,
     )
+}
+
+pub fn bgra_lrgb_rgb_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    unsafe {
+        bgra_to_rgb(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
 }

@@ -1,3 +1,7 @@
+News in 0.1.16
+--------------
+* Added bgra to rgb conversion
+
 News in 0.1.15
 --------------
 * Improved rgb to bgra conversion

@@ -18,6 +18,7 @@ unit = executable(
 test('init', unit, args : ['unit_init'])
 test('get_buffers_size', unit, args : ['unit_get_buffers_size'])
 test('convert_image_rgb_to_bgra_ok', unit, args : ['unit_image_convert_rgb_to_bgra_ok'])
+test('convert_image_bgra_to_rgb_ok', unit, args : ['unit_image_convert_bgra_to_rgb_ok'])
 test('convert_image_rgb_to_yuv_errors', unit, args : ['unit_convert_image_rgb_to_yuv_errors'])
 test('convert_image_yuv_to_rgb_errors', unit, args : ['unit_convert_image_yuv_to_rgb_errors'])
 test('convert_image_rgb_to_nv12_p1_ok', unit, args : ['unit_convert_image_rgb_to_nv12_ok', '1'])

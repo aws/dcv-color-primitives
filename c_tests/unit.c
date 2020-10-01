@@ -1652,6 +1652,93 @@ unit_image_convert_rgb_to_bgra_ok(void)
     TEST_END_GROUP();
 }
 
+static void
+unit_image_convert_bgra_to_rgb_ok(void)
+{
+    const uint32_t MAX_WIDTH = 49;
+    const uint32_t MAX_HEIGHT = 8;
+    const uint32_t MAX_FILL_BYTES = 2;
+    const uint32_t auto_stride = DCP_STRIDE_AUTO;
+    const uint8_t src_bpp = 4;
+    const uint8_t dst_bpp = 3;
+
+    uint8_t *src_buffers[1];
+    uint8_t *dst_buffers[1];
+
+    uint32_t width;
+    uint32_t height;
+    uint32_t src_stride_bytes;
+    uint32_t dst_stride_bytes;
+    uint32_t src_stride_diff;
+    uint32_t dst_stride_diff;
+    size_t src_stride_param;
+    size_t dst_stride_param;
+    Allocator alloc = { 0, };
+
+    DcpImageFormat src_format = {
+        DCP_PIXEL_FORMAT_BGRA,
+        DCP_COLOR_SPACE_LRGB,
+        1
+    };
+
+    DcpImageFormat dst_format = {
+        DCP_PIXEL_FORMAT_RGB,
+        DCP_COLOR_SPACE_LRGB,
+        1
+    };
+
+    DcpStatus status = dcp_status();
+    TEST_BEGIN_GROUP(__FUNCTION__);
+    init();
+    for (width = 0; width <= MAX_WIDTH; width++) {
+        for (height = 0; height <= MAX_HEIGHT; height++) {
+            for (src_stride_diff = 0; src_stride_diff <= MAX_FILL_BYTES; src_stride_diff++) {
+                for (dst_stride_diff = 0; dst_stride_diff <= MAX_FILL_BYTES; dst_stride_diff++) {
+                    uint32_t h;
+                    uint32_t w;
+                    TEST_BEGIN("Width=%d, Height=%d, Strides: src=%d, dst=%d", width, height, src_stride_diff, dst_stride_diff);
+
+                    src_stride_bytes = (src_bpp * width) + src_stride_diff;
+                    dst_stride_bytes = (dst_bpp * width) + dst_stride_diff;
+                    src_stride_param = src_stride_diff == 0 ? auto_stride : src_stride_bytes;
+                    dst_stride_param = dst_stride_diff == 0 ? auto_stride : dst_stride_bytes;
+
+                    src_buffers[0] = alloc_new(&alloc, src_stride_bytes * height);
+                    dst_buffers[0] = alloc_new(&alloc, dst_stride_bytes * height);
+
+                    for (h = 0; h < height; h++) {
+                        for (w = 0; w < width; w++) {
+                            src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 0] = rand() & 0xFF;
+                            src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 1] = rand() & 0xFF;
+                            src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 2] = rand() & 0xFF;
+                            src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 3] = 0xFF;
+                        }
+                    }
+
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, &src_stride_param, (const uint8_t * const *)src_buffers,
+                                                      &dst_format, &dst_stride_param, dst_buffers, &status.error);
+                    TEST_ASSERT(DCP_RESULT_OK, -1);
+
+                    for (h = 0; h < height; h++) {
+                        for (w = 0; w < width; w++) {
+                            TEST_ASSERT_EQ(dst_buffers[0][(h * dst_stride_bytes) + (w * dst_bpp) + 0], src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 2]);
+                            TEST_ASSERT_EQ(dst_buffers[0][(h * dst_stride_bytes) + (w * dst_bpp) + 1], src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 1]);
+                            TEST_ASSERT_EQ(dst_buffers[0][(h * dst_stride_bytes) + (w * dst_bpp) + 2], src_buffers[0][(h * src_stride_bytes) + (w * src_bpp) + 0]);
+                        }
+                    }
+
+                    alloc_free(&alloc);
+
+                    TEST_END();
+                }
+            }
+        }
+    }
+
+    TEST_END_GROUP();
+}
+
 int
 main(int   argc,
      char *argv[])
@@ -1683,6 +1770,8 @@ main(int   argc,
         unit_convert_image_over_4gb_limit();
     } else if (strcmp(test_name, "unit_image_convert_rgb_to_bgra_ok") == 0) {
         unit_image_convert_rgb_to_bgra_ok();
+    } else if (strcmp(test_name, "unit_image_convert_bgra_to_rgb_ok") == 0) {
+        unit_image_convert_bgra_to_rgb_ok();
     } else {
         return EXIT_FAILURE;
     }
