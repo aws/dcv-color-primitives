@@ -19,29 +19,32 @@ use crate::convert_image::sse2;
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_loadu2_m128i,
-    _mm256_loadu_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32,
-    _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permutevar8x32_epi32, _mm256_set1_epi16,
-    _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setzero_si256,
+    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
+    _mm256_extracti128_si256, _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16,
+    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
+    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
+    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
+    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
     _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
     _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
     _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8,
-    _mm_prefetch, _MM_HINT_NTA
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_prefetch, _mm_setzero_si128,
+    _mm_storeu_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
     __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
-    _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
-    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
-    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setzero_si256, _mm256_slli_epi16,
-    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16,
-    _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64,
-    _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_setzero_si128, _mm256_shuffle_epi8,
-    _mm_prefetch, _MM_HINT_NTA
+    _mm256_extracti128_si256, _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16,
+    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
+    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
+    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
+    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
+    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
+    _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
+    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_prefetch, _mm_setzero_si128,
+    _mm_storeu_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -413,6 +416,11 @@ unsafe fn lrgb_to_i444_8x(
         v,
         fix_to_i32_8x!(affine_transform(rg, bg, v_weights), FIX16),
     );
+}
+
+#[inline(always)]
+const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
+    ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
 #[inline(always)]
@@ -836,6 +844,179 @@ unsafe fn lrgb_to_i420_avx2(
             &y_weigths,
             &uv_weights,
         );
+    }
+
+    true
+}
+
+#[inline(always)]
+fn bgra_to_rgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    unsafe {
+        bgra_to_rgb_avx2(
+            width,
+            height,
+            last_src_plane,
+            src_strides,
+            src_buffers,
+            last_dst_plane,
+            dst_strides,
+            dst_buffers,
+        )
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn bgra_to_rgb_avx2(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    if dst_buffers.is_empty()
+        || dst_strides.is_empty()
+        || src_buffers.is_empty()
+        || src_strides.is_empty()
+    {
+        return false;
+    }
+
+    const BGRA_RGB_ITEMS_PER_ITERATION_4X: usize = 32;
+    const BGRA_RGB_ITEMS_PER_ITERATION: usize = 8;
+    const OUTPUT_BPP: usize = 3;
+    const INPUT_BPP: usize = 4;
+
+    let w = width as usize;
+    let h = height as usize;
+    let output_stride_diff = if dst_strides[0] == 0 {
+        0
+    } else {
+        dst_strides[0] - (OUTPUT_BPP * w)
+    };
+    let input_stride_diff = if src_strides[0] == 0 {
+        0
+    } else {
+        src_strides[0] - (INPUT_BPP * w)
+    };
+
+    let bgra_rgb_mask = _mm256_setr_epi8(
+        2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, -128, -128, -128, -128, 2, 1, 0, 6, 5, 4, 10, 9, 8,
+        14, 13, 12, -128, -128, -128, -128,
+    );
+
+    let bgra_rgb_mask_no_comb = _mm256_setr_epi8(
+        2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, 0, 0, 0, 0, 2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12,
+        0, 0, 0, 0,
+    );
+
+    let pack_mask = _mm256_setr_epi32(0, 1, 2, 4, 5, 6, 3, 7);
+
+    let limit_4x = w & !(BGRA_RGB_ITEMS_PER_ITERATION_4X - 1);
+    let limit = w & !(BGRA_RGB_ITEMS_PER_ITERATION - 1);
+    let output_buffer = dst_buffers[0].as_mut_ptr();
+    let input_buffer = src_buffers[0].as_ptr();
+    let mut ibuffer_offset;
+    let mut obuffer_offset;
+
+    for i in 0..h {
+        let mut y = 0;
+        ibuffer_offset = ((INPUT_BPP * w) + input_stride_diff) * i;
+        obuffer_offset = ((OUTPUT_BPP * w) + output_stride_diff) * i;
+
+        while y < limit_4x {
+            let bgra0 = _mm256_loadu_si256(input_buffer.add(ibuffer_offset) as *const __m256i);
+            let bgra1 = _mm256_loadu_si256(input_buffer.add(ibuffer_offset + 32) as *const __m256i);
+            let bgra2 = _mm256_loadu_si256(input_buffer.add(ibuffer_offset + 64) as *const __m256i);
+            let bgra3 = _mm256_loadu_si256(input_buffer.add(ibuffer_offset + 96) as *const __m256i);
+
+            let rgb0 =
+                _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra0, bgra_rgb_mask), pack_mask);
+            let rgb1 =
+                _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra1, bgra_rgb_mask), pack_mask);
+            let rgb2 =
+                _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra2, bgra_rgb_mask), pack_mask);
+            let rgb3 =
+                _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra3, bgra_rgb_mask), pack_mask);
+
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset) as *mut __m256i,
+                _mm256_or_si256(rgb0, _mm256_permute4x64_epi64(rgb1, shuffle(0, 3, 3, 3))),
+            );
+
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset + 32) as *mut __m256i,
+                _mm256_or_si256(
+                    _mm256_permute4x64_epi64(rgb1, shuffle(3, 3, 2, 1)),
+                    _mm256_permute4x64_epi64(rgb2, shuffle(1, 0, 3, 3)),
+                ),
+            );
+
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset + 64) as *mut __m256i,
+                _mm256_or_si256(
+                    _mm256_permute4x64_epi64(rgb2, shuffle(3, 3, 3, 2)),
+                    _mm256_permute4x64_epi64(rgb3, shuffle(2, 1, 0, 3)),
+                ),
+            );
+
+            ibuffer_offset += 4 * BGRA_RGB_ITEMS_PER_ITERATION_4X;
+            obuffer_offset += 3 * BGRA_RGB_ITEMS_PER_ITERATION_4X;
+            y += BGRA_RGB_ITEMS_PER_ITERATION_4X;
+        }
+
+        while y < limit {
+            let bgra0 = _mm256_loadu_si256(input_buffer.add(ibuffer_offset) as *const __m256i);
+            let rgb0 = _mm256_permutevar8x32_epi32(
+                _mm256_shuffle_epi8(bgra0, bgra_rgb_mask_no_comb),
+                pack_mask,
+            );
+
+            let lane1_128 = _mm256_extracti128_si256(rgb0, 0);
+            let lane2_64 = _mm256_extract_epi64(rgb0, 2);
+
+            _mm_storeu_si128(output_buffer.add(obuffer_offset) as *mut __m128i, lane1_128);
+            *(output_buffer.add(obuffer_offset + 16) as *mut i64) = lane2_64;
+
+            ibuffer_offset += 4 * BGRA_RGB_ITEMS_PER_ITERATION;
+            obuffer_offset += 3 * BGRA_RGB_ITEMS_PER_ITERATION;
+            y += BGRA_RGB_ITEMS_PER_ITERATION;
+        }
+    }
+
+    if limit != w {
+        ibuffer_offset = 0;
+        obuffer_offset = 0;
+
+        for _ in 0..height {
+            for y in limit..w {
+                *output_buffer.add((OUTPUT_BPP * y) + 0 + obuffer_offset) =
+                    *input_buffer.add((INPUT_BPP * y) + 2 + ibuffer_offset);
+                *output_buffer.add((OUTPUT_BPP * y) + 1 + obuffer_offset) =
+                    *input_buffer.add((INPUT_BPP * y) + 1 + ibuffer_offset);
+                *output_buffer.add((OUTPUT_BPP * y) + 2 + obuffer_offset) =
+                    *input_buffer.add((INPUT_BPP * y) + 0 + ibuffer_offset);
+            }
+
+            ibuffer_offset += (INPUT_BPP * w) + input_stride_diff;
+            obuffer_offset += (OUTPUT_BPP * w) + output_stride_diff;
+        }
     }
 
     true
@@ -2740,4 +2921,26 @@ pub fn bgr_lrgb_i444_bt709(
             dst_buffers,
         )
     }
+}
+
+pub fn bgra_lrgb_rgb_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    bgra_to_rgb(
+        width,
+        height,
+        last_src_plane,
+        src_strides,
+        src_buffers,
+        last_dst_plane,
+        dst_strides,
+        dst_buffers,
+    )
 }

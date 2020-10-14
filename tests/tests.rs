@@ -18,6 +18,7 @@ use std::slice::{from_raw_parts, from_raw_parts_mut};
 use dcp::*;
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
+use rand::Rng;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -42,330 +43,6 @@ const COLOR_SPACE_LRGB: u32 = ColorSpace::Lrgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
 const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
 const PIXEL_FORMAT_BGR: u32 = PixelFormat::Bgr as u32;
-
-const RGB_TO_BGRA_INPUT: [[[u8; 3]; 8]; 32] = [
-    [
-        [184, 141, 125],
-        [68, 233, 235],
-        [21, 170, 81],
-        [130, 29, 207],
-        [206, 27, 19],
-        [95, 39, 205],
-        [199, 221, 2],
-        [3, 206, 222],
-    ],
-    [
-        [15, 142, 125],
-        [68, 34, 235],
-        [88, 170, 3],
-        [44, 29, 67],
-        [206, 157, 19],
-        [95, 39, 105],
-        [132, 2, 23],
-        [23, 106, 212],
-    ],
-    [
-        [83, 59, 23],
-        [80, 23, 248],
-        [201, 142, 147],
-        [8, 49, 32],
-        [140, 58, 124],
-        [182, 11, 252],
-        [40, 214, 15],
-        [246, 19, 82],
-    ],
-    [
-        [19, 44, 151],
-        [47, 4, 10],
-        [38, 96, 5],
-        [111, 77, 244],
-        [255, 48, 52],
-        [110, 99, 119],
-        [118, 236, 26],
-        [24, 11, 230],
-    ],
-    [
-        [158, 39, 160],
-        [223, 117, 223],
-        [201, 27, 31],
-        [180, 51, 190],
-        [20, 23, 243],
-        [0, 202, 59],
-        [12, 20, 82],
-        [135, 121, 50],
-    ],
-    [
-        [154, 142, 125],
-        [78, 34, 235],
-        [88, 70, 133],
-        [44, 211, 67],
-        [206, 157, 119],
-        [95, 39, 152],
-        [132, 22, 233],
-        [23, 16, 212],
-    ],
-    [
-        [18, 59, 23],
-        [80, 213, 248],
-        [201, 142, 47],
-        [88, 49, 232],
-        [140, 58, 24],
-        [18, 111, 252],
-        [40, 14, 15],
-        [24, 19, 82],
-    ],
-    [
-        [169, 44, 15],
-        [47, 64, 10],
-        [38, 86, 51],
-        [100, 177, 244],
-        [25, 48, 152],
-        [110, 90, 11],
-        [11, 23, 26],
-        [24, 121, 20],
-    ],
-    [
-        [252, 154, 47],
-        [73, 173, 221],
-        [15, 47, 1],
-        [45, 50, 36],
-        [138, 249, 179],
-        [179, 19, 47],
-        [82, 253, 41],
-        [162, 151, 153],
-    ],
-    [
-        [15, 142, 125],
-        [68, 34, 235],
-        [88, 17, 3],
-        [44, 29, 67],
-        [216, 157, 19],
-        [95, 39, 205],
-        [12, 82, 231],
-        [23, 106, 12],
-    ],
-    [
-        [183, 59, 23],
-        [80, 23, 28],
-        [21, 12, 147],
-        [115, 49, 32],
-        [140, 58, 124],
-        [182, 121, 252],
-        [40, 21, 118],
-        [246, 19, 83],
-    ],
-    [
-        [154, 12, 125],
-        [68, 34, 25],
-        [88, 70, 33],
-        [144, 21, 67],
-        [16, 44, 151],
-        [147, 124, 105],
-        [38, 86, 5],
-        [120, 77, 24],
-    ],
-    [
-        [129, 73, 109],
-        [211, 188, 135],
-        [167, 247, 64],
-        [193, 16, 16],
-        [88, 187, 158],
-        [209, 20, 195],
-        [183, 3, 190],
-        [22, 150, 234],
-    ],
-    [
-        [83, 59, 23],
-        [80, 23, 48],
-        [201, 142, 147],
-        [83, 149, 32],
-        [154, 122, 125],
-        [68, 34, 25],
-        [188, 70, 33],
-        [16, 67, 214],
-    ],
-    [
-        [0, 20, 59],
-        [12, 20, 82],
-        [135, 21, 50],
-        [17, 124, 105],
-        [38, 86, 0],
-        [121, 77, 24],
-        [11, 236, 216],
-        [248, 18, 23],
-    ],
-    [
-        [83, 10, 223],
-        [80, 234, 248],
-        [201, 9, 147],
-        [184, 49, 12],
-        [138, 249, 199],
-        [179, 19, 4],
-        [82, 253, 41],
-        [162, 0, 153],
-    ],
-    [
-        [92, 174, 173],
-        [16, 67, 214],
-        [115, 190, 122],
-        [127, 195, 80],
-        [255, 48, 150],
-        [10, 90, 119],
-        [118, 236, 216],
-        [248, 118, 230],
-    ],
-    [
-        [15, 142, 125],
-        [68, 34, 235],
-        [88, 170, 3],
-        [44, 29, 67],
-        [206, 157, 19],
-        [95, 39, 105],
-        [40, 248, 15],
-        [246, 17, 82],
-    ],
-    [
-        [147, 24, 100],
-        [38, 6, 5],
-        [19, 77, 244],
-        [31, 133, 72],
-        [18, 206, 21],
-        [94, 248, 16],
-        [83, 10, 223],
-        [180, 24, 248],
-    ],
-    [
-        [21, 12, 147],
-        [28, 49, 32],
-        [0, 58, 124],
-        [12, 121, 252],
-        [252, 154, 47],
-        [73, 173, 21],
-        [15, 47, 11],
-        [45, 10, 36],
-    ],
-    [
-        [115, 36, 192],
-        [107, 6, 35],
-        [81, 253, 161],
-        [102, 3, 202],
-        [169, 44, 151],
-        [47, 24, 100],
-        [38, 86, 5],
-        [100, 77, 244],
-    ],
-    [
-        [38, 186, 5],
-        [10, 15, 244],
-        [255, 48, 152],
-        [110, 90, 119],
-        [185, 26, 221],
-        [94, 248, 16],
-        [114, 106, 53],
-        [83, 159, 223],
-    ],
-    [
-        [201, 9, 147],
-        [184, 49, 12],
-        [138, 249, 199],
-        [179, 19, 4],
-        [68, 134, 235],
-        [88, 70, 33],
-        [44, 21, 7],
-        [206, 157, 19],
-    ],
-    [
-        [194, 248, 16],
-        [114, 116, 53],
-        [83, 19, 223],
-        [115, 36, 192],
-        [107, 76, 35],
-        [81, 253, 16],
-        [113, 78, 40],
-        [161, 75, 109],
-    ],
-    [
-        [140, 58, 124],
-        [185, 110, 242],
-        [40, 248, 15],
-        [246, 17, 82],
-        [122, 74, 60],
-        [241, 205, 106],
-        [3, 78, 40],
-        [161, 175, 109],
-    ],
-    [
-        [15, 39, 205],
-        [199, 21, 2],
-        [3, 206, 22],
-        [88, 49, 132],
-        [140, 15, 124],
-        [18, 11, 252],
-        [40, 14, 15],
-        [24, 119, 82],
-    ],
-    [
-        [216, 157, 119],
-        [95, 39, 5],
-        [0, 82, 21],
-        [123, 106, 12],
-        [184, 241, 125],
-        [168, 23, 235],
-        [21, 170, 81],
-        [130, 239, 27],
-    ],
-    [
-        [81, 234, 248],
-        [201, 142, 147],
-        [84, 149, 0],
-        [3, 206, 122],
-        [8, 49, 132],
-        [10, 115, 124],
-        [115, 47, 11],
-        [245, 110, 36],
-    ],
-    [
-        [31, 33, 72],
-        [185, 206, 221],
-        [94, 248, 16],
-        [114, 106, 53],
-        [83, 59, 223],
-        [80, 234, 248],
-        [201, 142, 147],
-        [84, 49, 32],
-    ],
-    [
-        [16, 199, 15],
-        [47, 64, 112],
-        [38, 86, 151],
-        [10, 177, 24],
-        [18, 110, 242],
-        [20, 248, 15],
-        [24, 11, 82],
-        [12, 74, 160],
-    ],
-    [
-        [46, 1, 82],
-        [122, 74, 160],
-        [241, 25, 106],
-        [112, 36, 192],
-        [107, 176, 35],
-        [81, 253, 16],
-        [113, 78, 41],
-        [11, 75, 109],
-    ],
-    [
-        [8, 59, 23],
-        [80, 23, 24],
-        [201, 12, 17],
-        [181, 49, 132],
-        [141, 52, 124],
-        [8, 14, 0],
-        [13, 206, 122],
-        [255, 9, 132],
-    ],
-];
-
 const RGB_TO_YUV_INPUT: [[[u8; 4]; 8]; 8] = [
     [
         [161, 24, 44, 58],
@@ -1818,33 +1495,47 @@ fn over_4gb() {
 }
 
 #[test]
-fn rgb_bgra_ok() {
+fn lrgb_ok() {
     bootstrap();
+    const SUPPORTED_CONVERSIONS_SRC_DST: &[(PixelFormat, usize, PixelFormat, usize)] = &[
+        (PixelFormat::Rgb, 3, PixelFormat::Bgra, 4),
+        (PixelFormat::Bgra, 4, PixelFormat::Rgb, 3),
+    ];
 
-    const MAX_WIDTH: usize = 32;
+    for conversions in SUPPORTED_CONVERSIONS_SRC_DST.iter() {
+        lrgb_conversion_ok(conversions.0, conversions.1, conversions.2, conversions.3);
+    }
+}
+
+fn lrgb_conversion_ok(
+    src_pixel_format: PixelFormat,
+    src_bpp: usize,
+    dst_pixel_format: PixelFormat,
+    dst_bpp: usize,
+) {
+    const MAX_WIDTH: usize = 49;
     const MAX_HEIGHT: usize = 8;
     const MAX_FILL_BYTES: usize = 2;
-    const SRC_BPP: usize = 3;
-    const DST_BPP: usize = 4;
 
     let src_format = ImageFormat {
-        pixel_format: PixelFormat::Rgb,
+        pixel_format: src_pixel_format,
         color_space: ColorSpace::Lrgb,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
-        pixel_format: PixelFormat::Bgra,
+        pixel_format: dst_pixel_format,
         color_space: ColorSpace::Lrgb,
         num_planes: 1,
     };
+    let mut rng = rand::thread_rng();
 
     for width in 0..=MAX_WIDTH {
         for height in 0..=MAX_HEIGHT {
             for src_stride_fill in 0..=MAX_FILL_BYTES {
                 for dst_stride_fill in 0..=MAX_FILL_BYTES {
-                    let src_stride = (SRC_BPP * width) + src_stride_fill;
-                    let dst_stride = (DST_BPP * width) + dst_stride_fill;
+                    let src_stride = (src_bpp * width) + src_stride_fill;
+                    let dst_stride = (dst_bpp * width) + dst_stride_fill;
 
                     let src_stride_param = if src_stride_fill == 0 {
                         STRIDE_AUTO
@@ -1866,10 +1557,14 @@ fn rgb_bgra_ok() {
 
                     for h_iter in 0..height {
                         for w_iter in 0..width {
-                            let offset = (h_iter * src_stride) + (w_iter * SRC_BPP);
+                            let offset = (h_iter * src_stride) + (w_iter * src_bpp);
 
-                            test_input[offset..offset + 3]
-                                .clone_from_slice(&RGB_TO_BGRA_INPUT[w_iter][h_iter]);
+                            test_input[offset + 0] = rng.gen::<u8>();
+                            test_input[offset + 1] = rng.gen::<u8>();
+                            test_input[offset + 2] = rng.gen::<u8>();
+                            if src_bpp == 4 {
+                                test_input[offset + 3] = 255;
+                            }
                         }
                     }
                     src_buffers.push(&test_input);
@@ -1892,9 +1587,9 @@ fn rgb_bgra_ok() {
                             for h_iter in 0..height {
                                 for w_iter in 0..width {
                                     let input_index: usize =
-                                        (h_iter * src_stride) + (w_iter * SRC_BPP);
+                                        (h_iter * src_stride) + (w_iter * src_bpp);
                                     let output_index: usize =
-                                        (h_iter * dst_stride) + (w_iter * DST_BPP);
+                                        (h_iter * dst_stride) + (w_iter * dst_bpp);
                                     assert_eq!(
                                         test_output[output_index + 0],
                                         test_input[input_index + 2]
@@ -1907,7 +1602,9 @@ fn rgb_bgra_ok() {
                                         test_output[output_index + 2],
                                         test_input[input_index + 0]
                                     );
-                                    assert_eq!(test_output[output_index + 3], 255);
+                                    if dst_bpp == 4 {
+                                        assert_eq!(test_output[output_index + 3], 255);
+                                    }
                                 }
                             }
                         }
