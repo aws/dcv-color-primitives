@@ -19,7 +19,7 @@ use crate::convert_image::sse2;
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
+    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32,
     _mm256_extracti128_si256, _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16,
     _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
     _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
@@ -1115,7 +1115,7 @@ unsafe fn rgb_to_bgra_avx2(
         _mm_prefetch(input_buffer as *const i8, _MM_HINT_NTA);
 
         for _ in (0..width).step_by(LANE_COUNT) {
-            // In order to avoid out of bound read, 4 bytes are substracted from the offset 
+            // In order to avoid out of bound read, 4 bytes are substracted from the offset
             // of last read which goes in the first lane of input3, can be seen from schema.
             // bFgFrFbE gErEbDgD rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0 bFgFrFbE gErEbDgD rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
             //                                                                                                                                                                                     ^----------------0----------------^
