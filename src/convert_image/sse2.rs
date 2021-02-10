@@ -389,162 +389,58 @@ unsafe fn lrgb_to_i444_4x(
     );
 }
 
-#[inline(always)]
-fn lrgb_to_yuv(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-    sampler: Sampler,
-) -> bool {
-    unsafe {
-        lrgb_to_yuv_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-            sampler,
-        )
-    }
-}
-
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn lrgb_to_yuv_sse2(
-    width: u32,
-    height: u32,
-    _last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_strides: (usize, usize),
+    dst_buffers: (&mut [u8], &mut [u8]),
+    depth: usize,
+    weights: &[i32; 6],
     sampler: Sampler,
-) -> bool {
-    if (last_dst_plane >= dst_strides.len())
-        || (last_dst_plane >= dst_buffers.len())
-        || src_strides.is_empty()
-        || src_buffers.is_empty()
-    {
-        return false;
-    }
+) {
+    const DST_DEPTH: usize = LRGB_TO_YUV_WAVES;
 
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_rgb_stride = depth * col_count;
-    let packed_nv12_stride = col_count;
-
-    let rgb_stride = if src_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        src_strides[0]
-    };
-
-    let y_stride = if dst_strides[0] == 0 {
-        packed_nv12_stride
-    } else {
-        dst_strides[0]
-    };
-
-    let uv_stride = if dst_strides[last_dst_plane] == 0 {
-        packed_nv12_stride
-    } else {
-        dst_strides[last_dst_plane]
-    };
-
-    let rgb_plane = &src_buffers[0];
-    let (first, last) = dst_buffers.split_at_mut(last_dst_plane);
-    let interplane_split = y_stride * line_count;
-    if last_dst_plane == 0 && interplane_split > last[0].len() {
-        return false;
-    }
-
-    let (y_plane, uv_plane) = if last_dst_plane == 0 {
-        last[0].split_at_mut(interplane_split)
-    } else {
-        (&mut first[0][..], &mut last[0][..])
-    };
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride) || (uv_stride > max_stride) || (rgb_stride > max_stride) {
-        return false;
-    }
-
-    let wg_height = line_count / 2;
-    if y_stride * line_count > y_plane.len()
-        || uv_stride * wg_height > uv_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
+    let (y_stride, uv_stride) = dst_strides;
 
     let y_weigths = [
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(weights[0]),
+        _mm_set1_epi32(weights[1]),
         _mm_set1_epi32(Y_OFFSET),
     ];
 
     let uv_weights = [
-        _mm_set_epi32(
-            FORWARD_WEIGHTS[col][2],
-            FORWARD_WEIGHTS[col][3],
-            FORWARD_WEIGHTS[col][2],
-            FORWARD_WEIGHTS[col][3],
-        ),
-        _mm_set_epi32(
-            FORWARD_WEIGHTS[col][4],
-            FORWARD_WEIGHTS[col][5],
-            FORWARD_WEIGHTS[col][4],
-            FORWARD_WEIGHTS[col][5],
-        ),
+        _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
+        _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
         _mm_set1_epi32(C_OFFSET),
     ];
 
-    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-    let nv12_depth = LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let src_group = src_buffer.as_ptr();
+    let y_group = dst_buffers.0.as_mut_ptr();
+    let uv_group = dst_buffers.1.as_mut_ptr();
 
-    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
-        line_count
+    let src_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
+    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+        height
     } else {
-        line_count - 2
+        height - 2
     };
 
-    let rgb_group = rgb_plane.as_ptr();
-    let y_group = y_plane.as_mut_ptr();
-    let uv_group = uv_plane.as_mut_ptr();
-    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_width = width / LRGB_TO_YUV_WAVES;
     let wg_height = y_start / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
             lrgb_to_yuv_4x(
-                rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
-                y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)),
-                y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)),
-                uv_group.add(wg_index(x, y, nv12_depth, uv_stride)),
+                src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
+                src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
+                y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
+                y_group.add(wg_index(x, 2 * y + 1, DST_DEPTH, y_stride)),
+                uv_group.add(wg_index(x, y, DST_DEPTH, uv_stride)),
                 sampler,
                 &y_weigths,
                 &uv_weights,
@@ -553,15 +449,15 @@ unsafe fn lrgb_to_yuv_sse2(
     }
 
     // Handle leftover line
-    if y_start != line_count {
-        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+    if y_start != height {
+        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
         for x in 0..wg_width {
             lrgb_to_yuv_4x(
-                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
-                y_group.add(wg_index(x, y_start, nv12_depth, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, nv12_depth, y_stride)),
-                uv_group.add(wg_index(x, wg_height, nv12_depth, uv_stride)),
+                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
+                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
+                y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
+                y_group.add(wg_index(x, y_start + 1, DST_DEPTH, y_stride)),
+                uv_group.add(wg_index(x, wg_height, DST_DEPTH, uv_stride)),
                 sampler,
                 &y_weigths,
                 &uv_weights,
@@ -570,179 +466,66 @@ unsafe fn lrgb_to_yuv_sse2(
 
         // Handle leftover pixels
         lrgb_to_yuv_4x(
-            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
-            rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
-            y_group.add(wg_index(wg_width, y_start, nv12_depth, y_stride)),
-            y_group.add(wg_index(wg_width, y_start + 1, nv12_depth, y_stride)),
-            uv_group.add(wg_index(wg_width, wg_height, nv12_depth, uv_stride)),
+            src_group.add(wg_index(wg_width, y_start, src_depth, src_stride)),
+            src_group.add(wg_index(wg_width, y_start + 1, src_depth, src_stride)),
+            y_group.add(wg_index(wg_width, y_start, DST_DEPTH, y_stride)),
+            y_group.add(wg_index(wg_width, y_start + 1, DST_DEPTH, y_stride)),
+            uv_group.add(wg_index(wg_width, wg_height, DST_DEPTH, uv_stride)),
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
         );
-    }
-
-    true
-}
-
-#[inline(always)]
-fn lrgb_to_i420(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-    sampler: Sampler,
-) -> bool {
-    unsafe {
-        lrgb_to_i420_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-            sampler,
-        )
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn lrgb_to_i420_sse2(
-    width: u32,
-    height: u32,
-    _last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_strides: (usize, usize, usize),
+    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
+    depth: usize,
+    weights: &[i32; 6],
     sampler: Sampler,
-) -> bool {
-    if last_dst_plane != 2
-        || (last_dst_plane >= dst_strides.len())
-        || (last_dst_plane >= dst_buffers.len())
-        || src_strides.is_empty()
-        || src_buffers.is_empty()
-    {
-        return false;
-    }
-
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_rgb_stride = depth * col_count;
-
-    let rgb_stride = if src_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        src_strides[0]
-    };
-
-    let y_stride = if dst_strides[0] == 0 {
-        col_count
-    } else {
-        dst_strides[0]
-    };
-
-    let u_stride = if dst_strides[1] == 0 {
-        col_count / 2
-    } else {
-        dst_strides[1]
-    };
-
-    let v_stride = if dst_strides[2] == 0 {
-        col_count / 2
-    } else {
-        dst_strides[2]
-    };
-
-    let rgb_plane = &src_buffers[0];
-    let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
-    let (u_plane, v_plane) = uv_plane.split_at_mut(1);
-
-    let y_plane = &mut y_plane[0][..];
-    let u_plane = &mut u_plane[0][..];
-    let v_plane = &mut v_plane[0][..];
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride)
-        || (u_stride > max_stride)
-        || (v_stride > max_stride)
-        || (rgb_stride > max_stride)
-    {
-        return false;
-    }
-
-    let wg_height = line_count / 2;
-    if y_stride * line_count > y_plane.len()
-        || u_stride * wg_height > u_plane.len()
-        || v_stride * wg_height > v_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
+) {
+    let (y_stride, u_stride, v_stride) = dst_strides;
 
     let y_weigths = [
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(weights[0]),
+        _mm_set1_epi32(weights[1]),
         _mm_set1_epi32(Y_OFFSET),
     ];
 
     let uv_weights = [
-        _mm_set_epi32(
-            FORWARD_WEIGHTS[col][2],
-            FORWARD_WEIGHTS[col][3],
-            FORWARD_WEIGHTS[col][2],
-            FORWARD_WEIGHTS[col][3],
-        ),
-        _mm_set_epi32(
-            FORWARD_WEIGHTS[col][4],
-            FORWARD_WEIGHTS[col][5],
-            FORWARD_WEIGHTS[col][4],
-            FORWARD_WEIGHTS[col][5],
-        ),
+        _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
+        _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
         _mm_set1_epi32(C_OFFSET),
     ];
 
-    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let src_group = src_buffer.as_ptr();
+    let y_group = dst_buffers.0.as_mut_ptr();
+    let u_group = dst_buffers.1.as_mut_ptr();
+    let v_group = dst_buffers.2.as_mut_ptr();
 
-    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
-        line_count
+    let src_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
+    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+        height
     } else {
-        line_count - 2
+        height - 2
     };
 
-    let rgb_group = rgb_plane.as_ptr();
-    let y_group = y_plane.as_mut_ptr();
-    let u_group = u_plane.as_mut_ptr();
-    let v_group = v_plane.as_mut_ptr();
-    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_width = width / LRGB_TO_YUV_WAVES;
     let wg_height = y_start / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
             lrgb_to_i420_4x(
-                rgb_group.add(wg_index(x, 2 * y, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(x, 2 * y + 1, rgb_depth, rgb_stride)),
+                src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
+                src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, LRGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, 2 * y + 1, LRGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, u_stride)),
@@ -755,12 +538,12 @@ unsafe fn lrgb_to_i420_sse2(
     }
 
     // Handle leftover line
-    if y_start != line_count {
-        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+    if y_start != height {
+        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
         for x in 0..wg_width {
             lrgb_to_i420_4x(
-                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
-                rgb_group.add(wg_index(x, y_start + 1, rgb_depth, rgb_stride)),
+                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
+                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
@@ -773,8 +556,8 @@ unsafe fn lrgb_to_i420_sse2(
 
         // Handle leftover pixels
         lrgb_to_i420_4x(
-            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
-            rgb_group.add(wg_index(wg_width, y_start + 1, rgb_depth, rgb_stride)),
+            src_group.add(wg_index(wg_width, y_start, src_depth, src_stride)),
+            src_group.add(wg_index(wg_width, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
             y_group.add(wg_index(wg_width, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(
@@ -794,163 +577,61 @@ unsafe fn lrgb_to_i420_sse2(
             &uv_weights,
         );
     }
-
-    true
-}
-
-#[inline(always)]
-fn lrgb_to_i444(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-    sampler: Sampler,
-) -> bool {
-    unsafe {
-        lrgb_to_i444_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-            sampler,
-        )
-    }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn lrgb_to_i444_sse2(
-    width: u32,
-    height: u32,
-    _last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_strides: (usize, usize, usize),
+    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
+    depth: usize,
+    weights: &[i32; 6],
     sampler: Sampler,
-) -> bool {
-    if last_dst_plane != 2
-        || (last_dst_plane >= dst_strides.len())
-        || (last_dst_plane >= dst_buffers.len())
-        || src_strides.is_empty()
-        || src_buffers.is_empty()
-    {
-        return false;
-    }
-
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_rgb_stride = depth * col_count;
-
-    let rgb_stride = if src_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        src_strides[0]
-    };
-
-    let y_stride = if dst_strides[0] == 0 {
-        col_count
-    } else {
-        dst_strides[0]
-    };
-
-    let u_stride = if dst_strides[1] == 0 {
-        col_count
-    } else {
-        dst_strides[1]
-    };
-
-    let v_stride = if dst_strides[2] == 0 {
-        col_count
-    } else {
-        dst_strides[2]
-    };
-
-    let rgb_plane = &src_buffers[0];
-    let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
-    let (u_plane, v_plane) = uv_plane.split_at_mut(1);
-
-    let y_plane = &mut y_plane[0][..];
-    let u_plane = &mut u_plane[0][..];
-    let v_plane = &mut v_plane[0][..];
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride)
-        || (u_stride > max_stride)
-        || (v_stride > max_stride)
-        || (rgb_stride > max_stride)
-    {
-        return false;
-    }
-
-    if y_stride * line_count > y_plane.len()
-        || u_stride * line_count > u_plane.len()
-        || v_stride * line_count > v_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
+) {
+    let (y_stride, u_stride, v_stride) = dst_strides;
 
     let y_weights = [
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][0]),
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][1]),
+        _mm_set1_epi32(weights[0]),
+        _mm_set1_epi32(weights[1]),
         _mm_set1_epi32(Y_OFFSET),
     ];
 
     let u_weights = [
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][3]),
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][5]),
+        _mm_set1_epi32(weights[3]),
+        _mm_set1_epi32(weights[5]),
         _mm_set1_epi32(C_OFFSET16),
     ];
 
     let v_weights = [
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][2]),
-        _mm_set1_epi32(FORWARD_WEIGHTS[col][4]),
+        _mm_set1_epi32(weights[2]),
+        _mm_set1_epi32(weights[4]),
         _mm_set1_epi32(C_OFFSET16),
     ];
 
-    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((col_count - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let src_group = src_buffer.as_ptr();
+    let y_group = dst_buffers.0.as_mut_ptr();
+    let u_group = dst_buffers.1.as_mut_ptr();
+    let v_group = dst_buffers.2.as_mut_ptr();
 
-    let y_start = if (depth == 4) || (read_bytes_per_line <= rgb_stride) {
-        line_count
+    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+        height
     } else {
-        line_count - 1
+        height - 1
     };
 
-    let rgb_group = rgb_plane.as_ptr();
-    let y_group = y_plane.as_mut_ptr();
-    let u_group = u_plane.as_mut_ptr();
-    let v_group = v_plane.as_mut_ptr();
-    let wg_width = col_count / LRGB_TO_YUV_WAVES;
+    let wg_width = width / LRGB_TO_YUV_WAVES;
     let wg_height = y_start;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
             lrgb_to_i444_4x(
-                rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
+                src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, u_stride)),
                 v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, v_stride)),
@@ -963,11 +644,11 @@ unsafe fn lrgb_to_i444_sse2(
     }
 
     // Handle leftover line
-    if y_start != line_count {
-        let wg_width = (col_count - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+    if y_start != height {
+        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
         for x in 0..wg_width {
             lrgb_to_i444_4x(
-                rgb_group.add(wg_index(x, y_start, rgb_depth, rgb_stride)),
+                src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, u_stride)),
                 v_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, v_stride)),
@@ -980,7 +661,7 @@ unsafe fn lrgb_to_i444_sse2(
 
         // Handle leftover pixels
         lrgb_to_i444_4x(
-            rgb_group.add(wg_index(wg_width, y_start, rgb_depth, rgb_stride)),
+            src_group.add(wg_index(wg_width, y_start, rgb_depth, src_stride)),
             y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, u_stride)),
             v_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, v_stride)),
@@ -990,137 +671,44 @@ unsafe fn lrgb_to_i444_sse2(
             &v_weights,
         );
     }
-
-    true
-}
-
-#[inline(always)]
-fn yuv_to_lrgb(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    unsafe {
-        yuv_to_lrgb_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-        )
-    }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn yuv_to_lrgb_sse2(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    if (last_src_plane >= src_strides.len())
-        || (last_src_plane >= src_buffers.len())
-        || dst_strides.is_empty()
-        || dst_buffers.is_empty()
-    {
-        return false;
-    }
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize),
+    src_buffers: (&[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+    weights: &[i16; 8],
+) {
+    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES;
+    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
 
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_nv12_stride = col_count;
-    let packed_rgb_stride = depth * col_count;
+    let (y_stride, uv_stride) = src_strides;
 
-    let y_stride = if src_strides[0] == 0 {
-        packed_nv12_stride
-    } else {
-        src_strides[0]
-    };
+    let xxym = _mm_set1_epi16(weights[0]);
+    let rcrm = _mm_set1_epi16(weights[1]);
+    let gcrm = _mm_set1_epi16(weights[2]);
+    let gcbm = _mm_set1_epi16(weights[3]);
+    let bcbm = _mm_set1_epi16(weights[4]);
+    let rn = _mm_set1_epi16(weights[5]);
+    let gp = _mm_set1_epi16(weights[6]);
+    let bn = _mm_set1_epi16(weights[7]);
 
-    let uv_stride = if src_strides[last_src_plane] == 0 {
-        packed_nv12_stride
-    } else {
-        src_strides[last_src_plane]
-    };
+    let y_group = src_buffers.0.as_ptr();
+    let uv_group = src_buffers.1.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
 
-    let rgb_stride = if dst_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        dst_strides[0]
-    };
-
-    let rgb_plane = &mut dst_buffers[0];
-    let (first, last) = src_buffers.split_at(last_src_plane);
-    let interplane_split = y_stride * line_count;
-    if last_src_plane == 0 && interplane_split > last[0].len() {
-        return false;
-    }
-
-    let (y_plane, uv_plane) = if last_src_plane == 0 {
-        last[0].split_at(interplane_split)
-    } else {
-        (first[0], last[0])
-    };
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride) || (uv_stride > max_stride) || (rgb_stride > max_stride) {
-        return false;
-    }
-
-    let wg_height = line_count / 2;
-    if y_stride * line_count > y_plane.len()
-        || uv_stride * wg_height > uv_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
-
-    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
-
-    let y_group = y_plane.as_ptr();
-    let uv_group = uv_plane.as_ptr();
-    let rgb_group = rgb_plane.as_mut_ptr();
-    let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
-    let nv12_depth = YUV_TO_LRGB_WAVES;
-    let wg_width = col_count / YUV_TO_LRGB_WAVES;
+    let wg_width = width / YUV_TO_LRGB_WAVES;
+    let wg_height = height / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
             let (cb, cr) =
-                unpack_ui8x2_i16be_8x(uv_group.add(wg_index(x, y, nv12_depth, uv_stride)));
+                unpack_ui8x2_i16be_8x(uv_group.add(wg_index(x, y, SRC_DEPTH, uv_stride)));
 
             let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
             let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
@@ -1134,12 +722,12 @@ unsafe fn yuv_to_lrgb_sse2(
             let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
             let y0 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y, nv12_depth, y_stride)) as *const __m128i
+                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m128i
             );
 
             let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
@@ -1147,19 +735,19 @@ unsafe fn yuv_to_lrgb_sse2(
 
             let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
             );
 
             let y1 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y + 1, nv12_depth, y_stride)) as *const __m128i
+                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m128i
             );
 
             let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
@@ -1167,146 +755,52 @@ unsafe fn yuv_to_lrgb_sse2(
 
             let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
             );
         }
-    }
-
-    true
-}
-
-#[inline(always)]
-fn i420_to_lrgb(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    unsafe {
-        i420_to_lrgb_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-        )
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn i420_to_lrgb_sse2(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    if last_src_plane != 2
-        || last_src_plane >= src_strides.len()
-        || last_src_plane >= src_buffers.len()
-        || dst_strides.is_empty()
-        || dst_buffers.is_empty()
-    {
-        return false;
-    }
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize, usize),
+    src_buffers: (&[u8], &[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+    weights: &[i16; 8],
+) {
+    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES;
+    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
 
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_rgb_stride = depth * col_count;
+    let (y_stride, u_stride, v_stride) = src_strides;
 
-    let y_stride = if src_strides[0] != 0 {
-        src_strides[0]
-    } else {
-        col_count
-    };
+    let xxym = _mm_set1_epi16(weights[0]);
+    let rcrm = _mm_set1_epi16(weights[1]);
+    let gcrm = _mm_set1_epi16(weights[2]);
+    let gcbm = _mm_set1_epi16(weights[3]);
+    let bcbm = _mm_set1_epi16(weights[4]);
+    let rn = _mm_set1_epi16(weights[5]);
+    let gp = _mm_set1_epi16(weights[6]);
+    let bn = _mm_set1_epi16(weights[7]);
 
-    let u_stride = if src_strides[1] != 0 {
-        src_strides[1]
-    } else {
-        col_count / 2
-    };
+    let y_group = src_buffers.0.as_ptr();
+    let u_group = src_buffers.1.as_ptr();
+    let v_group = src_buffers.2.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
 
-    let v_stride = if src_strides[2] != 0 {
-        src_strides[2]
-    } else {
-        col_count / 2
-    };
-
-    let rgb_stride = if dst_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        dst_strides[0]
-    };
-
-    let rgb_plane = &mut dst_buffers[0];
-    let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride)
-        || (u_stride > max_stride)
-        || (v_stride > max_stride)
-        || (rgb_stride > max_stride)
-    {
-        return false;
-    }
-
-    let wg_height = line_count / 2;
-    if y_stride * line_count > y_plane.len()
-        || u_stride * wg_height > u_plane.len()
-        || v_stride * wg_height > v_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
-
-    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
-
-    let y_group = y_plane.as_ptr();
-    let u_group = u_plane.as_ptr();
-    let v_group = v_plane.as_ptr();
-    let rgb_group = rgb_plane.as_mut_ptr();
-    let rgb_depth = 2 * YUV_TO_LRGB_WAVES;
-    let i420_depth = YUV_TO_LRGB_WAVES;
-    let wg_width = col_count / YUV_TO_LRGB_WAVES;
+    let wg_width = width / YUV_TO_LRGB_WAVES;
+    let wg_height = height / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            let cb = unpack_ui8_i16be_8x(u_group.add(wg_index(x, y, i420_depth / 2, u_stride)));
-            let cr = unpack_ui8_i16be_8x(v_group.add(wg_index(x, y, i420_depth / 2, v_stride)));
+            let cb = unpack_ui8_i16be_8x(u_group.add(wg_index(x, y, SRC_DEPTH / 2, u_stride)));
+            let cr = unpack_ui8_i16be_8x(v_group.add(wg_index(x, y, SRC_DEPTH / 2, v_stride)));
 
             let sb = _mm_sub_epi16(_mm_mulhi_epu16(cb, bcbm), bn);
             let sr = _mm_sub_epi16(_mm_mulhi_epu16(cr, rcrm), rn);
@@ -1320,12 +814,12 @@ unsafe fn i420_to_lrgb_sse2(
             let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
             let y0 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y, i420_depth, y_stride)) as *const __m128i
+                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m128i
             );
 
             let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x, 2 * y, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_lo, y00), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_lo, y00), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_lo, y00), FIX6),
@@ -1333,19 +827,19 @@ unsafe fn i420_to_lrgb_sse2(
 
             let y10 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x + 1, 2 * y, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_hi, y10), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_hi, y10), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
             );
 
             let y1 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y + 1, i420_depth, y_stride)) as *const __m128i
+                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m128i
             );
 
             let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x, 2 * y + 1, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_lo, y01), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_lo, y01), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_lo, y01), FIX6),
@@ -1353,152 +847,55 @@ unsafe fn i420_to_lrgb_sse2(
 
             let y11 = _mm_mulhi_epu16(_mm_unpackhi_epi8(zero!(), y1), xxym);
             pack_i16x3_8x(
-                rgb_group.add(wg_index(2 * x + 1, 2 * y + 1, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_hi, y11), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_hi, y11), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y11), FIX6),
             );
         }
     }
-
-    true
-}
-
-#[inline(always)]
-fn i444_to_lrgb(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    unsafe {
-        i444_to_lrgb_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-            channels,
-            colorimetry,
-        )
-    }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn i444_to_lrgb_sse2(
-    width: u32,
-    height: u32,
-    last_src_plane: usize,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: usize,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-    channels: PixelFormatChannels,
-    colorimetry: Colorimetry,
-) -> bool {
-    if last_src_plane != 2
-        || last_src_plane >= src_strides.len()
-        || last_src_plane >= src_buffers.len()
-        || dst_strides.is_empty()
-        || dst_buffers.is_empty()
-    {
-        return false;
-    }
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize, usize),
+    src_buffers: (&[u8], &[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+    weights: &[i16; 8],
+) {
+    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES / 2;
+    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
 
-    let depth = channels as usize;
-    let col_count = width as usize;
-    let line_count = height as usize;
-    let packed_rgb_stride = depth * col_count;
+    let (y_stride, u_stride, v_stride) = src_strides;
 
-    let y_stride = if src_strides[0] != 0 {
-        src_strides[0]
-    } else {
-        col_count
-    };
+    let xxym = _mm_set1_epi16(weights[0]);
+    let rcrm = _mm_set1_epi16(weights[1]);
+    let gcrm = _mm_set1_epi16(weights[2]);
+    let gcbm = _mm_set1_epi16(weights[3]);
+    let bcbm = _mm_set1_epi16(weights[4]);
+    let rn = _mm_set1_epi16(weights[5]);
+    let gp = _mm_set1_epi16(weights[6]);
+    let bn = _mm_set1_epi16(weights[7]);
 
-    let u_stride = if src_strides[1] != 0 {
-        src_strides[1]
-    } else {
-        col_count
-    };
+    let y_group = src_buffers.0.as_ptr();
+    let u_group = src_buffers.1.as_ptr();
+    let v_group = src_buffers.2.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
 
-    let v_stride = if src_strides[2] != 0 {
-        src_strides[2]
-    } else {
-        col_count
-    };
+    let wg_width = width / SRC_DEPTH;
 
-    let rgb_stride = if dst_strides[0] == 0 {
-        packed_rgb_stride
-    } else {
-        dst_strides[0]
-    };
-
-    let rgb_plane = &mut dst_buffers[0];
-    let (y_plane, u_plane, v_plane) = (src_buffers[0], src_buffers[1], src_buffers[2]);
-
-    if line_count == 0 || col_count == 0 {
-        return true;
-    }
-
-    let max_stride = usize::max_value() / line_count;
-    if (y_stride > max_stride)
-        || (u_stride > max_stride)
-        || (v_stride > max_stride)
-        || (rgb_stride > max_stride)
-    {
-        return false;
-    }
-
-    if y_stride * line_count > y_plane.len()
-        || u_stride * line_count > u_plane.len()
-        || v_stride * line_count > v_plane.len()
-        || rgb_stride * line_count > rgb_plane.len()
-    {
-        return false;
-    }
-
-    let col = colorimetry as usize;
-
-    let xxym = _mm_set1_epi16(BACKWARD_WEIGHTS[col][0]);
-    let rcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][1]);
-    let gcrm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][2]);
-    let gcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][3]);
-    let bcbm = _mm_set1_epi16(BACKWARD_WEIGHTS[col][4]);
-    let rn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][5]);
-    let gp = _mm_set1_epi16(BACKWARD_WEIGHTS[col][6]);
-    let bn = _mm_set1_epi16(BACKWARD_WEIGHTS[col][7]);
-
-    let y_group = y_plane.as_ptr();
-    let u_group = u_plane.as_ptr();
-    let v_group = v_plane.as_ptr();
-    let rgb_group = rgb_plane.as_mut_ptr();
-    let rgb_depth = YUV_TO_LRGB_WAVES * 2;
-    let group_width = YUV_TO_LRGB_WAVES / 2;
-    let wg_width = col_count / group_width;
-
-    for y in 0..line_count {
+    for y in 0..height {
         for x in 0..wg_width {
-            let cb0 = _mm_loadl_epi64(
-                u_group.add(wg_index(x, y, group_width, u_stride)) as *const __m128i
-            );
-            let cr0 = _mm_loadl_epi64(
-                v_group.add(wg_index(x, y, group_width, v_stride)) as *const __m128i
-            );
-            let y0 = _mm_loadl_epi64(
-                y_group.add(wg_index(x, y, group_width, y_stride)) as *const __m128i
-            );
+            let cb0 =
+                _mm_loadl_epi64(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)) as *const __m128i);
+            let cr0 =
+                _mm_loadl_epi64(v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)) as *const __m128i);
+            let y0 =
+                _mm_loadl_epi64(y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)) as *const __m128i);
 
             let cb_lo = _mm_unpacklo_epi8(zero!(), cb0);
             let cr_lo = _mm_unpacklo_epi8(zero!(), cr0);
@@ -1512,111 +909,47 @@ unsafe fn i444_to_lrgb_sse2(
             );
 
             pack_i16x3_8x(
-                rgb_group.add(wg_index(x, y, rgb_depth, rgb_stride)),
+                dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
                 fix_to_i16_8x!(_mm_add_epi16(sr_lo, y_lo), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sg_lo, y_lo), FIX6),
                 fix_to_i16_8x!(_mm_add_epi16(sb_lo, y_lo), FIX6),
             );
         }
     }
-
-    true
-}
-
-#[inline(always)]
-fn rgb_to_bgra(
-    width: u32,
-    height: u32,
-    last_src_plane: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    last_dst_plane: u32,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    unsafe {
-        rgb_to_bgra_sse2(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
 unsafe fn rgb_to_bgra_sse2(
-    width: u32,
-    height: u32,
-    _last_src_plane: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: u32,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    if width == 0 || height == 0 {
-        return true;
-    }
-
-    if dst_buffers.is_empty()
-        || dst_strides.is_empty()
-        || src_buffers.is_empty()
-        || src_strides.is_empty()
-    {
-        return false;
-    }
-
-    let max_stride = usize::max_value() / height as usize;
-    if (src_strides[0] > max_stride) || (dst_strides[0] > max_stride) {
-        return false;
-    }
-
-    if src_strides[0] * height as usize > src_buffers[0].len()
-        || dst_strides[0] * height as usize > dst_buffers[0].len()
-    {
-        return false;
-    }
-
-    const OUTPUT_BPP: usize = 4;
-    const INPUT_BPP: usize = 3;
-
-    let w = width as usize;
-    let output_stride_diff = if dst_strides[0] == 0 {
-        0
-    } else {
-        dst_strides[0] - (OUTPUT_BPP * w)
-    };
-    let input_stride_diff = if src_strides[0] == 0 {
-        0
-    } else {
-        src_strides[0] - (INPUT_BPP * w)
-    };
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const SRC_DEPTH: usize = 3;
+    const DST_DEPTH: usize = 4;
 
     let first_pixel_mask = _mm_set_epi32(0, 0, 0, -1);
     let first_two_pixels_mask = _mm_set_epi32(0, 0, -1, -1);
-    let output_buffer = dst_buffers[0].as_mut_ptr();
-    let input_buffer = src_buffers[0].as_ptr();
-    let mut ibuffer_offset = 0;
-    let mut obuffer_offset = 0;
+
+    let src_group = src_buffer.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
+
+    let src_stride_diff = src_stride - (SRC_DEPTH * width);
+    let dst_stride_diff = dst_stride - (DST_DEPTH * width);
+    let mut src_offset = 0;
+    let mut dst_offset = 0;
 
     for _ in 0..height {
         for _ in (0..width).step_by(LANE_COUNT) {
-            let input0 = _mm_loadu_si128(input_buffer.add(ibuffer_offset) as *const __m128i);
-            let input1 =
-                _mm_loadu_si128(input_buffer.add(ibuffer_offset + LANE_COUNT) as *const __m128i);
+            let input0 = _mm_loadu_si128(src_group.add(src_offset) as *const __m128i);
+            let input1 = _mm_loadu_si128(src_group.add(src_offset + LANE_COUNT) as *const __m128i);
             let input2 =
-                _mm_loadu_si128(input_buffer.add(ibuffer_offset + (LANE_COUNT * 2)) as *const __m128i);
+                _mm_loadu_si128(src_group.add(src_offset + (LANE_COUNT * 2)) as *const __m128i);
 
-            rgb_to_bgra_4x(
-                input0,
-                output_buffer.add(obuffer_offset) as *mut __m128i,
-            );
+            rgb_to_bgra_4x(input0, dst_group.add(dst_offset) as *mut __m128i);
 
             // second iteration is with input0,input1
             // we should merge last 4 bytes of input0 with first 8 bytes of input1
@@ -1627,10 +960,7 @@ unsafe fn rgb_to_bgra_sse2(
                 _mm_andnot_si128(first_pixel_mask, first8),
             );
 
-            rgb_to_bgra_4x(
-                input,
-                output_buffer.add(obuffer_offset + 16) as *mut __m128i,
-            );
+            rgb_to_bgra_4x(input, dst_group.add(dst_offset + 16) as *mut __m128i);
 
             // third iteration is with input1,input2
             // we should merge last 8 bytes of input1 with first 4 bytes of input2
@@ -1641,23 +971,655 @@ unsafe fn rgb_to_bgra_sse2(
                 _mm_andnot_si128(first_two_pixels_mask, first8),
             );
 
-            rgb_to_bgra_4x(
-                input,
-                output_buffer.add(obuffer_offset + 32) as *mut __m128i,
-            );
+            rgb_to_bgra_4x(input, dst_group.add(dst_offset + 32) as *mut __m128i);
 
             // fourth iteration is with input2
             rgb_to_bgra_4x(
                 _mm_shuffle_epi32(input2, mm_shuffle(0, 3, 2, 1)),
-                output_buffer.add(obuffer_offset + 48) as *mut __m128i,
+                dst_group.add(dst_offset + 48) as *mut __m128i,
             );
 
-            ibuffer_offset += LANE_COUNT * INPUT_BPP;
-            obuffer_offset += LANE_COUNT * OUTPUT_BPP;
+            src_offset += LANE_COUNT * SRC_DEPTH;
+            dst_offset += LANE_COUNT * DST_DEPTH;
         }
 
-        ibuffer_offset += input_stride_diff;
-        obuffer_offset += output_stride_diff;
+        src_offset += src_stride_diff;
+        dst_offset += dst_stride_diff;
+    }
+}
+
+#[inline(never)]
+fn nv12_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: usize,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    colorimetry: usize,
+) -> bool {
+    const DST_DEPTH: usize = PixelFormatChannels::Four as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if last_src_plane >= src_strides.len()
+        || last_src_plane >= src_buffers.len()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    // Check subsampling limits
+    let w = width as usize;
+    let h = height as usize;
+    let ch = h / 2;
+    if ch == 0 {
+        return false;
+    }
+
+    let rgb_stride = DST_DEPTH * w;
+
+    // Compute actual strides
+    let src_strides = (
+        compute_stride(src_strides[0], w),
+        compute_stride(src_strides[last_src_plane], w),
+    );
+    let dst_stride = compute_stride(dst_strides[0], rgb_stride);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let mut src_buffers = (src_buffers[0], src_buffers[last_src_plane]);
+    if last_src_plane == 0 {
+        if src_buffers.0.len() < src_strides.0 * h {
+            return false;
+        }
+
+        src_buffers = src_buffers.0.split_at(src_strides.0 * h);
+    }
+
+    let dst_buffer = &mut dst_buffers[0][..];
+    if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
+        || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, rgb_stride)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            yuv_to_lrgb_sse2(
+                vector_part,
+                h,
+                src_strides,
+                src_buffers,
+                dst_stride,
+                dst_buffer,
+                &BACKWARD_WEIGHTS[colorimetry],
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let dw = w * DST_DEPTH;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if w >= src_buffers.0.len() || w >= src_buffers.1.len() || dw >= dst_buffer.len() {
+            return false;
+        }
+
+        x86::nv12_to_lrgb(
+            scalar_part,
+            h,
+            src_strides,
+            (&src_buffers.0[w..], &src_buffers.1[w..]),
+            dst_stride,
+            &mut dst_buffer[dw..],
+            &x86::BACKWARD_WEIGHTS[colorimetry],
+        );
+    }
+
+    true
+}
+
+#[inline(never)]
+fn i420_bgra_lrgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    colorimetry: usize,
+) -> bool {
+    const DST_DEPTH: usize = PixelFormatChannels::Four as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.len() < 3
+        || src_buffers.len() < 3
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    // Check subsampling limits
+    let w = width as usize;
+    let h = height as usize;
+    let cw = w / 2;
+    let ch = h / 2;
+    if cw == 0 || ch == 0 {
+        return false;
+    }
+
+    let rgb_stride = DST_DEPTH * w;
+
+    // Compute actual strides
+    let src_strides = (
+        compute_stride(src_strides[0], w),
+        compute_stride(src_strides[1], cw),
+        compute_stride(src_strides[2], cw),
+    );
+    let dst_stride = compute_stride(dst_strides[0], rgb_stride);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffers = (src_buffers[0], src_buffers[1], src_buffers[2]);
+    let dst_buffer = &mut dst_buffers[0][..];
+    if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
+        || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, cw)
+        || out_of_bounds(src_buffers.2.len(), src_strides.2, ch - 1, cw)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, rgb_stride)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            i420_to_lrgb_sse2(
+                vector_part,
+                h,
+                src_strides,
+                src_buffers,
+                dst_stride,
+                dst_buffer,
+                &BACKWARD_WEIGHTS[colorimetry],
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let cw = w / 2;
+        let dw = w * DST_DEPTH;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if w >= src_buffers.0.len()
+            || cw >= src_buffers.1.len()
+            || cw >= src_buffers.2.len()
+            || dw >= dst_buffer.len()
+        {
+            return false;
+        }
+
+        x86::i420_to_lrgb(
+            scalar_part,
+            h,
+            src_strides,
+            (
+                &src_buffers.0[w..],
+                &src_buffers.1[cw..],
+                &src_buffers.2[cw..],
+            ),
+            dst_stride,
+            &mut dst_buffer[dw..],
+            &x86::BACKWARD_WEIGHTS[colorimetry],
+        );
+    }
+
+    true
+}
+
+#[inline(never)]
+fn i444_bgra_lrgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    colorimetry: usize,
+) -> bool {
+    const DST_DEPTH: usize = PixelFormatChannels::Four as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.len() < 3
+        || src_buffers.len() < 3
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+    let rgb_stride = DST_DEPTH * w;
+
+    // Compute actual strides
+    let src_strides = (
+        compute_stride(src_strides[0], w),
+        compute_stride(src_strides[1], w),
+        compute_stride(src_strides[2], w),
+    );
+    let dst_stride = compute_stride(dst_strides[0], rgb_stride);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffers = (src_buffers[0], src_buffers[1], src_buffers[2]);
+    let dst_buffer = &mut dst_buffers[0][..];
+    if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
+        || out_of_bounds(src_buffers.1.len(), src_strides.1, h - 1, w)
+        || out_of_bounds(src_buffers.2.len(), src_strides.2, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, rgb_stride)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES / 2);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            i444_to_lrgb_sse2(
+                vector_part,
+                h,
+                src_strides,
+                src_buffers,
+                dst_stride,
+                dst_buffer,
+                &BACKWARD_WEIGHTS[colorimetry],
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let dw = w * DST_DEPTH;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if w >= src_buffers.0.len()
+            || w >= src_buffers.1.len()
+            || w >= src_buffers.2.len()
+            || dw >= dst_buffer.len()
+        {
+            return false;
+        }
+
+        x86::i444_to_lrgb(
+            scalar_part,
+            h,
+            src_strides,
+            (
+                &src_buffers.0[w..],
+                &src_buffers.1[w..],
+                &src_buffers.2[w..],
+            ),
+            dst_stride,
+            &mut dst_buffer[dw..],
+            &x86::BACKWARD_WEIGHTS[colorimetry],
+        );
+    }
+
+    true
+}
+
+#[inline(never)]
+fn lrgb_i444(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: usize,
+    sampler: Sampler,
+) -> bool {
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.len() < 3
+        || dst_buffers.len() < 3
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+    let depth = channels as usize;
+    let rgb_stride = depth * w;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], rgb_stride);
+    let dst_strides = (
+        compute_stride(dst_strides[0], w),
+        compute_stride(dst_strides[1], w),
+        compute_stride(dst_strides[2], w),
+    );
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = &src_buffers[0];
+    let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
+    let (u_plane, v_plane) = uv_plane.split_at_mut(1);
+    let (y_plane, u_plane, v_plane) = (
+        &mut y_plane[0][..],
+        &mut u_plane[0][..],
+        &mut v_plane[0][..],
+    );
+    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+        || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
+        || out_of_bounds(u_plane.len(), dst_strides.1, h - 1, w)
+        || out_of_bounds(v_plane.len(), dst_strides.2, h - 1, w)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            lrgb_to_i444_sse2(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_strides,
+                (y_plane, u_plane, v_plane),
+                depth,
+                &FORWARD_WEIGHTS[colorimetry],
+                sampler,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let sw = w * depth;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if sw >= src_buffer.len() || w >= y_plane.len() || w >= u_plane.len() || w >= v_plane.len()
+        {
+            return false;
+        }
+
+        x86::lrgb_to_i444(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sw..],
+            dst_strides,
+            (&mut y_plane[w..], &mut u_plane[w..], &mut v_plane[w..]),
+            depth,
+            &x86::FORWARD_WEIGHTS[colorimetry],
+            sampler,
+        );
+    }
+
+    true
+}
+
+#[inline(never)]
+fn lrgb_i420(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: usize,
+    sampler: Sampler,
+) -> bool {
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.len() < 3
+        || dst_buffers.len() < 3
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+    let cw = w / 2;
+    let ch = h / 2;
+    if cw == 0 || ch == 0 {
+        return false;
+    }
+
+    let depth = channels as usize;
+    let rgb_stride = depth * w;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], rgb_stride);
+    let dst_strides = (
+        compute_stride(dst_strides[0], w),
+        compute_stride(dst_strides[1], cw),
+        compute_stride(dst_strides[2], cw),
+    );
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = &src_buffers[0];
+    let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
+    let (u_plane, v_plane) = uv_plane.split_at_mut(1);
+    let (y_plane, u_plane, v_plane) = (
+        &mut y_plane[0][..],
+        &mut u_plane[0][..],
+        &mut v_plane[0][..],
+    );
+    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+        || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
+        || out_of_bounds(u_plane.len(), dst_strides.1, ch - 1, cw)
+        || out_of_bounds(v_plane.len(), dst_strides.2, ch - 1, cw)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            lrgb_to_i420_sse2(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_strides,
+                (y_plane, u_plane, v_plane),
+                depth,
+                &FORWARD_WEIGHTS[colorimetry],
+                sampler,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let cw = w / 2;
+        let sw = w * depth;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if sw >= src_buffer.len()
+            || w >= y_plane.len()
+            || cw >= u_plane.len()
+            || cw >= v_plane.len()
+        {
+            return false;
+        }
+
+        x86::lrgb_to_i420(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sw..],
+            dst_strides,
+            (&mut y_plane[w..], &mut u_plane[cw..], &mut v_plane[cw..]),
+            depth,
+            &x86::FORWARD_WEIGHTS[colorimetry],
+            sampler,
+        );
+    }
+
+    true
+}
+
+#[inline(never)]
+fn lrgb_nv12(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: usize,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+    channels: PixelFormatChannels,
+    colorimetry: usize,
+    sampler: Sampler,
+) -> bool {
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || last_dst_plane >= dst_strides.len()
+        || last_dst_plane >= dst_buffers.len()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+    let ch = h / 2;
+    if ch == 0 {
+        return false;
+    }
+
+    let depth = channels as usize;
+    let rgb_stride = depth * w;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], rgb_stride);
+    let dst_strides = (
+        compute_stride(dst_strides[0], w),
+        compute_stride(dst_strides[last_dst_plane], w),
+    );
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = &src_buffers[0];
+    if last_dst_plane == 0 && dst_buffers[last_dst_plane].len() < dst_strides.0 * h {
+        return false;
+    }
+
+    let (y_plane, uv_plane) = if last_dst_plane == 0 {
+        dst_buffers[last_dst_plane].split_at_mut(dst_strides.0 * h)
+    } else {
+        let (y_plane, uv_plane) = dst_buffers.split_at_mut(last_dst_plane);
+
+        (&mut y_plane[0][..], &mut uv_plane[0][..])
+    };
+
+    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+        || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
+        || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, w)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            lrgb_to_yuv_sse2(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_strides,
+                (y_plane, uv_plane),
+                depth,
+                &FORWARD_WEIGHTS[colorimetry],
+                sampler,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let sw = w * depth;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if sw >= src_buffer.len() || w >= y_plane.len() || w >= uv_plane.len() {
+            return false;
+        }
+
+        x86::lrgb_to_nv12(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sw..],
+            dst_strides,
+            (&mut y_plane[w..], &mut uv_plane[w..]),
+            depth,
+            &x86::FORWARD_WEIGHTS[colorimetry],
+            sampler,
+        );
     }
 
     true
@@ -1666,229 +1628,145 @@ unsafe fn rgb_to_bgra_sse2(
 pub fn argb_lrgb_nv12_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_nv12_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn argb_lrgb_nv12_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_nv12_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn bgra_lrgb_nv12_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_nv12_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgra_lrgb_nv12_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_nv12_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgr_lrgb_nv12_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt601,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_nv12_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn bgr_lrgb_nv12_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
     last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_yuv(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt709,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_nv12_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn nv12_bt601_bgra_lrgb(
@@ -1897,35 +1775,20 @@ pub fn nv12_bt601_bgra_lrgb(
     last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
-        yuv_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-        )
-    } else {
-        x86::nv12_bt601_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    nv12_bgra_lrgb(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt601 as usize,
+    )
 }
 
 pub fn nv12_bt709_bgra_lrgb(
@@ -1934,674 +1797,464 @@ pub fn nv12_bt709_bgra_lrgb(
     last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
-        yuv_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-        )
-    } else {
-        x86::nv12_bt709_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    nv12_bgra_lrgb(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt709 as usize,
+    )
 }
 
 pub fn rgb_lrgb_bgra_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
-        rgb_to_bgra(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    } else {
-        x86::rgb_lrgb_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
+    const SRC_DEPTH: usize = PixelFormatChannels::Three as usize;
+    const DST_DEPTH: usize = PixelFormatChannels::Four as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
     }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], SRC_DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DST_DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut dst_buffers[0][..];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, LANE_COUNT);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            rgb_to_bgra_sse2(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_stride,
+                dst_buffer,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let w = vector_part;
+        let sw = w * SRC_DEPTH;
+        let dw = w * DST_DEPTH;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if sw >= src_buffer.len() || dw >= dst_buffer.len() {
+            return false;
+        }
+
+        x86::rgb_to_bgra(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sw..],
+            dst_stride,
+            &mut dst_buffer[dw..],
+        );
+    }
+
+    true
 }
 
 pub fn i420_bt601_bgra_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
-        i420_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-        )
-    } else {
-        x86::i420_bt601_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    i420_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt601 as usize,
+    )
 }
 
 pub fn i420_bt709_bgra_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES) {
-        i420_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-        )
-    } else {
-        x86::i420_bt709_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    i420_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt709 as usize,
+    )
 }
 
 pub fn i444_bt601_bgra_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES / 2) {
-        i444_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-        )
-    } else {
-        x86::i444_bt601_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    i444_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt601 as usize,
+    )
 }
 
 pub fn i444_bt709_bgra_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, YUV_TO_LRGB_WAVES / 2) {
-        i444_to_lrgb(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-        )
-    } else {
-        x86::i444_bt709_bgra_lrgb(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    i444_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Bt709 as usize,
+    )
 }
 
 pub fn argb_lrgb_i420_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_i420_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn argb_lrgb_i420_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_i420_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn bgra_lrgb_i420_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_i420_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgra_lrgb_i420_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_i420_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgr_lrgb_i420_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt601,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_i420_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn bgr_lrgb_i420_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i420(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt709,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_i420_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn argb_lrgb_i444_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_i444_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn argb_lrgb_i444_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Argb,
-        )
-    } else {
-        x86::argb_lrgb_i444_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Argb,
+    )
 }
 
 pub fn bgra_lrgb_i444_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt601,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_i444_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgra_lrgb_i444_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Four,
-            Colorimetry::Bt709,
-            Sampler::Bgra,
-        )
-    } else {
-        x86::bgra_lrgb_i444_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgra,
+    )
 }
 
 pub fn bgr_lrgb_i444_bt601(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt601,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_i444_bt601(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt601 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn bgr_lrgb_i444_bt709(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    if is_wg_multiple(width, LRGB_TO_YUV_WAVES) {
-        lrgb_to_i444(
-            width,
-            height,
-            last_src_plane as usize,
-            src_strides,
-            src_buffers,
-            last_dst_plane as usize,
-            dst_strides,
-            dst_buffers,
-            PixelFormatChannels::Three,
-            Colorimetry::Bt709,
-            Sampler::Bgr,
-        )
-    } else {
-        x86::bgr_lrgb_i444_bt709(
-            width,
-            height,
-            last_src_plane,
-            src_strides,
-            src_buffers,
-            last_dst_plane,
-            dst_strides,
-            dst_buffers,
-        )
-    }
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt709 as usize,
+        Sampler::Bgr,
+    )
 }
 
 pub fn bgra_lrgb_rgb_lrgb(
