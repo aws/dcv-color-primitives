@@ -34,9 +34,23 @@ pub fn wg_index(x: usize, y: usize, w: usize, h: usize) -> usize {
     (h * y) + (x * w)
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn is_wg_multiple(x: u32, w: usize) -> bool {
-    ((x as usize) & (w - 1)) == 0
+pub fn lower_multiple_of_pot(x: usize, p: usize) -> usize {
+    x & !(p - 1)
+}
+
+pub fn out_of_bounds(size: usize, width: usize, height_minus_one: usize, stride: usize) -> bool {
+    width > size
+        || (height_minus_one != 0
+            && ((stride > usize::max_value() / height_minus_one)
+                || (stride * height_minus_one > size - width)))
+}
+
+pub fn compute_stride(stride: usize, def: usize) -> usize {
+    if stride != 0 {
+        stride
+    } else {
+        def
+    }
 }
 
 pub const FIX16: i32 = 16;
