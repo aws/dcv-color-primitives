@@ -1006,12 +1006,12 @@ unsafe fn bgra_to_rgb_avx2(
 
         for _ in 0..height {
             for y in limit..w {
-                *output_buffer.add((OUTPUT_BPP * y) + 0 + obuffer_offset) =
+                *output_buffer.add((OUTPUT_BPP * y) + obuffer_offset) =
                     *input_buffer.add((INPUT_BPP * y) + 2 + ibuffer_offset);
                 *output_buffer.add((OUTPUT_BPP * y) + 1 + obuffer_offset) =
                     *input_buffer.add((INPUT_BPP * y) + 1 + ibuffer_offset);
                 *output_buffer.add((OUTPUT_BPP * y) + 2 + obuffer_offset) =
-                    *input_buffer.add((INPUT_BPP * y) + 0 + ibuffer_offset);
+                    *input_buffer.add((INPUT_BPP * y) + ibuffer_offset);
             }
 
             ibuffer_offset += (INPUT_BPP * w) + input_stride_diff;
@@ -1104,7 +1104,7 @@ unsafe fn rgb_to_bgra_avx2(
         src_strides[0] - (INPUT_BPP * w)
     };
 
-    let mask_alphas =  _mm256_set1_epi32(ALPHAS_MASK as i32);
+    let mask_alphas = _mm256_set1_epi32(ALPHAS_MASK as i32);
     let mask_shuffle = _mm256_loadu_si256(SHUFFLE_MASK.as_ptr() as *const __m256i);
     let output_buffer = dst_buffers[0].as_mut_ptr();
     let input_buffer = src_buffers[0].as_ptr();
@@ -1143,7 +1143,8 @@ unsafe fn rgb_to_bgra_avx2(
             );
 
             let input3 = _mm256_loadu2_m128i(
-                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 7) - 4) as *const __m128i,
+                input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 7) - 4)
+                    as *const __m128i,
                 input_buffer.add(ibuffer_offset + (GROUP_SIZE * INPUT_BPP * 6)) as *const __m128i,
             );
 
@@ -1156,9 +1157,18 @@ unsafe fn rgb_to_bgra_avx2(
             let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, mask_shuffle), mask_alphas);
 
             _mm256_storeu_si256(output_buffer.add(obuffer_offset) as *mut __m256i, res);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + LANE_COUNT) as *mut __m256i, res1);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + (LANE_COUNT * 2)) as *mut __m256i, res2);
-            _mm256_storeu_si256(output_buffer.add(obuffer_offset + (LANE_COUNT * 3)) as *mut __m256i, res3);
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset + LANE_COUNT) as *mut __m256i,
+                res1,
+            );
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset + (LANE_COUNT * 2)) as *mut __m256i,
+                res2,
+            );
+            _mm256_storeu_si256(
+                output_buffer.add(obuffer_offset + (LANE_COUNT * 3)) as *mut __m256i,
+                res3,
+            );
 
             ibuffer_offset += LANE_COUNT * INPUT_BPP;
             obuffer_offset += LANE_COUNT * OUTPUT_BPP;
