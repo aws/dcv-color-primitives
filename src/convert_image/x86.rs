@@ -1071,9 +1071,9 @@ unsafe fn bgra_to_rgb(
         }
 
         while y < w {
-            *output_buffer.add(obuffer_offset + 0) = *input_buffer.add(ibuffer_offset + 2);
+            *output_buffer.add(obuffer_offset) = *input_buffer.add(ibuffer_offset + 2);
             *output_buffer.add(obuffer_offset + 1) = *input_buffer.add(ibuffer_offset + 1);
-            *output_buffer.add(obuffer_offset + 2) = *input_buffer.add(ibuffer_offset + 0);
+            *output_buffer.add(obuffer_offset + 2) = *input_buffer.add(ibuffer_offset);
 
             ibuffer_offset += INPUT_BPP;
             obuffer_offset += OUTPUT_BPP;
