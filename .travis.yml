@@ -15,6 +15,7 @@ install:
 
 script:
   - cargo build --verbose --all
-  - cargo test --verbose --all
+  - cargo test --verbose --tests --features "test"
+  - cargo test --verbose --doc
   - cargo check --target wasm32-unknown-unknown
   - wasm-pack test --node

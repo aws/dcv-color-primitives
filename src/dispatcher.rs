@@ -82,12 +82,14 @@ pub fn get_index(src_index: u32, dst_index: u32) -> usize {
     (src_index * COLUMNS + dst_index) as usize
 }
 
+#[cfg(not(feature = "test"))]
 #[inline(never)]
 pub fn is_pixel_format_valid(pixel_format: u32) -> bool {
     pixel_format.wrapping_sub(LO_RGB_PIXEL_FORMAT)
         <= HI_YUV_PIXEL_FORMAT.wrapping_sub(LO_RGB_PIXEL_FORMAT)
 }
 
+#[cfg(not(feature = "test"))]
 #[inline(never)]
 pub fn is_color_space_valid(color_space: u32) -> bool {
     color_space.wrapping_sub(LO_RGB_COLOR_SPACE)

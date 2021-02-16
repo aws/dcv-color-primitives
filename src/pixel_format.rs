@@ -192,6 +192,7 @@ pub fn get_buffers_size(
     true
 }
 
+#[cfg(not(feature = "test"))]
 pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
     let last_plane = num_planes.wrapping_sub(1);
     let spec = PF_SPECS[pixel_format as usize];

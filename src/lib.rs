@@ -453,7 +453,8 @@ static mut GLOBAL_STATE: GlobalState = GlobalState {
 /// use dcv_color_primitives as dcp;
 /// dcp::initialize();
 /// ```
-pub fn initialize() {
+pub fn initialize(#[cfg(feature = "test")] force_set: &str) {
+    #[cfg(not(feature = "test"))]
     unsafe {
         if GLOBAL_STATE.init {
             return;
@@ -461,6 +462,17 @@ pub fn initialize() {
     }
 
     let (manufacturer, set) = get_cpu_info();
+
+    // This is for internal use only and should be left undocumented
+    #[cfg(feature = "test")]
+    let set = match force_set {
+        "x86" => InstructionSet::X86,
+        "sse2" => match set {
+            InstructionSet::Avx2 => InstructionSet::Sse2,
+            _ => set,
+        },
+        _ => set,
+    };
 
     unsafe {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -779,7 +791,7 @@ pub fn get_buffers_size(
 ///
 /// # Algorithm 4
 /// Conversion from BGRA to RGB
-/// 
+///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
@@ -866,6 +878,7 @@ pub fn convert_image(
 }
 
 #[doc(hidden)]
+#[cfg(not(feature = "test"))]
 mod c_bindings {
     use super::*;
     use pixel_format::{are_planes_compatible, MAX_NUMBER_OF_PLANES};

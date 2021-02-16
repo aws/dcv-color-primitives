@@ -20,6 +20,11 @@ use dcv_color_primitives as dcp;
 use itertools::iproduct;
 use rand::Rng;
 
+#[cfg(feature = "test")]
+const SETS: [&str; 3] = ["x86", "sse2", "avx2"];
+#[cfg(not(feature = "test"))]
+const SETS: [&str; 1] = [""];
+
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
 const PIXEL_FORMATS: &[PixelFormat; 9] = &[
@@ -296,23 +301,34 @@ macro_rules! set_expected {
     };
 }
 
-fn bootstrap() {
-    let desc = describe_acceleration();
-    if desc.is_err() {
-        initialize();
-
+fn bootstrap(set: &str) {
+    #[cfg(not(feature = "test"))]
+    {
+        let _ = set;
         let desc = describe_acceleration();
-        assert_eq!(desc.is_ok(), true);
-        match desc {
-            Ok(s) => println!("{}", s),
-            Err(_) => assert!(false),
+        if desc.is_ok() {
+            return;
         }
+
+        initialize();
+    }
+
+    #[cfg(feature = "test")]
+    initialize(set);
+
+    let desc = describe_acceleration();
+    assert_eq!(desc.is_ok(), true);
+    match desc {
+        Ok(s) => println!("{}", s),
+        Err(_) => assert!(false),
     }
 }
 
 #[test]
 fn init() {
-    bootstrap();
+    for set in SETS.iter() {
+        bootstrap(set);
+    }
 }
 
 fn rgb_to_yuv_size_mode_stride(
@@ -1063,138 +1079,152 @@ fn yuv_to_rgb_ok(format: PixelFormat, num_planes: u32) {
 
 #[test]
 fn rgb_to_nv12_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    rgb_to_yuv_ok(PixelFormat::Nv12, 1);
-    rgb_to_yuv_ok(PixelFormat::Nv12, 2);
+        rgb_to_yuv_ok(PixelFormat::Nv12, 1);
+        rgb_to_yuv_ok(PixelFormat::Nv12, 2);
+    }
 }
 
 #[test]
 fn rgb_to_i420_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    rgb_to_yuv_ok(PixelFormat::I420, 3);
+        rgb_to_yuv_ok(PixelFormat::I420, 3);
+    }
 }
 
 #[test]
 fn rgb_to_i444_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    rgb_to_yuv_ok(PixelFormat::I444, 3);
+        rgb_to_yuv_ok(PixelFormat::I444, 3);
+    }
 }
 
 #[test]
 fn i420_to_rgb_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    yuv_to_rgb_ok(PixelFormat::I420, 3);
+        yuv_to_rgb_ok(PixelFormat::I420, 3);
+    }
 }
 
 #[test]
 fn nv12_to_rgb_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    yuv_to_rgb_ok(PixelFormat::Nv12, 1);
-    yuv_to_rgb_ok(PixelFormat::Nv12, 2);
+        yuv_to_rgb_ok(PixelFormat::Nv12, 1);
+        yuv_to_rgb_ok(PixelFormat::Nv12, 2);
+    }
 }
 
 #[test]
 fn i444_to_rgb_ok() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    yuv_to_rgb_ok(PixelFormat::I444, 3);
+        yuv_to_rgb_ok(PixelFormat::I444, 3);
+    }
 }
 
 #[test]
 fn rgb_to_yuv_errors() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    const WIDTH: u32 = 2;
-    const HEIGHT: u32 = 2;
-    const CHROMA_HEIGHT: u32 = HEIGHT / 2;
-    const SRC_STRIDE: usize = (WIDTH as usize) * 4;
-    const IN_SIZE: usize = SRC_STRIDE * (HEIGHT as usize);
-    const OUT_SIZE: usize = (WIDTH as usize) * ((HEIGHT as usize) + (CHROMA_HEIGHT as usize));
+        const WIDTH: u32 = 2;
+        const HEIGHT: u32 = 2;
+        const CHROMA_HEIGHT: u32 = HEIGHT / 2;
+        const SRC_STRIDE: usize = (WIDTH as usize) * 4;
+        const IN_SIZE: usize = SRC_STRIDE * (HEIGHT as usize);
+        const OUT_SIZE: usize = (WIDTH as usize) * ((HEIGHT as usize) + (CHROMA_HEIGHT as usize));
 
-    // Allocate and initialize input
-    let test_input: &[u8] = &[0u8; IN_SIZE];
+        // Allocate and initialize input
+        let test_input: &[u8] = &[0u8; IN_SIZE];
 
-    // Allocate and initialize output
-    let test_output_p0: &mut [u8] = &mut [0u8; OUT_SIZE];
-    let test_output_p1: &mut [u8] = &mut [0u8; OUT_SIZE];
+        // Allocate and initialize output
+        let test_output_p0: &mut [u8] = &mut [0u8; OUT_SIZE];
+        let test_output_p1: &mut [u8] = &mut [0u8; OUT_SIZE];
 
-    for num_planes in 0u32..=3 {
-        // Only 1 and 2 are valid values
-        for src_pixel_format in PIXEL_FORMATS.iter() {
-            for src_color_space in COLOR_SPACES.iter() {
-                for dst_color_space in COLOR_SPACES.iter() {
-                    let src_format = ImageFormat {
-                        pixel_format: *src_pixel_format,
-                        color_space: *src_color_space,
-                        num_planes: 1,
-                    };
+        for num_planes in 0u32..=3 {
+            // Only 1 and 2 are valid values
+            for src_pixel_format in PIXEL_FORMATS.iter() {
+                for src_color_space in COLOR_SPACES.iter() {
+                    for dst_color_space in COLOR_SPACES.iter() {
+                        let src_format = ImageFormat {
+                            pixel_format: *src_pixel_format,
+                            color_space: *src_color_space,
+                            num_planes: 1,
+                        };
 
-                    let dst_format = ImageFormat {
-                        pixel_format: PixelFormat::Nv12,
-                        color_space: *dst_color_space,
-                        num_planes: num_planes,
-                    };
+                        let dst_format = ImageFormat {
+                            pixel_format: PixelFormat::Nv12,
+                            color_space: *dst_color_space,
+                            num_planes: num_planes,
+                        };
 
-                    // Compute strides
-                    let src_buffers: &[&[u8]] = &[test_input];
-                    let dst_buffers: &mut [&mut [u8]] = &mut [test_output_p0, test_output_p1];
-                    let dst_strides: &[usize] = &[WIDTH as usize; 2];
+                        // Compute strides
+                        let src_buffers: &[&[u8]] = &[test_input];
+                        let dst_buffers: &mut [&mut [u8]] = &mut [test_output_p0, test_output_p1];
+                        let dst_strides: &[usize] = &[WIDTH as usize; 2];
 
-                    // Test image convert
-                    let src_pf = *src_pixel_format as u32;
-                    let src_cs = *src_color_space as u32;
-                    let dst_cs = *dst_color_space as u32;
-                    let src_pf_rgb = src_pf < PIXEL_FORMAT_I444;
-                    let src_cs_rgb = src_cs <= COLOR_SPACE_LRGB;
-                    let dst_cs_rgb = dst_cs <= COLOR_SPACE_LRGB;
+                        // Test image convert
+                        let src_pf = *src_pixel_format as u32;
+                        let src_cs = *src_color_space as u32;
+                        let dst_cs = *dst_color_space as u32;
+                        let src_pf_rgb = src_pf < PIXEL_FORMAT_I444;
+                        let src_cs_rgb = src_cs <= COLOR_SPACE_LRGB;
+                        let dst_cs_rgb = dst_cs <= COLOR_SPACE_LRGB;
 
-                    let mut expected: Result<(), ErrorKind> = Ok(());
+                        let mut expected: Result<(), ErrorKind> = Ok(());
 
-                    set_expected!(expected, (WIDTH & 1) != 0, ErrorKind::InvalidValue);
-                    set_expected!(expected, (HEIGHT & 1) != 0, ErrorKind::InvalidValue);
+                        set_expected!(expected, (WIDTH & 1) != 0, ErrorKind::InvalidValue);
+                        set_expected!(expected, (HEIGHT & 1) != 0, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, !src_pf_rgb && src_cs_rgb, ErrorKind::InvalidValue);
-                    set_expected!(expected, src_pf_rgb && !src_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, !src_pf_rgb && src_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, src_pf_rgb && !src_cs_rgb, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, dst_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, dst_cs_rgb, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, num_planes < 1, ErrorKind::InvalidValue);
-                    set_expected!(expected, num_planes > 2, ErrorKind::InvalidValue);
+                        set_expected!(expected, num_planes < 1, ErrorKind::InvalidValue);
+                        set_expected!(expected, num_planes > 2, ErrorKind::InvalidValue);
 
-                    set_expected!(
-                        expected,
-                        src_pf != PIXEL_FORMAT_ARGB
-                            && src_pf != PIXEL_FORMAT_BGRA
-                            && src_pf != PIXEL_FORMAT_BGR,
-                        ErrorKind::InvalidOperation
-                    );
+                        set_expected!(
+                            expected,
+                            src_pf != PIXEL_FORMAT_ARGB
+                                && src_pf != PIXEL_FORMAT_BGRA
+                                && src_pf != PIXEL_FORMAT_BGR,
+                            ErrorKind::InvalidOperation
+                        );
 
-                    set_expected!(
-                        expected,
-                        src_cs != COLOR_SPACE_LRGB,
-                        ErrorKind::InvalidOperation
-                    );
+                        set_expected!(
+                            expected,
+                            src_cs != COLOR_SPACE_LRGB,
+                            ErrorKind::InvalidOperation
+                        );
 
-                    let status = convert_image(
-                        WIDTH,
-                        HEIGHT,
-                        &src_format,
-                        None,
-                        src_buffers,
-                        &dst_format,
-                        Some(dst_strides),
-                        dst_buffers,
-                    );
+                        let status = convert_image(
+                            WIDTH,
+                            HEIGHT,
+                            &src_format,
+                            None,
+                            src_buffers,
+                            &dst_format,
+                            Some(dst_strides),
+                            dst_buffers,
+                        );
 
-                    assert!(expected.is_ok() == status.is_ok());
-                    match status {
-                        Ok(_) => assert!(expected.is_ok()),
-                        Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                        assert!(expected.is_ok() == status.is_ok());
+                        match status {
+                            Ok(_) => assert!(expected.is_ok()),
+                            Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                        }
                     }
                 }
             }
@@ -1204,92 +1234,94 @@ fn rgb_to_yuv_errors() {
 
 #[test]
 fn yuv_to_rgb_errors() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    const WIDTH: u32 = 2;
-    const HEIGHT: u32 = 2;
-    const CHROMA_HEIGHT: u32 = HEIGHT / 2;
-    const DST_STRIDE: usize = (WIDTH as usize) * 4;
-    const IN_SIZE: usize = (WIDTH as usize) * ((HEIGHT as usize) + (CHROMA_HEIGHT as usize));
-    const OUT_SIZE: usize = DST_STRIDE * (HEIGHT as usize);
+        const WIDTH: u32 = 2;
+        const HEIGHT: u32 = 2;
+        const CHROMA_HEIGHT: u32 = HEIGHT / 2;
+        const DST_STRIDE: usize = (WIDTH as usize) * 4;
+        const IN_SIZE: usize = (WIDTH as usize) * ((HEIGHT as usize) + (CHROMA_HEIGHT as usize));
+        const OUT_SIZE: usize = DST_STRIDE * (HEIGHT as usize);
 
-    // Allocate and initialize input
-    let test_input_p0: &[u8] = &[0u8; IN_SIZE];
-    let test_input_p1: &[u8] = &[0u8; IN_SIZE];
+        // Allocate and initialize input
+        let test_input_p0: &[u8] = &[0u8; IN_SIZE];
+        let test_input_p1: &[u8] = &[0u8; IN_SIZE];
 
-    // Allocate and initialize output
-    let test_output: &mut [u8] = &mut [0u8; OUT_SIZE];
+        // Allocate and initialize output
+        let test_output: &mut [u8] = &mut [0u8; OUT_SIZE];
 
-    for num_planes in 0u32..=3 {
-        // Only 1 and 2 are valid values
-        for dst_pixel_format in PIXEL_FORMATS.iter() {
-            for dst_color_space in COLOR_SPACES.iter() {
-                for src_color_space in COLOR_SPACES.iter() {
-                    let src_format = ImageFormat {
-                        pixel_format: PixelFormat::Nv12,
-                        color_space: *src_color_space,
-                        num_planes: num_planes,
-                    };
+        for num_planes in 0u32..=3 {
+            // Only 1 and 2 are valid values
+            for dst_pixel_format in PIXEL_FORMATS.iter() {
+                for dst_color_space in COLOR_SPACES.iter() {
+                    for src_color_space in COLOR_SPACES.iter() {
+                        let src_format = ImageFormat {
+                            pixel_format: PixelFormat::Nv12,
+                            color_space: *src_color_space,
+                            num_planes: num_planes,
+                        };
 
-                    let dst_format = ImageFormat {
-                        pixel_format: *dst_pixel_format,
-                        color_space: *dst_color_space,
-                        num_planes: 1,
-                    };
+                        let dst_format = ImageFormat {
+                            pixel_format: *dst_pixel_format,
+                            color_space: *dst_color_space,
+                            num_planes: 1,
+                        };
 
-                    // Compute strides
-                    let src_buffers: &[&[u8]] = &[test_input_p0, test_input_p1];
-                    let src_strides: &[usize] = &[WIDTH as usize; 2];
-                    let dst_buffers: &mut [&mut [u8]] = &mut [test_output];
+                        // Compute strides
+                        let src_buffers: &[&[u8]] = &[test_input_p0, test_input_p1];
+                        let src_strides: &[usize] = &[WIDTH as usize; 2];
+                        let dst_buffers: &mut [&mut [u8]] = &mut [test_output];
 
-                    // Test image convert
-                    let dst_pf = *dst_pixel_format as u32;
-                    let dst_cs = *dst_color_space as u32;
-                    let src_cs = *src_color_space as u32;
-                    let dst_pf_rgb = dst_pf < PIXEL_FORMAT_I444;
-                    let dst_cs_rgb = dst_cs <= COLOR_SPACE_LRGB;
-                    let src_cs_rgb = src_cs <= COLOR_SPACE_LRGB;
+                        // Test image convert
+                        let dst_pf = *dst_pixel_format as u32;
+                        let dst_cs = *dst_color_space as u32;
+                        let src_cs = *src_color_space as u32;
+                        let dst_pf_rgb = dst_pf < PIXEL_FORMAT_I444;
+                        let dst_cs_rgb = dst_cs <= COLOR_SPACE_LRGB;
+                        let src_cs_rgb = src_cs <= COLOR_SPACE_LRGB;
 
-                    let mut expected: Result<(), ErrorKind> = Ok(());
+                        let mut expected: Result<(), ErrorKind> = Ok(());
 
-                    set_expected!(expected, (WIDTH & 1) != 0, ErrorKind::InvalidValue);
-                    set_expected!(expected, (HEIGHT & 1) != 0, ErrorKind::InvalidValue);
+                        set_expected!(expected, (WIDTH & 1) != 0, ErrorKind::InvalidValue);
+                        set_expected!(expected, (HEIGHT & 1) != 0, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, src_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, src_cs_rgb, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, !dst_pf_rgb && dst_cs_rgb, ErrorKind::InvalidValue);
-                    set_expected!(expected, dst_pf_rgb && !dst_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, !dst_pf_rgb && dst_cs_rgb, ErrorKind::InvalidValue);
+                        set_expected!(expected, dst_pf_rgb && !dst_cs_rgb, ErrorKind::InvalidValue);
 
-                    set_expected!(expected, num_planes < 1, ErrorKind::InvalidValue);
-                    set_expected!(expected, num_planes > 2, ErrorKind::InvalidValue);
+                        set_expected!(expected, num_planes < 1, ErrorKind::InvalidValue);
+                        set_expected!(expected, num_planes > 2, ErrorKind::InvalidValue);
 
-                    set_expected!(
-                        expected,
-                        dst_pf != PIXEL_FORMAT_BGRA,
-                        ErrorKind::InvalidOperation
-                    );
+                        set_expected!(
+                            expected,
+                            dst_pf != PIXEL_FORMAT_BGRA,
+                            ErrorKind::InvalidOperation
+                        );
 
-                    set_expected!(
-                        expected,
-                        dst_cs != COLOR_SPACE_LRGB,
-                        ErrorKind::InvalidOperation
-                    );
+                        set_expected!(
+                            expected,
+                            dst_cs != COLOR_SPACE_LRGB,
+                            ErrorKind::InvalidOperation
+                        );
 
-                    let status = convert_image(
-                        WIDTH,
-                        HEIGHT,
-                        &src_format,
-                        Some(src_strides),
-                        src_buffers,
-                        &dst_format,
-                        None,
-                        dst_buffers,
-                    );
+                        let status = convert_image(
+                            WIDTH,
+                            HEIGHT,
+                            &src_format,
+                            Some(src_strides),
+                            src_buffers,
+                            &dst_format,
+                            None,
+                            dst_buffers,
+                        );
 
-                    assert!(expected.is_ok() == status.is_ok());
-                    match status {
-                        Ok(_) => assert!(expected.is_ok()),
-                        Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                        assert!(expected.is_ok() == status.is_ok());
+                        match status {
+                            Ok(_) => assert!(expected.is_ok()),
+                            Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                        }
                     }
                 }
             }
@@ -1299,96 +1331,99 @@ fn yuv_to_rgb_errors() {
 
 #[test]
 fn buffers_size() {
-    bootstrap();
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    const WIDTH: u32 = 4098;
-    const HEIGHT: u32 = 258;
-    let buffers_size = &mut [0usize; MAX_NUMBER_OF_PLANES as usize];
+        const WIDTH: u32 = 4098;
+        const HEIGHT: u32 = 258;
+        let buffers_size = &mut [0usize; MAX_NUMBER_OF_PLANES as usize];
 
-    for num_planes in 0..=MAX_NUMBER_OF_PLANES + 1 {
-        for pixel_format in PIXEL_FORMATS.iter() {
-            let pf = *pixel_format as u32;
+        for num_planes in 0..=MAX_NUMBER_OF_PLANES + 1 {
+            for pixel_format in PIXEL_FORMATS.iter() {
+                let pf = *pixel_format as u32;
 
-            let format = ImageFormat {
-                pixel_format: *pixel_format,
-                color_space: ColorSpace::Lrgb,
-                num_planes,
-            };
+                let format = ImageFormat {
+                    pixel_format: *pixel_format,
+                    color_space: ColorSpace::Lrgb,
+                    num_planes,
+                };
 
-            // Compute valid number of planes
-            let mut max_number_of_planes = 0;
-            while max_number_of_planes < MAX_NUMBER_OF_PLANES {
-                if NUM_LOG2_DEN_PER_PLANE[pf as usize][(2 * max_number_of_planes) as usize] == 0 {
-                    break;
+                // Compute valid number of planes
+                let mut max_number_of_planes = 0;
+                while max_number_of_planes < MAX_NUMBER_OF_PLANES {
+                    if NUM_LOG2_DEN_PER_PLANE[pf as usize][(2 * max_number_of_planes) as usize] == 0
+                    {
+                        break;
+                    }
+                    max_number_of_planes = max_number_of_planes + 1;
                 }
-                max_number_of_planes = max_number_of_planes + 1;
-            }
 
-            // Invalid width
-            let mut expected: Result<(), ErrorKind> = Ok(());
+                // Invalid width
+                let mut expected: Result<(), ErrorKind> = Ok(());
 
-            set_expected!(expected, pf >= PIXEL_FORMAT_I422, ErrorKind::InvalidValue);
-            set_expected!(
-                expected,
-                num_planes != 1 && num_planes != max_number_of_planes,
-                ErrorKind::InvalidValue
-            );
+                set_expected!(expected, pf >= PIXEL_FORMAT_I422, ErrorKind::InvalidValue);
+                set_expected!(
+                    expected,
+                    num_planes != 1 && num_planes != max_number_of_planes,
+                    ErrorKind::InvalidValue
+                );
 
-            let status = get_buffers_size(1, HEIGHT, &format, None, buffers_size);
-            match status {
-                Ok(_) => assert!(expected.is_ok()),
-                Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
-            }
+                let status = get_buffers_size(1, HEIGHT, &format, None, buffers_size);
+                match status {
+                    Ok(_) => assert!(expected.is_ok()),
+                    Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                }
 
-            // Invalid height
-            let mut expected: Result<(), ErrorKind> = Ok(());
+                // Invalid height
+                let mut expected: Result<(), ErrorKind> = Ok(());
 
-            set_expected!(expected, pf >= PIXEL_FORMAT_I420, ErrorKind::InvalidValue);
-            set_expected!(
-                expected,
-                num_planes != 1 && num_planes != max_number_of_planes,
-                ErrorKind::InvalidValue
-            );
+                set_expected!(expected, pf >= PIXEL_FORMAT_I420, ErrorKind::InvalidValue);
+                set_expected!(
+                    expected,
+                    num_planes != 1 && num_planes != max_number_of_planes,
+                    ErrorKind::InvalidValue
+                );
 
-            let status = get_buffers_size(WIDTH, 1, &format, None, buffers_size);
-            match status {
-                Ok(_) => assert!(expected.is_ok()),
-                Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
-            }
+                let status = get_buffers_size(WIDTH, 1, &format, None, buffers_size);
+                match status {
+                    Ok(_) => assert!(expected.is_ok()),
+                    Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
+                }
 
-            // Test size is valid
-            let mut expected: Result<(), ErrorKind> = Ok(());
+                // Test size is valid
+                let mut expected: Result<(), ErrorKind> = Ok(());
 
-            set_expected!(
-                expected,
-                num_planes != 1 && num_planes != max_number_of_planes,
-                ErrorKind::InvalidValue
-            );
+                set_expected!(
+                    expected,
+                    num_planes != 1 && num_planes != max_number_of_planes,
+                    ErrorKind::InvalidValue
+                );
 
-            let status = get_buffers_size(WIDTH, HEIGHT, &format, None, buffers_size);
+                let status = get_buffers_size(WIDTH, HEIGHT, &format, None, buffers_size);
 
-            match status {
-                Ok(_) => {
-                    let pf = pf as usize;
-                    let num_planes = num_planes as usize;
-                    let area = (WIDTH as usize) * (HEIGHT as usize);
+                match status {
+                    Ok(_) => {
+                        let pf = pf as usize;
+                        let num_planes = num_planes as usize;
+                        let area = (WIDTH as usize) * (HEIGHT as usize);
 
-                    if num_planes == 1 {
-                        assert_eq!(
-                            buffers_size[0],
-                            (area * NUM_LOG2_DEN[pf][0]) >> NUM_LOG2_DEN[pf][1]
-                        );
-                    } else {
-                        for i in 0..num_planes {
+                        if num_planes == 1 {
                             assert_eq!(
-                                buffers_size[i],
-                                (area * NUM_LOG2_DEN_PER_PLANE[pf][2 * i])
-                                    >> NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]
+                                buffers_size[0],
+                                (area * NUM_LOG2_DEN[pf][0]) >> NUM_LOG2_DEN[pf][1]
                             );
+                        } else {
+                            for i in 0..num_planes {
+                                assert_eq!(
+                                    buffers_size[i],
+                                    (area * NUM_LOG2_DEN_PER_PLANE[pf][2 * i])
+                                        >> NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]
+                                );
+                            }
                         }
                     }
+                    Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
                 }
-                Err(s) => assert!((s as u32) == (expected.err().unwrap() as u32)),
             }
         }
     }
@@ -1397,7 +1432,7 @@ fn buffers_size() {
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn over_4gb() {
-    bootstrap();
+    bootstrap("");
 
     // In this test the output image will larger than 4GB:
     // width = 536870944 * 2 * 4 = 4294967552
@@ -1496,14 +1531,17 @@ fn over_4gb() {
 
 #[test]
 fn lrgb_ok() {
-    bootstrap();
-    const SUPPORTED_CONVERSIONS_SRC_DST: &[(PixelFormat, usize, PixelFormat, usize)] = &[
-        (PixelFormat::Rgb, 3, PixelFormat::Bgra, 4),
-        (PixelFormat::Bgra, 4, PixelFormat::Rgb, 3),
-    ];
+    for iset in SETS.iter() {
+        bootstrap(iset);
 
-    for conversions in SUPPORTED_CONVERSIONS_SRC_DST.iter() {
-        lrgb_conversion_ok(conversions.0, conversions.1, conversions.2, conversions.3);
+        const SUPPORTED_CONVERSIONS_SRC_DST: &[(PixelFormat, usize, PixelFormat, usize)] = &[
+            (PixelFormat::Rgb, 3, PixelFormat::Bgra, 4),
+            (PixelFormat::Bgra, 4, PixelFormat::Rgb, 3),
+        ];
+
+        for conversions in SUPPORTED_CONVERSIONS_SRC_DST.iter() {
+            lrgb_conversion_ok(conversions.0, conversions.1, conversions.2, conversions.3);
+        }
     }
 }
 
