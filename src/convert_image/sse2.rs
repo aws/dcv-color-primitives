@@ -47,6 +47,7 @@ const YUV_TO_LRGB_WG_SIZE: usize = 1;
 const LRGB_TO_YUV_WAVES: usize = LANE_COUNT / LRGB_TO_YUV_WG_SIZE;
 const YUV_TO_LRGB_WAVES: usize = LANE_COUNT / YUV_TO_LRGB_WG_SIZE;
 
+#[cfg(not(tarpaulin_include))]
 const fn mm_shuffle(z: i32, y: i32, x: i32, w: i32) -> i32 {
     (z << 6) | (y << 4) | (x << 2) | w
 }
@@ -124,7 +125,6 @@ macro_rules! fix_to_i16_8x {
 /// x:   --x7--x6 --x5--x4 --x3--x2 --x1--x0
 /// y0:  --x3--x3 --x2--x2 --x1--x1 --x0--x0
 /// y1:  --x7--x7 --x6--x6 --x5--x5 --x4--x4
-#[inline(always)]
 unsafe fn i16_to_i16x2_8x(x: __m128i) -> (__m128i, __m128i) {
     (_mm_unpacklo_epi16(x, x), _mm_unpackhi_epi16(x, x))
 }
@@ -134,7 +134,6 @@ unsafe fn i16_to_i16x2_8x(x: __m128i) -> (__m128i, __m128i) {
 ///
 /// image: g15g14g13g12 g11g10g9g18 g7g6g5g4 g3g2g1g0
 /// res:   g7--g6-- g5--g4-- g3--g2-- g1--g0--
-#[inline(always)]
 unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
     let x = _mm_set1_epi64x(*(image as *const i64));
     _mm_unpacklo_epi8(zero!(), x)
@@ -146,7 +145,6 @@ unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
 /// image: g7r7g6r6 g5r5g4r4 g3r3g2r2 g1r1g0r0
 /// red:   r7--r6-- r5--r4-- r3--r2-- r1--r0--
 /// green: g7--g6-- g5--g4-- g3--g2-- g1--g0--
-#[inline(always)]
 unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
     let x = _mm_loadu_si128(image as *const __m128i);
     (
@@ -163,7 +161,6 @@ unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
 /// blue:     --r7--r6 --r5--r4 --r3--r2 --r1--r0
 /// image[0]: ffr3g3b3 ffr2g2b2 ffr1g1b1 ffr0g0b0
 /// image[1]: ffr7g7b7 ffr6g6b6 ffr5g5b5 ffr4g4b4
-#[inline(always)]
 unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m128i) {
     let x = _mm_packus_epi16(blue, red);
     let y = _mm_packus_epi16(green, _mm_srli_epi16(_mm_cmpeq_epi32(zero!(), zero!()), 8));
@@ -187,7 +184,6 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 ///
 /// green_red:         --g3--r3 --g2--r2 --g1--r1 --g0--r0
 /// green_blue:        --g3--b3 --g2--b2 --g1--b1 --g0--b0
-#[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i, __m128i) {
     let line = match sampler {
         Sampler::BgrOverflow => _mm_set_epi32(
@@ -223,7 +219,6 @@ unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i,
     (_mm_or_si128(red, green), _mm_or_si128(blue, green))
 }
 
-#[inline(always)]
 unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
     let alpha_mask = _mm_set1_epi32(0xff);
 
@@ -251,14 +246,12 @@ unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
 ///
 /// red:      ******r3 ******r2 ******r1 ******r0
 /// image[0]: r3r2r1r0
-#[inline(always)]
 unsafe fn pack_i32_4x(image: *mut u8, red: __m128i) {
     let y = _mm_packs_epi32(red, red);
     let z = _mm_packus_epi16(y, y);
     *(image as *mut i32) = _mm_cvtsi128_si32(z);
 }
 
-#[inline(always)]
 unsafe fn affine_transform(xy: __m128i, zy: __m128i, weights: &[__m128i; 3]) -> __m128i {
     _mm_add_epi32(
         _mm_add_epi32(
@@ -279,7 +272,6 @@ unsafe fn affine_transform(xy: __m128i, zy: __m128i, weights: &[__m128i; 3]) -> 
 /// xs1 = x20 + x30 + x21 + x31
 /// ys0 = y00 + y10 + y01 + y11
 /// ys1 = y20 + y30 + y21 + y31
-#[inline(always)]
 unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
     _mm_add_epi16(
         _mm_add_epi16(xy0, _mm_shuffle_epi32(xy0, xcgh_odd_even_words!())),
@@ -288,7 +280,6 @@ unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
 }
 
 /// Convert linear rgb to yuv colorspace (4-wide)
-#[inline(always)]
 unsafe fn lrgb_to_yuv_4x(
     rgb0: *const u8,
     rgb1: *const u8,
@@ -319,7 +310,6 @@ unsafe fn lrgb_to_yuv_4x(
     );
 }
 
-#[inline(always)]
 unsafe fn lrgb_to_i420_4x(
     rgb0: *const u8,
     rgb1: *const u8,
@@ -361,7 +351,6 @@ unsafe fn lrgb_to_i420_4x(
     *(v as *mut u16) = (uv_res >> 16) as u16;
 }
 
-#[inline(always)]
 unsafe fn lrgb_to_i444_4x(
     rgb: *const u8,
     y: *mut u8,
@@ -1019,10 +1008,6 @@ fn nv12_bgra_lrgb(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    if ch == 0 {
-        return false;
-    }
-
     let rgb_stride = DST_DEPTH * w;
 
     // Compute actual strides
@@ -1072,8 +1057,8 @@ fn nv12_bgra_lrgb(
         let w = vector_part;
         let dw = w * DST_DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if w >= src_buffers.0.len() || w >= src_buffers.1.len() || dw >= dst_buffer.len() {
             return false;
         }
@@ -1123,10 +1108,6 @@ fn i420_bgra_lrgb(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    if cw == 0 || ch == 0 {
-        return false;
-    }
-
     let rgb_stride = DST_DEPTH * w;
 
     // Compute actual strides
@@ -1171,8 +1152,8 @@ fn i420_bgra_lrgb(
         let cw = w / 2;
         let dw = w * DST_DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if w >= src_buffers.0.len()
             || cw >= src_buffers.1.len()
             || cw >= src_buffers.2.len()
@@ -1270,8 +1251,8 @@ fn i444_bgra_lrgb(
         let w = vector_part;
         let dw = w * DST_DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if w >= src_buffers.0.len()
             || w >= src_buffers.1.len()
             || w >= src_buffers.2.len()
@@ -1347,7 +1328,7 @@ fn lrgb_i444(
         &mut u_plane[0][..],
         &mut v_plane[0][..],
     );
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, h - 1, w)
         || out_of_bounds(v_plane.len(), dst_strides.2, h - 1, w)
@@ -1378,8 +1359,8 @@ fn lrgb_i444(
         let w = vector_part;
         let sw = w * depth;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if sw >= src_buffer.len() || w >= y_plane.len() || w >= u_plane.len() || w >= v_plane.len()
         {
             return false;
@@ -1431,10 +1412,6 @@ fn lrgb_i420(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    if cw == 0 || ch == 0 {
-        return false;
-    }
-
     let depth = channels as usize;
     let rgb_stride = depth * w;
 
@@ -1456,7 +1433,7 @@ fn lrgb_i420(
         &mut u_plane[0][..],
         &mut v_plane[0][..],
     );
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, ch - 1, cw)
         || out_of_bounds(v_plane.len(), dst_strides.2, ch - 1, cw)
@@ -1488,8 +1465,8 @@ fn lrgb_i420(
         let cw = w / 2;
         let sw = w * depth;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if sw >= src_buffer.len()
             || w >= y_plane.len()
             || cw >= u_plane.len()
@@ -1544,10 +1521,6 @@ fn lrgb_nv12(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    if ch == 0 {
-        return false;
-    }
-
     let depth = channels as usize;
     let rgb_stride = depth * w;
 
@@ -1573,7 +1546,7 @@ fn lrgb_nv12(
         (&mut y_plane[0][..], &mut uv_plane[0][..])
     };
 
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, w)
     {
@@ -1603,8 +1576,8 @@ fn lrgb_nv12(
         let w = vector_part;
         let sw = w * depth;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if sw >= src_buffer.len() || w >= y_plane.len() || w >= uv_plane.len() {
             return false;
         }
@@ -1878,8 +1851,8 @@ pub fn rgb_lrgb_bgra_lrgb(
         let sw = w * SRC_DEPTH;
         let dw = w * DST_DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
+        // The compiler is not smart here, this condition should never happen
+        #[cfg(not(tarpaulin_include))]
         if sw >= src_buffer.len() || dw >= dst_buffer.len() {
             return false;
         }

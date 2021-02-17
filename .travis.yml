@@ -1,4 +1,11 @@
 language: rust
+# tarpaulin has only been tested on bionic and trusty other distros may have issues
+dist: bionic
+addons:
+    apt:
+        packages:
+            - libssl-dev
+cache: cargo
 rust:
   - stable
   - beta
@@ -13,9 +20,20 @@ install:
   - rustup target add wasm32-unknown-unknown
   - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
+before_script: |
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    cargo install cargo-tarpaulin
+  fi
+
 script:
   - cargo build --verbose --all
   - cargo test --verbose --tests --features "test"
   - cargo test --verbose --doc
   - cargo check --target wasm32-unknown-unknown
   - wasm-pack test --node
+
+after_success: |
+  if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+    # Uncomment the following line for coveralls.io
+    cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID --tests --ignore-panics --exclude-files benches --features "test"
+  fi

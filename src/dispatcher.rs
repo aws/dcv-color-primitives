@@ -17,10 +17,12 @@ use crate::color_space::*;
 use crate::pixel_format::*;
 use crate::static_assert;
 
+#[cfg(not(tarpaulin_include))]
 const fn enum_count(lo: u32, hi: u32) -> u32 {
     hi - lo + 1
 }
 
+#[cfg(not(tarpaulin_include))]
 const fn upper_power_of_two(x: u32) -> u32 {
     1 << (32 - (x - 1).leading_zeros())
 }
@@ -83,6 +85,7 @@ pub fn get_index(src_index: u32, dst_index: u32) -> usize {
 }
 
 #[cfg(not(feature = "test"))]
+#[cfg(not(tarpaulin_include))]
 #[inline(never)]
 pub fn is_pixel_format_valid(pixel_format: u32) -> bool {
     pixel_format.wrapping_sub(LO_RGB_PIXEL_FORMAT)
@@ -90,6 +93,7 @@ pub fn is_pixel_format_valid(pixel_format: u32) -> bool {
 }
 
 #[cfg(not(feature = "test"))]
+#[cfg(not(tarpaulin_include))]
 #[inline(never)]
 pub fn is_color_space_valid(color_space: u32) -> bool {
     color_space.wrapping_sub(LO_RGB_COLOR_SPACE)
