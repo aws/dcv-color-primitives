@@ -140,9 +140,17 @@ fn get_plane_spec(dimension: u32, bpp: u32, plane: u32) -> usize {
 
 pub fn is_compatible(pixel_format: u32, width: u32, height: u32, last_plane: u32) -> bool {
     let spec = PF_SPECS[pixel_format as usize];
+    let planes = get_pf_planes(spec);
+    let matches_exact = last_plane.wrapping_sub(planes);
+    let last_plane = if pixel_format == (PixelFormat::Nv12 as u32) {
+        last_plane
+    } else {
+        1
+    };
+
     ((width & get_pf_width(spec))
         | (height & get_pf_height(spec))
-        | last_plane.wrapping_mul(last_plane.wrapping_sub(get_pf_planes(spec))))
+        | (last_plane.wrapping_mul(matches_exact)))
         == 0
 }
 
@@ -198,5 +206,12 @@ pub fn get_buffers_size(
 pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
     let last_plane = num_planes.wrapping_sub(1);
     let spec = PF_SPECS[pixel_format as usize];
-    last_plane.wrapping_mul(last_plane.wrapping_sub(get_pf_planes(spec))) == 0
+    let matches_exact = last_plane.wrapping_sub(get_pf_planes(spec));
+    let last_plane = if pixel_format == (PixelFormat::Nv12 as u32) {
+        last_plane
+    } else {
+        1
+    };
+
+    last_plane.wrapping_mul(matches_exact) == 0
 }
