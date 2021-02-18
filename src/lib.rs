@@ -439,29 +439,7 @@ static mut GLOBAL_STATE: GlobalState = GlobalState {
     converters: [None; dispatcher::TABLE_SIZE],
 };
 
-/// Automatically initializes the library functions that are most appropriate for
-/// the current processor type.
-///
-/// You should call this function before calling any other library function
-///
-/// # Safety
-/// You can not use any other library function (also in other threads) while the initialization
-/// is in progress. Failure to do so result in undefined behaviour
-///
-/// # Examples
-/// ```
-/// use dcv_color_primitives as dcp;
-/// dcp::initialize();
-/// ```
-pub fn initialize() {
-    unsafe {
-        if GLOBAL_STATE.init {
-            return;
-        }
-    }
-
-    let (manufacturer, set) = get_cpu_info();
-
+fn initialize_global_state(manufacturer: CpuManufacturer, set: InstructionSet) {
     unsafe {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         match set {
@@ -486,6 +464,49 @@ pub fn initialize() {
         GLOBAL_STATE.set = set;
         GLOBAL_STATE.init = true;
     }
+}
+
+/// Automatically initializes the library functions that are most appropriate for
+/// the current processor type.
+///
+/// You should call this function before calling any other library function
+///
+/// # Safety
+/// You can not use any other library function (also in other threads) while the initialization
+/// is in progress. Failure to do so result in undefined behaviour
+///
+/// # Examples
+/// ```
+/// use dcv_color_primitives as dcp;
+/// dcp::initialize();
+/// ```
+#[cfg(not(tarpaulin_include))]
+pub fn initialize() {
+    unsafe {
+        if GLOBAL_STATE.init {
+            return;
+        }
+    }
+
+    let (manufacturer, set) = get_cpu_info();
+    initialize_global_state(manufacturer, set);
+}
+
+// This is for internal use only and should be left undocumented
+#[cfg(feature = "test_instruction_sets")]
+pub fn initialize_with_instruction_set(instruction_set: &str) {
+    let (manufacturer, set) = get_cpu_info();
+
+    let set = match instruction_set {
+        "x86" => InstructionSet::X86,
+        "sse2" => match set {
+            InstructionSet::Avx2 => InstructionSet::Sse2,
+            _ => set,
+        },
+        _ => set,
+    };
+
+    initialize_global_state(manufacturer, set);
 }
 
 /// Returns a description of the algorithms that are best for the running cpu and
@@ -779,7 +800,7 @@ pub fn get_buffers_size(
 ///
 /// # Algorithm 4
 /// Conversion from BGRA to RGB
-/// 
+///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
@@ -866,6 +887,7 @@ pub fn convert_image(
 }
 
 #[doc(hidden)]
+#[cfg(not(feature = "test_instruction_sets"))]
 mod c_bindings {
     use super::*;
     use pixel_format::{are_planes_compatible, MAX_NUMBER_OF_PLANES};
