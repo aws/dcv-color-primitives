@@ -47,6 +47,7 @@ const YUV_TO_LRGB_WG_SIZE: usize = 1;
 const LRGB_TO_YUV_WAVES: usize = LANE_COUNT / LRGB_TO_YUV_WG_SIZE;
 const YUV_TO_LRGB_WAVES: usize = LANE_COUNT / YUV_TO_LRGB_WG_SIZE;
 
+#[cfg(not(tarpaulin_include))]
 const fn mm_shuffle(z: i32, y: i32, x: i32, w: i32) -> i32 {
     (z << 6) | (y << 4) | (x << 2) | w
 }

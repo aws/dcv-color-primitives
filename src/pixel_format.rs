@@ -66,10 +66,12 @@ pub const STRIDE_AUTO: usize = 0;
 
 pub const DEFAULT_STRIDES: [usize; MAX_NUMBER_OF_PLANES] = [STRIDE_AUTO; MAX_NUMBER_OF_PLANES];
 
+#[cfg(not(tarpaulin_include))]
 const fn make_pf_spec(planes: u32, width: u32, height: u32) -> u32 {
     (height << 3) | (width << 2) | planes
 }
 
+#[cfg(not(tarpaulin_include))]
 const fn make_plane_spec(plane0: u32, plane1: u32, plane2: u32, plane3: u32) -> u32 {
     (plane3 << 18) | (plane2 << 12) | (plane1 << 6) | plane0
 }
@@ -192,6 +194,7 @@ pub fn get_buffers_size(
     true
 }
 
+#[cfg(not(feature = "test_instruction_sets"))]
 pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
     let last_plane = num_planes.wrapping_sub(1);
     let spec = PF_SPECS[pixel_format as usize];
