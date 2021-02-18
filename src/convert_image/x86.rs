@@ -806,10 +806,6 @@ fn nv12_bgra_lrgb(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    if ch == 0 {
-        return false;
-    }
-
     let rgb_stride = DST_DEPTH * w;
 
     // Compute actual strides
@@ -882,10 +878,6 @@ fn i420_bgra_lrgb(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    if cw == 0 || ch == 0 {
-        return false;
-    }
-
     let rgb_stride = DST_DEPTH * w;
 
     // Compute actual strides
@@ -1086,10 +1078,6 @@ fn lrgb_i420(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    if cw == 0 || ch == 0 {
-        return false;
-    }
-
     let depth = channels as usize;
     let rgb_stride = depth * w;
 
@@ -1164,10 +1152,6 @@ fn lrgb_nv12(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    if ch == 0 {
-        return false;
-    }
-
     let depth = channels as usize;
     let rgb_stride = depth * w;
 
