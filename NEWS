@@ -1,3 +1,12 @@
+News in 0.1.18
+--------------
+* Image conversion is now using the most performant available path (sse2 or avx2)
+  even when the image width is not a multiple of 16 (sse2) or 32 (avx2)
+* Added code coverage through tarpaulin
+* Fixed bug in plane constraint computation
+* Check if the buffers contain enough data according to the
+  desired conversion
+
 News in 0.1.17
 --------------
 * Fixed 32-bit build
