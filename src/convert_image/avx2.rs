@@ -1568,7 +1568,7 @@ fn lrgb_i444(
         &mut u_plane[0][..],
         &mut v_plane[0][..],
     );
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, h - 1, w)
         || out_of_bounds(v_plane.len(), dst_strides.2, h - 1, w)
@@ -1673,7 +1673,7 @@ fn lrgb_i420(
         &mut u_plane[0][..],
         &mut v_plane[0][..],
     );
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, ch - 1, cw)
         || out_of_bounds(v_plane.len(), dst_strides.2, ch - 1, cw)
@@ -1786,7 +1786,7 @@ fn lrgb_nv12(
         (&mut y_plane[0][..], &mut uv_plane[0][..])
     };
 
-    if out_of_bounds(src_buffers[0].len(), src_stride, h - 1, rgb_stride)
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, w)
     {
