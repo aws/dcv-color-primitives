@@ -15,15 +15,36 @@ jobs:
   fast_finish: true
 
 install:
+  - rustup target add i686-unknown-linux-gnu
   - rustup target add wasm32-unknown-unknown
   - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 script:
+  # Check formatting. Show diff in case of failure
+  - cargo fmt --all -- --check
+  # Default (64 bit) build
   - cargo build --verbose --all
+  # Ensure code quality with clippy
+  - cargo clippy --lib --tests
+  # Test 64 bit target
   - cargo test --verbose --tests --features "test_instruction_sets"
   - cargo test --verbose --doc
+  # Test 32 bit target
+  - cargo build --verbose --all --target i686-unknown-linux-gnu
+  - cargo test --verbose --tests --features "test_instruction_sets" --target i686-unknown-linux-gnu
+  # Test wasm target
   - cargo check --target wasm32-unknown-unknown
   - wasm-pack test --node
+  # Generate assembly for automatic inspection
+  - cargo rustc --release -- --emit asm
+  # Search for undefined instructions in the crate.
+  # This is symptom of unhandled situations leading to panic
+  # or slice indices out of bounds
+  - ! `grep -q 'ud2' target/release/deps/dcv_color_primitives*.s`
+  # Search for accidental performance degradation.
+  # For example, non-inlined avx2 code might produce
+  # function generation for every used intrinsics
+  - ! `grep -q 'call.*_mm256' target/release/deps/dcv_color_primitives*.s`
 
 after_success: |
   if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
