@@ -179,7 +179,7 @@ unsafe fn unpack_ui8x2_i16be_16x(image: *const u8) -> (__m256i, __m256i) {
 }
 
 /// Truncate and deinterleave 3 short samples into 4 uchar samples (16-wide)
-/// Alpha set to DEFAULT_ALPHA
+/// Alpha set to `DEFAULT_ALPHA`
 #[inline(always)]
 unsafe fn pack_i16x3_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m256i) {
     let blue_red = _mm256_packus_epi16(blue, red);
