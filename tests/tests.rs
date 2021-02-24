@@ -358,8 +358,6 @@ fn check_bounds(
         return;
     }
 
-    let sizes = &mut [0_usize; 4];
-
     check_err(
         convert_image(
             width,
@@ -393,9 +391,12 @@ fn check_bounds(
     for i in 0..src_format.num_planes as usize {
         let mut src_vec = Vec::new();
 
-        assert!(get_buffers_size(width, height, src_format, None, sizes).is_ok());
         for (c, v) in src_buffers.iter().enumerate() {
-            src_vec.push(&v[if c == i { 1 } else { 0 }..sizes[c]]);
+            if c == i {
+                src_vec.push(&v[..0]);
+            } else {
+                src_vec.push(&v[..]);
+            }
         }
 
         check_err(
@@ -418,9 +419,12 @@ fn check_bounds(
     for i in 0..dst_format.num_planes as usize {
         let mut dst_vec = Vec::new();
 
-        assert!(get_buffers_size(width, height, dst_format, None, sizes).is_ok());
         for (c, v) in dst_buffers.iter_mut().enumerate() {
-            dst_vec.push(&mut v[if c == i { 1 } else { 0 }..sizes[c]]);
+            if c == i {
+                dst_vec.push(&mut v[..0]);
+            } else {
+                dst_vec.push(&mut v[..]);
+            }
         }
 
         check_err(
@@ -1126,11 +1130,7 @@ fn rgb_to_i444_ok() {
 }
 
 fn i420_to_rgb_ok() {
-    for iset in &SETS {
-        bootstrap(iset);
-
-        yuv_to_rgb_ok(PixelFormat::I420, 3);
-    }
+    yuv_to_rgb_ok(PixelFormat::I420, 3);
 }
 
 fn nv12_to_rgb_ok() {
