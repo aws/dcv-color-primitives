@@ -718,7 +718,7 @@ unsafe fn rgb_to_bgra_avx2(
     const SRC_DEPTH: usize = 3;
     const DST_DEPTH: usize = 4;
 
-    let alpha_mask = _mm256_set1_epi32(0xFF00_0000u32 as i32);
+    let alpha_mask = _mm256_set1_epi32(-16_777_216); // 0xFF000000
     let shf_mask = _mm256_setr_epi8(
         2, 1, 0, -1, 5, 4, 3, -1, 8, 7, 6, -1, 11, 10, 9, -1, 2, 1, 0, -1, 5, 4, 3, -1, 8, 7, 6,
         -1, 11, 10, 9, -1,
