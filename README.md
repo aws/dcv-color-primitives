@@ -1,6 +1,6 @@
 # DCV Color Primitives - dcp
 
-[![Build Status](https://travis-ci.org/aws/dcv-color-primitives.png?branch=master)](https://travis-ci.org/aws/dcv-color-primitives)
+[![Build Status](https://github.com/aws/dcv-color-primitives/actions/workflows/ci.yml/badge.svg)](https://github.com/aws/dcv-color-primitives/actions/workflows/ci.yml)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![documentation](https://docs.rs/dcv-color-primitives/badge.svg)](https://docs.rs/dcv-color-primitives)
 [![Coverage Status](https://codecov.io/gh/aws/dcv-color-primitives/branch/master/graph/badge.svg)](https://codecov.io/gh/aws/dcv-color-primitives)
