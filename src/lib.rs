@@ -904,7 +904,7 @@ pub fn convert_image(
 
 #[doc(hidden)]
 #[cfg(not(feature = "test_instruction_sets"))]
-mod c_bindings {
+pub mod c_api {
     #![allow(clippy::wildcard_imports)]
     use super::*; // We are importing everything
     use pixel_format::{are_planes_compatible, MAX_NUMBER_OF_PLANES};
