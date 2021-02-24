@@ -459,8 +459,8 @@ unsafe fn lrgb_to_yuv_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
-        for x in 0..wg_width {
+        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..rem {
             lrgb_to_yuv_8x(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
@@ -475,11 +475,11 @@ unsafe fn lrgb_to_yuv_avx2(
 
         // Handle leftover pixels
         lrgb_to_yuv_8x(
-            src_group.add(wg_index(wg_width, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(wg_width, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(wg_width, y_start, DST_DEPTH, y_stride)),
-            y_group.add(wg_index(wg_width, y_start + 1, DST_DEPTH, y_stride)),
-            uv_group.add(wg_index(wg_width, wg_height, DST_DEPTH, uv_stride)),
+            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
+            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
+            y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
+            y_group.add(wg_index(rem, y_start + 1, DST_DEPTH, y_stride)),
+            uv_group.add(wg_index(rem, wg_height, DST_DEPTH, uv_stride)),
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
@@ -554,8 +554,8 @@ unsafe fn lrgb_to_i420_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
-        for x in 0..wg_width {
+        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..rem {
             lrgb_to_i420_8x(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
@@ -571,22 +571,12 @@ unsafe fn lrgb_to_i420_avx2(
 
         // Handle leftover pixels
         lrgb_to_i420_8x(
-            src_group.add(wg_index(wg_width, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(wg_width, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-            y_group.add(wg_index(wg_width, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(
-                wg_width,
-                wg_height,
-                LRGB_TO_YUV_WAVES / 2,
-                u_stride,
-            )),
-            v_group.add(wg_index(
-                wg_width,
-                wg_height,
-                LRGB_TO_YUV_WAVES / 2,
-                v_stride,
-            )),
+            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
+            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
+            y_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+            y_group.add(wg_index(rem, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(rem, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
+            v_group.add(wg_index(rem, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
@@ -863,8 +853,8 @@ unsafe fn lrgb_to_i444_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let wg_width = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
-        for x in 0..wg_width {
+        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        for x in 0..rem {
             lrgb_to_i444_8x(
                 src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
@@ -879,10 +869,10 @@ unsafe fn lrgb_to_i444_avx2(
 
         // Handle leftover pixels
         lrgb_to_i444_8x(
-            src_group.add(wg_index(wg_width, y_start, rgb_depth, src_stride)),
-            y_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, u_stride)),
-            v_group.add(wg_index(wg_width, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+            src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
+            y_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, u_stride)),
+            v_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, v_stride)),
             Sampler::BgrOverflow,
             &y_weights,
             &u_weights,
