@@ -60,7 +60,7 @@ fn compare_cpu_manufacturer(features: &[u32; 4], name: &[u8; 12]) -> u32 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
+pub fn get() -> (CpuManufacturer, InstructionSet) {
     let mut manufacturer = CpuManufacturer::Unknown;
     let mut set = InstructionSet::X86;
 
@@ -103,6 +103,6 @@ pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
 }
 
 #[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
-pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
+pub fn get() -> (CpuManufacturer, InstructionSet) {
     (CpuManufacturer::Unknown, InstructionSet::X86)
 }
