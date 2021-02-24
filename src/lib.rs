@@ -14,11 +14,26 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #![warn(missing_docs)]
-#![warn(unused, clippy::cast_ptr_alignment)]
 #![deny(trivial_casts)]
 #![deny(trivial_numeric_casts)]
 #![deny(unstable_features)]
 #![deny(unused_import_braces)]
+#![deny(
+    clippy::complexity,
+    clippy::correctness,
+    clippy::perf,
+    clippy::style,
+    clippy::pedantic
+)]
+#![allow(
+    clippy::too_many_arguments, // API design
+    clippy::similar_names, // This requires effort to ensure
+    // Due to vzeroupper use, compiler does not inline intrinsics
+    // but rather creates a function for each one that wraps the operation followed
+    // by vzeroupper().
+    // This is detrimental to performance
+    clippy::inline_always,
+)]
 
 //! DCV color primitives is a library to perform image color model conversion.
 //!
@@ -926,14 +941,14 @@ mod c_bindings {
             if let Ok(s) = CString::new(acc) {
                 s.into_raw()
             } else {
-                    let p: *const c_char = ptr::null();
-                    p as *mut c_char
-                }
-        } else {
                 let p: *const c_char = ptr::null();
                 p as *mut c_char
             }
+        } else {
+            let p: *const c_char = ptr::null();
+            p as *mut c_char
         }
+    }
 
     #[no_mangle]
     pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {
