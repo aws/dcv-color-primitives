@@ -922,20 +922,18 @@ mod c_bindings {
 
     #[no_mangle]
     pub extern "C" fn dcp_describe_acceleration() -> *mut c_char {
-        match describe_acceleration() {
-            Ok(acc) => match CString::new(acc) {
-                Ok(s) => s.into_raw(),
-                Err(_) => {
+        if let Ok(acc) = describe_acceleration() {
+            if let Ok(s) = CString::new(acc) {
+                s.into_raw()
+            } else {
                     let p: *const c_char = ptr::null();
                     p as *mut c_char
                 }
-            },
-            Err(_) => {
+        } else {
                 let p: *const c_char = ptr::null();
                 p as *mut c_char
             }
         }
-    }
 
     #[no_mangle]
     pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {

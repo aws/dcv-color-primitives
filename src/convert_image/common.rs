@@ -49,10 +49,10 @@ pub fn out_of_bounds(size: usize, width: usize, height_minus_one: usize, stride:
 }
 
 pub fn compute_stride(stride: usize, def: usize) -> usize {
-    if stride != 0 {
-        stride
-    } else {
+    if stride == 0 {
         def
+    } else {
+        stride
     }
 }
 
