@@ -512,6 +512,7 @@ pub fn initialize() {
 pub fn initialize_with_instruction_set(instruction_set: &str) {
     let (manufacturer, set) = cpu_info::get();
 
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     let set = match instruction_set {
         "x86" => InstructionSet::X86,
         "sse2" => match set {
