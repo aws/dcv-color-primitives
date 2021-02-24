@@ -170,7 +170,7 @@ pub fn get_buffers_size(
         return false;
     }
 
-    let stride = &mut [0usize; MAX_NUMBER_OF_PLANES];
+    let stride = &mut [0_usize; MAX_NUMBER_OF_PLANES];
 
     let pixel_format = pixel_format as usize;
     let stride_spec = STRIDE_SPECS[pixel_format];

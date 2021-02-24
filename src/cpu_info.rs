@@ -64,7 +64,7 @@ pub fn get_cpu_info() -> (CpuManufacturer, InstructionSet) {
     let mut manufacturer = CpuManufacturer::Unknown;
     let mut set = InstructionSet::X86;
 
-    let features = &mut [0u32; 4];
+    let features = &mut [0; 4];
     cpuid(0, features);
 
     if features[0] != 0 {
