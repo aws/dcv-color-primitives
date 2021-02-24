@@ -399,7 +399,7 @@ unsafe fn lrgb_to_yuv_sse2(
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize),
-    dst_buffers: (&mut [u8], &mut [u8]),
+    dst_buffers: &mut (&mut [u8], &mut [u8]),
     depth: usize,
     weights: &[i32; 6],
     sampler: Sampler,
@@ -488,7 +488,7 @@ unsafe fn lrgb_to_i420_sse2(
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
-    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
+    dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
     depth: usize,
     weights: &[i32; 6],
     sampler: Sampler,
@@ -589,7 +589,7 @@ unsafe fn lrgb_to_i444_sse2(
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
-    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
+    dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
     depth: usize,
     weights: &[i32; 6],
     sampler: Sampler,
@@ -1067,12 +1067,12 @@ fn nv12_bgra_lrgb(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let dw = w * DST_DEPTH;
+        let x = vector_part;
+        let dx = x * DST_DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
-        if w >= src_buffers.0.len() || w >= src_buffers.1.len() || dw >= dst_buffer.len() {
+        if x >= src_buffers.0.len() || x >= src_buffers.1.len() || dx >= dst_buffer.len() {
             return false;
         }
 
@@ -1080,9 +1080,9 @@ fn nv12_bgra_lrgb(
             scalar_part,
             h,
             src_strides,
-            (&src_buffers.0[w..], &src_buffers.1[w..]),
+            (&src_buffers.0[x..], &src_buffers.1[x..]),
             dst_stride,
-            &mut dst_buffer[dw..],
+            &mut dst_buffer[dx..],
             &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
@@ -1161,16 +1161,16 @@ fn i420_bgra_lrgb(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let cw = w / 2;
-        let dw = w * DST_DEPTH;
+        let x = vector_part;
+        let cx = x / 2;
+        let dx = x * DST_DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
-        if w >= src_buffers.0.len()
-            || cw >= src_buffers.1.len()
-            || cw >= src_buffers.2.len()
-            || dw >= dst_buffer.len()
+        if x >= src_buffers.0.len()
+            || cx >= src_buffers.1.len()
+            || cx >= src_buffers.2.len()
+            || dx >= dst_buffer.len()
         {
             return false;
         }
@@ -1180,12 +1180,12 @@ fn i420_bgra_lrgb(
             h,
             src_strides,
             (
-                &src_buffers.0[w..],
-                &src_buffers.1[cw..],
-                &src_buffers.2[cw..],
+                &src_buffers.0[x..],
+                &src_buffers.1[cx..],
+                &src_buffers.2[cx..],
             ),
             dst_stride,
-            &mut dst_buffer[dw..],
+            &mut dst_buffer[dx..],
             &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
@@ -1261,15 +1261,15 @@ fn i444_bgra_lrgb(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let dw = w * DST_DEPTH;
+        let x = vector_part;
+        let dx = x * DST_DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
-        if w >= src_buffers.0.len()
-            || w >= src_buffers.1.len()
-            || w >= src_buffers.2.len()
-            || dw >= dst_buffer.len()
+        if x >= src_buffers.0.len()
+            || x >= src_buffers.1.len()
+            || x >= src_buffers.2.len()
+            || dx >= dst_buffer.len()
         {
             return false;
         }
@@ -1279,12 +1279,12 @@ fn i444_bgra_lrgb(
             h,
             src_strides,
             (
-                &src_buffers.0[w..],
-                &src_buffers.1[w..],
-                &src_buffers.2[w..],
+                &src_buffers.0[x..],
+                &src_buffers.1[x..],
+                &src_buffers.2[x..],
             ),
             dst_stride,
-            &mut dst_buffer[dw..],
+            &mut dst_buffer[dx..],
             &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
@@ -1360,7 +1360,7 @@ fn lrgb_i444(
                 src_stride,
                 src_buffer,
                 dst_strides,
-                (y_plane, u_plane, v_plane),
+                &mut (y_plane, u_plane, v_plane),
                 depth,
                 &FORWARD_WEIGHTS[colorimetry],
                 sampler,
@@ -1369,12 +1369,12 @@ fn lrgb_i444(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let sw = w * depth;
+        let x = vector_part;
+        let sx = x * depth;
 
         // The compiler is not smart here
         // This condition should never happen
-        if sw >= src_buffer.len() || w >= y_plane.len() || w >= u_plane.len() || w >= v_plane.len()
+        if sx >= src_buffer.len() || x >= y_plane.len() || x >= u_plane.len() || x >= v_plane.len()
         {
             return false;
         }
@@ -1383,9 +1383,9 @@ fn lrgb_i444(
             scalar_part,
             h,
             src_stride,
-            &src_buffer[sw..],
+            &src_buffer[sx..],
             dst_strides,
-            (&mut y_plane[w..], &mut u_plane[w..], &mut v_plane[w..]),
+            &mut (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
             depth,
             &x86::FORWARD_WEIGHTS[colorimetry],
             sampler,
@@ -1465,7 +1465,7 @@ fn lrgb_i420(
                 src_stride,
                 src_buffer,
                 dst_strides,
-                (y_plane, u_plane, v_plane),
+                &mut (y_plane, u_plane, v_plane),
                 depth,
                 &FORWARD_WEIGHTS[colorimetry],
                 sampler,
@@ -1474,16 +1474,16 @@ fn lrgb_i420(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let cw = w / 2;
-        let sw = w * depth;
+        let x = vector_part;
+        let cx = x / 2;
+        let sx = x * depth;
 
         // The compiler is not smart here
         // This condition should never happen
-        if sw >= src_buffer.len()
-            || w >= y_plane.len()
-            || cw >= u_plane.len()
-            || cw >= v_plane.len()
+        if sx >= src_buffer.len()
+            || x >= y_plane.len()
+            || cx >= u_plane.len()
+            || cx >= v_plane.len()
         {
             return false;
         }
@@ -1492,9 +1492,9 @@ fn lrgb_i420(
             scalar_part,
             h,
             src_stride,
-            &src_buffer[sw..],
+            &src_buffer[sx..],
             dst_strides,
-            (&mut y_plane[w..], &mut u_plane[cw..], &mut v_plane[cw..]),
+            &mut (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
             depth,
             &x86::FORWARD_WEIGHTS[colorimetry],
             sampler,
@@ -1577,7 +1577,7 @@ fn lrgb_nv12(
                 src_stride,
                 src_buffer,
                 dst_strides,
-                (y_plane, uv_plane),
+                &mut (y_plane, uv_plane),
                 depth,
                 &FORWARD_WEIGHTS[colorimetry],
                 sampler,
@@ -1586,12 +1586,12 @@ fn lrgb_nv12(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let sw = w * depth;
+        let x = vector_part;
+        let sx = x * depth;
 
         // The compiler is not smart here
         // This condition should never happen
-        if sw >= src_buffer.len() || w >= y_plane.len() || w >= uv_plane.len() {
+        if sx >= src_buffer.len() || x >= y_plane.len() || x >= uv_plane.len() {
             return false;
         }
 
@@ -1599,9 +1599,9 @@ fn lrgb_nv12(
             scalar_part,
             h,
             src_stride,
-            &src_buffer[sw..],
+            &src_buffer[sx..],
             dst_strides,
-            (&mut y_plane[w..], &mut uv_plane[w..]),
+            &mut (&mut y_plane[x..], &mut uv_plane[x..]),
             depth,
             &x86::FORWARD_WEIGHTS[colorimetry],
             sampler,
@@ -1860,13 +1860,13 @@ pub fn rgb_lrgb_bgra_lrgb(
     }
 
     if scalar_part > 0 {
-        let w = vector_part;
-        let sw = w * SRC_DEPTH;
-        let dw = w * DST_DEPTH;
+        let x = vector_part;
+        let sx = x * SRC_DEPTH;
+        let dx = x * DST_DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
-        if sw >= src_buffer.len() || dw >= dst_buffer.len() {
+        if sx >= src_buffer.len() || dx >= dst_buffer.len() {
             return false;
         }
 
@@ -1874,9 +1874,9 @@ pub fn rgb_lrgb_bgra_lrgb(
             scalar_part,
             h,
             src_stride,
-            &src_buffer[sw..],
+            &src_buffer[sx..],
             dst_stride,
-            &mut dst_buffer[dw..],
+            &mut dst_buffer[dx..],
         );
     }
 
