@@ -89,6 +89,8 @@ const SAMPLER_OFFSETS: [[usize; 3]; Sampler::Length as usize] =
 /// - if fix is negative, fix[31] is 1, fix[31] + 255 = 256, when clamped to uint8 is 0 (just what we want)
 /// -    <<  is positive, fix[31] is 0, fix[31] + 255 = 255, when clamped to uint8 is 255 (just what we want)
 fn fix_to_u8_sat(fix: i32, frac_bits: i32) -> u8 {
+    // Checked: we want the lower 8 bits
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     if (fix & !((256 << frac_bits) - 1)) == 0 {
         ((fix as u32) >> frac_bits) as u8
     } else {
@@ -145,7 +147,9 @@ fn fix_to_i32(fix: i32, frac_bits: i32) -> i32 {
 }
 
 /// Truncate and interleave 2 int to 2 uchar
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32) {
+    // Checked: truncation is explicitly wanted
     *image = x as u8;
     *image.add(1) = y as u8;
 }
@@ -312,14 +316,20 @@ pub fn lrgb_to_i420(
                 let sb = (b00 + b10) + (b01 + b11);
 
                 let u = u_group.add(wg_index(x, y, 1, u_stride));
-                *u = fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, C_OFFSET), FIX18) as u8;
-
                 let v = v_group.add(wg_index(x, y, 1, v_stride));
-                *v = fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, C_OFFSET), FIX18) as u8;
+
+                // Checked: this is proved to not go outside the 8-bit boundary
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                {
+                    *u =
+                        fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, C_OFFSET), FIX18) as u8;
+                    *v =
+                        fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, C_OFFSET), FIX18) as u8;
                 }
             }
         }
     }
+}
 
 #[inline(never)]
 pub fn lrgb_to_i444(
@@ -357,19 +367,23 @@ pub fn lrgb_to_i444(
                     unpack_ui8x3_i32(src_group.add(wg_index(x, y, depth, src_stride)), sampler);
 
                 let y_data = y_group.add(wg_index(x, y, 1, y_stride));
-                *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, Y_OFFSET), FIX16) as u8;
-
                 let u_data = u_group.add(wg_index(x, y, 1, u_stride));
+                let v_data = v_group.add(wg_index(x, y, 1, v_stride));
+
+                // Checked: this is proved to not go outside the 8-bit boundary
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                {
+                    *y_data =
+                        fix_to_i32(affine_transform(r, g, b, xr, xg, xb, Y_OFFSET), FIX16) as u8;
                     *u_data =
                         fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
-
-                let v_data = v_group.add(wg_index(x, y, 1, v_stride));
                     *v_data =
                         fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
                 }
             }
         }
     }
+}
 
 #[inline(never)]
 pub fn i444_to_lrgb(
@@ -636,7 +650,12 @@ fn bgra_to_rgb(
                 let bgra2 = loadu(src_ptr.add(2));
                 let bgra3 = loadu(src_ptr.add(3));
 
-                let rgb0 =
+                // Checked: we want to reinterpret the bits
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    clippy::cast_possible_wrap
+                )]
                 let (rgb0, rgb1, rgb2, rgb3) = (
                     _bswap64((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64)
                         as u64,
@@ -732,8 +751,9 @@ pub fn rgb_to_bgra(
 
                 let bgra: *mut i64 = dst_group.add(dst_offset).cast();
 
-                *bgra = _bswap64(
-                    (((rgb0 >> 16) & LOW_MASK) | ((rgb0 << 40) & HIGH_MASK) | ALPHA_MASK) as i64,
+                // Checked: we want to reinterpret the bits
+                #[allow(clippy::cast_possible_wrap)]
+                {
                     storeu(
                         bgra,
                         _bswap64(
@@ -762,6 +782,7 @@ pub fn rgb_to_bgra(
                                 as i64,
                         ),
                     );
+                }
 
                 x += ITEMS_PER_ITERATION;
                 src_offset += SRC_DEPTH * ITEMS_PER_ITERATION;
@@ -772,8 +793,8 @@ pub fn rgb_to_bgra(
             while x < single_swap_iterations {
                 let ptr: *const u32 = src_group.add(src_offset).cast();
 
-                *(dst_group.add(dst_offset) as *mut i32) =
-                    _bswap(((*(src_group.add(src_offset) as *const u32) << 8) | 0xFF) as i32);
+                // Checked: we want to reinterpret the bits
+                #[allow(clippy::cast_possible_wrap)]
                 storeu(
                     dst_group.add(dst_offset).cast(),
                     _bswap(((loadu(ptr) << 8) | 0xFF) as i32),

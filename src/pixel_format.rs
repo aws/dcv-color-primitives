@@ -126,15 +126,15 @@ fn get_pf_planes(pf: u32) -> u32 {
     pf & 3
 }
 
-fn get_plane_value(bpp: u32, plane: u32) -> u32 {
+fn get_plane_value(bpp: u32, plane: usize) -> u32 {
     (bpp >> (6 * plane)) & 0x3F
 }
 
-fn get_plane_mask(bpp: u32, plane: u32) -> usize {
+fn get_plane_mask(bpp: u32, plane: usize) -> usize {
     (INVALID_PLANE != get_plane_value(bpp, plane)) as usize
 }
 
-fn get_plane_spec(dimension: u32, bpp: u32, plane: u32) -> usize {
+fn get_plane_spec(dimension: u32, bpp: u32, plane: usize) -> usize {
     (dimension.wrapping_shr(get_plane_value(bpp, plane))) as usize
 }
 
@@ -176,7 +176,7 @@ pub fn get_buffers_size(
     let stride_spec = STRIDE_SPECS[pixel_format];
     for i in 0..MAX_NUMBER_OF_PLANES {
         stride[i] = if i >= strides.len() || strides[i] == STRIDE_AUTO {
-            get_plane_mask(stride_spec, i as u32) * get_plane_spec(width, stride_spec, i as u32)
+            get_plane_mask(stride_spec, i) * get_plane_spec(width, stride_spec, i)
         } else {
             strides[i]
         };
@@ -189,13 +189,13 @@ pub fn get_buffers_size(
             + ((stride[2] * get_plane_spec(height, height_spec, 2))
                 + (stride[3] * get_plane_spec(height, height_spec, 3)));
     } else {
-        let buffer_array = &mut buffers_size[..last_plane + 1];
-        let stride_array = &stride[..last_plane + 1];
+        let buffer_array = &mut buffers_size[..=last_plane];
+        let stride_array = &stride[..=last_plane];
 
         for (buffer_size, (i, stride)) in
             buffer_array.iter_mut().zip(stride_array.iter().enumerate())
         {
-            *buffer_size = *stride * get_plane_spec(height, height_spec, i as u32);
+            *buffer_size = *stride * get_plane_spec(height, height_spec, i);
         }
     }
 
