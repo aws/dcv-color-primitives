@@ -43,7 +43,7 @@ type BenchmarkResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 fn skip_line(file: &mut Cursor<&[u8]>) -> BenchmarkResult<()> {
     let mut byte = [0; 1];
     while byte[0] != 0xA {
-        file.read(&mut byte)?;
+        file.read_exact(&mut byte)?;
     }
 
     Ok(())
@@ -133,7 +133,7 @@ fn bgra_nv12(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", width, height + height / 2)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -189,7 +189,7 @@ fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", width, height + height / 2)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -245,7 +245,7 @@ fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", width, height + height + height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -298,7 +298,7 @@ fn nv12_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -351,7 +351,7 @@ fn rgb_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkR
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -404,7 +404,7 @@ fn bgra_rgb(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkR
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 3 * width, height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -463,7 +463,7 @@ fn i420_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
@@ -471,7 +471,7 @@ fn i420_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
 
 fn i444_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
     let (width, mut height, input_buffer) = { pnm_data(&mut input_file)? };
-    height = height / 3;
+    height /= 3;
 
     // Allocate output
     let dst_size: usize = 4 * (width as usize) * (height as usize);
@@ -521,7 +521,7 @@ fn i444_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
-        buffer.write(&output_buffer)?;
+        buffer.write_all(&output_buffer)?;
     }
 
     Ok(elapsed)
