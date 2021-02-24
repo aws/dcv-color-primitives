@@ -488,14 +488,14 @@ pub fn initialize() {
         }
     }
 
-    let (manufacturer, set) = get_cpu_info();
+    let (manufacturer, set) = cpu_info::get();
     initialize_global_state(manufacturer, set);
 }
 
 /// This is for internal use only
 #[cfg(feature = "test_instruction_sets")]
 pub fn initialize_with_instruction_set(instruction_set: &str) {
-    let (manufacturer, set) = get_cpu_info();
+    let (manufacturer, set) = cpu_info::get();
 
     let set = match instruction_set {
         "x86" => InstructionSet::X86,
