@@ -14,7 +14,8 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use crate::convert_image::common::*;
+#![allow(clippy::wildcard_imports)]
+use crate::convert_image::common::*; // We are importing everything
 use crate::convert_image::x86;
 
 #[cfg(target_arch = "x86")]
