@@ -355,12 +355,17 @@ unsafe fn lrgb_to_i420_4x(
     // uv_res: v1v0u1u0
     let packed_to_32 = _mm_packs_epi32(shuff, shuff);
     let packed_to_16 = _mm_packus_epi16(packed_to_32, packed_to_32);
+
+    // Checked: we want to reinterpret the bits
+    #[allow(clippy::cast_sign_loss)]
     let uv_res = _mm_cvtsi128_si32(packed_to_16) as u32;
 
-    *(u as *mut u16) = uv_res as u16;
-    *(v as *mut u16) = (uv_res >> 16) as u16;
+    // Checked: we are extracting the lower and upper part of a 32-bit integer
+    #[allow(clippy::cast_possible_truncation)]
+    {
         storeu(u.cast(), uv_res as u16);
         storeu(v.cast(), (uv_res >> 16) as u16);
+    }
 }
 
 #[inline(always)]

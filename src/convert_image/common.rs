@@ -21,15 +21,22 @@ const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
 
 #[cfg(not(tarpaulin_include))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
     let val = (((x & 0xFFFF) as u32) << 16) | ((y & 0xFFFF) as u32);
+
+    // Checked: we want to reinterpret the bits
     val as i32
 }
 
 #[cfg(not(tarpaulin_include))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub const fn i32_to_i16(x: i32) -> i16 {
+    // Checked: we want to reinterpret the bits
     let val = (x & 0xFFFF) as u32;
+
+    // Checked: we are extracting the lower part of a 32-bit integer
     val as i16
 }
 

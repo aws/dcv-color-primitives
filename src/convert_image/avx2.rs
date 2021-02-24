@@ -350,13 +350,18 @@ unsafe fn lrgb_to_i420_8x(
     let packed_to_32 = _mm256_packs_epi32(shuff, shuff);
     let packed_to_16 = _mm256_packus_epi16(packed_to_32, packed_to_32);
     let permuted = _mm256_permutevar8x32_epi32(packed_to_16, pack_lo_dword_2x128!());
+
+    // Checked: we want to reinterpret the bits
+    #[allow(clippy::cast_sign_loss)]
     let uv_res = _mm256_extract_epi64(permuted, 0) as u64;
 
-    *(u as *mut u32) = uv_res as u32;
-    *(v as *mut u32) = (uv_res >> 32) as u32;
+    // Checked: we are extracting the lower and upper part of a 64-bit integer
+    #[allow(clippy::cast_possible_truncation)]
+    {
         storeu(u.cast(), uv_res as u32);
         storeu(v.cast(), (uv_res >> 32) as u32);
     }
+}
 
 #[inline(always)]
 unsafe fn lrgb_to_i444_8x(
@@ -387,7 +392,9 @@ unsafe fn lrgb_to_i444_8x(
 }
 
 #[cfg(not(tarpaulin_include))]
+#[allow(clippy::cast_possible_wrap)]
 const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
+    // Checked: we want to reinterpret the bits
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
