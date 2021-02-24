@@ -27,6 +27,7 @@
 )]
 #![allow(
     clippy::too_many_arguments, // API design
+    clippy::missing_safety_doc, // Until we add them...
     clippy::similar_names, // This requires effort to ensure
     // Due to vzeroupper use, compiler does not inline intrinsics
     // but rather creates a function for each one that wraps the operation followed
