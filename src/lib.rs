@@ -938,7 +938,7 @@ mod c_bindings {
     #[no_mangle]
     pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {
         if !string.is_null() {
-            let _ = CString::from_raw(string);
+            let _unused = CString::from_raw(string);
         }
     }
 
