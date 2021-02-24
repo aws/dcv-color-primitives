@@ -35,8 +35,8 @@
 //! | RGB                  | BGRA                       |
 //!
 //! The supported color models are:
-//! * YCbCr, ITU-R Recommendation BT.601 (standard video system)
-//! * YCbCr, ITU-R Recommendation BT.709 (CSC systems)
+//! * ycbcr, ITU-R Recommendation BT.601 (standard video system)
+//! * ycbcr, ITU-R Recommendation BT.709 (CSC systems)
 //!
 //! # Examples
 //!
@@ -335,32 +335,32 @@ impl error::Error for ErrorKind {
 ///
 /// Each pixel format has one or more compatible color spaces:
 ///
-/// pixel_format      | color_space
-/// ------------------|--------------------------------------
-/// PixelFormat::Argb | ColorSpace::Lrgb
-/// PixelFormat::Bgra | ColorSpace::Lrgb
-/// PixelFormat::Bgr  | ColorSpace::Lrgb
-/// PixelFormat::Rgba | ColorSpace::Lrgb
-/// PixelFormat::Rgb  | ColorSpace::Lrgb
-/// PixelFormat::I444 | ColorSpace::Bt601, ColorSpace::Bt709
-/// PixelFormat::I422 | ColorSpace::Bt601, ColorSpace::Bt709
-/// PixelFormat::I420 | ColorSpace::Bt601, ColorSpace::Bt709
-/// PixelFormat::Nv12 | ColorSpace::Bt601, ColorSpace::Bt709
+/// pixel format        | color space
+/// --------------------|--------------------------------------
+/// `PixelFormat::Argb` | `ColorSpace::Lrgb`
+/// `PixelFormat::Bgra` | `ColorSpace::Lrgb`
+/// `PixelFormat::Bgr`  | `ColorSpace::Lrgb`
+/// `PixelFormat::Rgba` | `ColorSpace::Lrgb`
+/// `PixelFormat::Rgb`  | `ColorSpace::Lrgb`
+/// `PixelFormat::I444` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
+/// `PixelFormat::I422` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
+/// `PixelFormat::I420` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
+/// `PixelFormat::Nv12` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
 ///
 /// Some pixel formats might impose additional restrictions on the accepted number of
 /// planes and the image size:
 ///
-/// pixel_format      | subsampling | w   | h   | #planes | #1     | #2     | #3
-/// ------------------|:-----------:|:---:|:---:|:-------:|:------:|:------:|:-------:
-/// PixelFormat::Argb | 4:4:4       |     |     | 1       | argb:4 |        |
-/// PixelFormat::Bgra | 4:4:4       |     |     | 1       | bgra:4 |        |
-/// PixelFormat::Bgr  | 4:4:4       |     |     | 1       | bgr:3  |        |
-/// PixelFormat::Rgba | 4:4:4       |     |     | 1       | rgba:4 |        |
-/// PixelFormat::Rgb  | 4:4:4       |     |     | 1       | rgb:3  |        |
-/// PixelFormat::I444 | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
-/// PixelFormat::I422 | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
-/// PixelFormat::I420 | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
-/// PixelFormat::Nv12 | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
+/// pixel format        | subsampling | w   | h   | #planes | #1     | #2     | #3
+/// --------------------|:-----------:|:---:|:---:|:-------:|:------:|:------:|:-------:
+/// `PixelFormat::Argb` | 4:4:4       |     |     | 1       | argb:4 |        |
+/// `PixelFormat::Bgra` | 4:4:4       |     |     | 1       | bgra:4 |        |
+/// `PixelFormat::Bgr`  | 4:4:4       |     |     | 1       | bgr:3  |        |
+/// `PixelFormat::Rgba` | 4:4:4       |     |     | 1       | rgba:4 |        |
+/// `PixelFormat::Rgb`  | 4:4:4       |     |     | 1       | rgb:3  |        |
+/// `PixelFormat::I444` | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
+/// `PixelFormat::I422` | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
+/// `PixelFormat::I420` | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
+/// `PixelFormat::Nv12` | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
 ///
 /// The values reported in columns `w` and `h`, when specified, indicate that the described
 /// image should have width and height that are multiples of the specified values
@@ -492,7 +492,7 @@ pub fn initialize() {
     initialize_global_state(manufacturer, set);
 }
 
-// This is for internal use only and should be left undocumented
+/// This is for internal use only
 #[cfg(feature = "test_instruction_sets")]
 pub fn initialize_with_instruction_set(instruction_set: &str) {
     let (manufacturer, set) = get_cpu_info();
@@ -665,7 +665,7 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// * [`NotEnoughData`] if the strides array is not `None` and its length is less than the
 ///   image format number of planes
 ///
-/// * [`NotEnoughData`] if the buffers_sizes array is not `None` and its length is less than the
+/// * [`NotEnoughData`] if the buffers size array is not `None` and its length is less than the
 ///   image format number of planes
 ///
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.NotInitialized
@@ -729,22 +729,22 @@ pub fn get_buffers_size(
 ///
 ///   The list of available conversions is specified here:
 ///
-///   Source image pixel format     | Supported destination image pixel formats
-///   ------------------------------|------------------------------------------
-///   PixelFormat::Argb             | PixelFormat::I420 [`1`]
-///   PixelFormat::Argb             | PixelFormat::I444 [`1`]
-///   PixelFormat::Argb             | PixelFormat::Nv12 [`1`]
-///   PixelFormat::Bgra             | PixelFormat::I420 [`1`]
-///   PixelFormat::Bgra             | PixelFormat::I444 [`1`]
-///   PixelFormat::Bgra             | PixelFormat::Nv12 [`1`]
-///   PixelFormat::Bgra             | PixelFormat::Rgb  [`4`]
-///   PixelFormat::Bgr              | PixelFormat::I420 [`1`]
-///   PixelFormat::Bgr              | PixelFormat::I444 [`1`]
-///   PixelFormat::Bgr              | PixelFormat::Nv12 [`1`]
-///   PixelFormat::I420             | PixelFormat::Bgra [`2`]
-///   PixelFormat::I444             | PixelFormat::Bgra [`2`]
-///   PixelFormat::Nv12             | PixelFormat::Bgra [`2`]
-///   PixelFormat::Rgb              | PixelFormat::Bgra [`3`]
+///   Source image pixel format       | Supported destination image pixel formats
+///   --------------------------------|------------------------------------------
+///   `PixelFormat::Argb`             | `PixelFormat::I420` [`1`]
+///   `PixelFormat::Argb`             | `PixelFormat::I444` [`1`]
+///   `PixelFormat::Argb`             | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Bgra`             | `PixelFormat::I420` [`1`]
+///   `PixelFormat::Bgra`             | `PixelFormat::I444` [`1`]
+///   `PixelFormat::Bgra`             | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Bgra`             | `PixelFormat::Rgb`  [`4`]
+///   `PixelFormat::Bgr`              | `PixelFormat::I420` [`1`]
+///   `PixelFormat::Bgr`              | `PixelFormat::I444` [`1`]
+///   `PixelFormat::Bgr`              | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::I420`             | `PixelFormat::Bgra` [`2`]
+///   `PixelFormat::I444`             | `PixelFormat::Bgra` [`2`]
+///   `PixelFormat::Nv12`             | `PixelFormat::Bgra` [`2`]
+///   `PixelFormat::Rgb`              | `PixelFormat::Bgra` [`3`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
 ///   source image format number of planes
@@ -760,7 +760,7 @@ pub fn get_buffers_size(
 ///   You can compute the buffers' size using [`get_buffers_size`]
 ///
 /// # Algorithm 1
-/// Conversion from linear RGB model to YCbCr color model, with 4:2:0 downsampling
+/// Conversion from linear RGB model to ycbcr color model, with 4:2:0 downsampling
 ///
 /// If the destination image color space is Bt601, the following formula is applied:
 /// ```text
@@ -777,7 +777,7 @@ pub fn get_buffers_size(
 /// ```
 ///
 /// # Algorithm 2
-/// Conversion from YCbCr model to linear RGB model, with 4:4:4 upsampling
+/// Conversion from ycbcr model to linear RGB model, with 4:4:4 upsampling
 ///
 /// If the destination image contains an alpha channel, each component will be set to 255
 ///

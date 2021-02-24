@@ -72,6 +72,7 @@ const SAMPLER_OFFSETS: [[usize; 3]; Sampler::Length as usize] =
 /// Convert fixed point number approximation to uchar, using saturation
 ///
 /// This is equivalent to the following code:
+/// ```c
 /// if (fix[8 + frac_bits:31] == 0) {
 ///      return fix >> frac_bits;  // extracts the integer part, no integer underflow
 /// } else if (fix < 0) {
@@ -79,6 +80,7 @@ const SAMPLER_OFFSETS: [[usize; 3]; Sampler::Length as usize] =
 /// } else {
 ///      return 255;     // no integer underflow occurred, fix is just bigger than 255
 /// }
+/// ```
 ///
 /// We can get rid of the last branch (else if / else) by observing that:
 /// - if fix is negative, fix[31] is 1, fix[31] + 255 = 256, when clamped to uint8 is 0 (just what we want)
@@ -146,7 +148,7 @@ unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32) {
 }
 
 /// Truncate and interleave 3 int into a dword
-/// Last component is set to DEFAULT_ALPHA
+/// Last component is set to `DEFAULT_ALPHA`
 unsafe fn pack_ui8x3(image: *mut u8, x: u8, y: u8, z: u8) {
     *image = x;
     *image.add(1) = y;

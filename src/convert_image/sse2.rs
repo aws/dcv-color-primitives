@@ -157,7 +157,7 @@ unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
 }
 
 /// Truncate and deinterleave 3 short samples into 4 uchar samples (8-wide)
-/// Alpha set to DEFAULT_ALPHA
+/// Alpha set to `DEFAULT_ALPHA`
 ///
 /// red:      --r7--r6 --r5--r4 --r3--r2 --r1--r0
 /// green:    --r7--r6 --r5--r4 --r3--r2 --r1--r0
@@ -186,8 +186,8 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 /// image (sampler=2): ******** r3g3b3r2 g2b2r1g1 b1r0g0b0
 /// image (sampler=3): -------- r3g3b3r2 g2b2r1g1 b1r0g0b0
 ///
-/// green_red:         --g3--r3 --g2--r2 --g1--r1 --g0--r0
-/// green_blue:        --g3--b3 --g2--b2 --g1--b1 --g0--b0
+/// `green_red`:       --g3--r3 --g2--r2 --g1--r1 --g0--r0
+/// `green_blue`:      --g3--b3 --g2--b2 --g1--b1 --g0--b0
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i, __m128i) {
     let line = match sampler {
