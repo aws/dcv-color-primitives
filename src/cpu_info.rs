@@ -91,10 +91,10 @@ pub fn get() -> (CpuManufacturer, InstructionSet) {
                 }
             }
 
-            set = if (features[1] & (1 << 5)) != 0 {
-                InstructionSet::Avx2
-            } else {
+            set = if (features[1] & (1 << 5)) == 0 {
                 InstructionSet::Sse2
+            } else {
+                InstructionSet::Avx2
             };
         }
     }
