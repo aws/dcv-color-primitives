@@ -18,28 +18,28 @@
 use crate::convert_image::common::*;
 use crate::convert_image::x86;
 
+use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
+
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
     __m128i, _mm_add_epi16, _mm_add_epi32, _mm_and_si128, _mm_andnot_si128, _mm_cmpeq_epi32,
-    _mm_cvtsi128_si32, _mm_loadl_epi64, _mm_loadu_si128, _mm_madd_epi16, _mm_mulhi_epu16,
-    _mm_or_si128, _mm_packs_epi32, _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32,
-    _mm_set1_epi64x, _mm_set_epi32, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16,
-    _mm_shufflelo_epi16, _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16,
-    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
-    _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
-    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_cvtsi128_si32, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
+    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
+    _mm_set_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16, _mm_shufflelo_epi16,
+    _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16, _mm_srai_epi32, _mm_srli_epi16,
+    _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8,
+    _mm_unpacklo_epi16, _mm_unpacklo_epi32, _mm_unpacklo_epi64, _mm_unpacklo_epi8,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
     __m128i, _mm_add_epi16, _mm_add_epi32, _mm_and_si128, _mm_andnot_si128, _mm_cmpeq_epi32,
-    _mm_cvtsi128_si32, _mm_loadl_epi64, _mm_loadu_si128, _mm_madd_epi16, _mm_mulhi_epu16,
-    _mm_or_si128, _mm_packs_epi32, _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32,
-    _mm_set1_epi64x, _mm_set_epi32, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16,
-    _mm_shufflelo_epi16, _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16,
-    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_storeu_si128,
-    _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8, _mm_unpacklo_epi16, _mm_unpacklo_epi32,
-    _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_cvtsi128_si32, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
+    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
+    _mm_set_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16, _mm_shufflelo_epi16,
+    _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16, _mm_srai_epi32, _mm_srli_epi16,
+    _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8,
+    _mm_unpacklo_epi16, _mm_unpacklo_epi32, _mm_unpacklo_epi64, _mm_unpacklo_epi8,
 };
 
 const LANE_COUNT: usize = 16;
@@ -138,7 +138,7 @@ unsafe fn i16_to_i16x2_8x(x: __m128i) -> (__m128i, __m128i) {
 /// res:   g7--g6-- g5--g4-- g3--g2-- g1--g0--
 #[inline(always)]
 unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
-    let x = _mm_set1_epi64x(*(image as *const i64));
+    let x = _mm_set1_epi64x(loadu(image.cast()));
     _mm_unpacklo_epi8(zero!(), x)
 }
 
@@ -150,7 +150,7 @@ unsafe fn unpack_ui8_i16be_8x(image: *const u8) -> __m128i {
 /// green: g7--g6-- g5--g4-- g3--g2-- g1--g0--
 #[inline(always)]
 unsafe fn unpack_ui8x2_i16be_8x(image: *const u8) -> (__m128i, __m128i) {
-    let x = _mm_loadu_si128(image as *const __m128i);
+    let x = loadu(image.cast());
     (
         _mm_slli_epi16(x, 8),
         _mm_slli_epi16(_mm_srli_epi16(x, 8), 8),
@@ -172,11 +172,9 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
     let z = _mm_unpacklo_epi8(x, y);
     let w = _mm_unpackhi_epi8(x, y);
 
-    _mm_storeu_si128(image as *mut __m128i, _mm_unpacklo_epi16(z, w));
-    _mm_storeu_si128(
-        image.add(LANE_COUNT) as *mut __m128i,
-        _mm_unpackhi_epi16(z, w),
-    );
+    let rgba: *mut __m128i = image.cast();
+    storeu(rgba, _mm_unpacklo_epi16(z, w));
+    storeu(rgba.add(1), _mm_unpackhi_epi16(z, w));
 }
 
 /// Convert 3 deinterleaved uchar samples into 2 deinterleaved
@@ -192,13 +190,11 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i, __m128i) {
     let line = match sampler {
-        Sampler::BgrOverflow => _mm_set_epi32(
-            0,
-            *(image.offset(8) as *const i32),
-            *(image.offset(4) as *const i32),
-            *(image as *const i32),
-        ),
-        _ => _mm_loadu_si128(image as *const __m128i),
+        Sampler::BgrOverflow => {
+            let bgr: *const i32 = image.cast();
+            _mm_set_epi32(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
+        }
+        _ => loadu(image.cast()),
     };
 
     let aligned_line = match sampler {
@@ -245,8 +241,10 @@ unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
     let pshufl16 = _mm_shufflelo_epi16(pshuf32, mm_shuffle(0, 1, 2, 3));
     let pshufh16 = _mm_shufflehi_epi16(pshufl16, mm_shuffle(0, 1, 2, 3));
 
-    let res = _mm_shuffle_epi32(pshufh16, mm_shuffle(0, 1, 2, 3));
-    _mm_storeu_si128(output_buffer, res);
+    storeu(
+        output_buffer,
+        _mm_shuffle_epi32(pshufh16, mm_shuffle(0, 1, 2, 3)),
+    );
 }
 
 /// Truncate int to uchar (4-wide)
@@ -257,7 +255,7 @@ unsafe fn rgb_to_bgra_4x(input: __m128i, output_buffer: *mut __m128i) {
 unsafe fn pack_i32_4x(image: *mut u8, red: __m128i) {
     let y = _mm_packs_epi32(red, red);
     let z = _mm_packus_epi16(y, y);
-    *(image as *mut i32) = _mm_cvtsi128_si32(z);
+    storeu(image.cast(), _mm_cvtsi128_si32(z));
 }
 
 #[inline(always)]
@@ -361,6 +359,8 @@ unsafe fn lrgb_to_i420_4x(
 
     *(u as *mut u16) = uv_res as u16;
     *(v as *mut u16) = (uv_res >> 16) as u16;
+        storeu(u.cast(), uv_res as u16);
+        storeu(v.cast(), (uv_res >> 16) as u16);
 }
 
 #[inline(always)]
@@ -713,9 +713,7 @@ unsafe fn yuv_to_lrgb_sse2(
             let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
             let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
-            let y0 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m128i
-            );
+            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
 
             let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
@@ -733,8 +731,10 @@ unsafe fn yuv_to_lrgb_sse2(
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
             );
 
-            let y1 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m128i
+            let y1 = loadu(
+                y_group
+                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
+                    .cast(),
             );
 
             let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
@@ -805,9 +805,7 @@ unsafe fn i420_to_lrgb_sse2(
             let (sr_lo, sr_hi) = i16_to_i16x2_8x(sr);
             let (sg_lo, sg_hi) = i16_to_i16x2_8x(sg);
 
-            let y0 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m128i
-            );
+            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
 
             let y00 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y0), xxym);
             pack_i16x3_8x(
@@ -825,8 +823,10 @@ unsafe fn i420_to_lrgb_sse2(
                 fix_to_i16_8x!(_mm_add_epi16(sb_hi, y10), FIX6),
             );
 
-            let y1 = _mm_loadu_si128(
-                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m128i
+            let y1 = loadu(
+                y_group
+                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
+                    .cast(),
             );
 
             let y01 = _mm_mulhi_epu16(_mm_unpacklo_epi8(zero!(), y1), xxym);
@@ -882,12 +882,18 @@ unsafe fn i444_to_lrgb_sse2(
 
     for y in 0..height {
         for x in 0..wg_width {
-            let cb0 =
-                _mm_loadl_epi64(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)) as *const __m128i);
-            let cr0 =
-                _mm_loadl_epi64(v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)) as *const __m128i);
-            let y0 =
-                _mm_loadl_epi64(y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)) as *const __m128i);
+            let cb0 = _mm_set_epi64x(
+                0,
+                loadu(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)).cast()),
+            );
+            let cr0 = _mm_set_epi64x(
+                0,
+                loadu(v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)).cast()),
+            );
+            let y0 = _mm_set_epi64x(
+                0,
+                loadu(y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)).cast()),
+            );
 
             let cb_lo = _mm_unpacklo_epi8(zero!(), cb0);
             let cr_lo = _mm_unpacklo_epi8(zero!(), cr0);
@@ -936,12 +942,14 @@ unsafe fn rgb_to_bgra_sse2(
 
     for _ in 0..height {
         for _ in (0..width).step_by(LANE_COUNT) {
-            let input0 = _mm_loadu_si128(src_group.add(src_offset) as *const __m128i);
-            let input1 = _mm_loadu_si128(src_group.add(src_offset + LANE_COUNT) as *const __m128i);
-            let input2 =
-                _mm_loadu_si128(src_group.add(src_offset + (LANE_COUNT * 2)) as *const __m128i);
+            let src_ptr: *const __m128i = src_group.add(src_offset).cast();
+            let dst_ptr: *mut __m128i = dst_group.add(dst_offset).cast();
 
-            rgb_to_bgra_4x(input0, dst_group.add(dst_offset) as *mut __m128i);
+            let input0 = loadu(src_ptr);
+            let input1 = loadu(src_ptr.add(1));
+            let input2 = loadu(src_ptr.add(2));
+
+            rgb_to_bgra_4x(input0, dst_ptr);
 
             // second iteration is with input0,input1
             // we should merge last 4 bytes of input0 with first 8 bytes of input1
@@ -952,7 +960,7 @@ unsafe fn rgb_to_bgra_sse2(
                 _mm_andnot_si128(first_pixel_mask, first8),
             );
 
-            rgb_to_bgra_4x(input, dst_group.add(dst_offset + 16) as *mut __m128i);
+            rgb_to_bgra_4x(input, dst_ptr.add(1));
 
             // third iteration is with input1,input2
             // we should merge last 8 bytes of input1 with first 4 bytes of input2
@@ -963,12 +971,12 @@ unsafe fn rgb_to_bgra_sse2(
                 _mm_andnot_si128(first_two_pixels_mask, first8),
             );
 
-            rgb_to_bgra_4x(input, dst_group.add(dst_offset + 32) as *mut __m128i);
+            rgb_to_bgra_4x(input, dst_ptr.add(2));
 
             // fourth iteration is with input2
             rgb_to_bgra_4x(
                 _mm_shuffle_epi32(input2, mm_shuffle(0, 3, 2, 1)),
-                dst_group.add(dst_offset + 48) as *mut __m128i,
+                dst_ptr.add(3),
             );
 
             src_offset += LANE_COUNT * SRC_DEPTH;

@@ -18,34 +18,32 @@
 use crate::convert_image::common::*; // We are importing everything
 use crate::convert_image::x86;
 
+use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
+
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32,
-    _mm256_extracti128_si256, _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16,
-    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
-    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
-    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
-    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
-    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
-    _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extracti128_si256,
+    _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32,
+    _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
+    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
+    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16,
+    _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
     _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_prefetch, _mm_setzero_si128,
-    _mm_storeu_si128, _MM_HINT_NTA,
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
-    __m128i, __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
-    _mm256_extracti128_si256, _mm256_loadu2_m128i, _mm256_loadu_si256, _mm256_madd_epi16,
-    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
-    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
-    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
-    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
-    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16,
-    _mm256_srli_epi32, _mm256_srli_si256, _mm256_storeu_si256, _mm256_sub_epi16,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
+    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
+    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
+    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
+    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16,
+    _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
     _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_loadu_si128, _mm_prefetch, _mm_setzero_si128,
-    _mm_storeu_si128, _MM_HINT_NTA,
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -159,7 +157,7 @@ unsafe fn i16_to_i16x2_16x(x: __m256i) -> (__m256i, __m256i) {
 /// stored in big endian (16-wide)
 #[inline(always)]
 unsafe fn unpack_ui8_i16be_16x(image: *const u8) -> __m256i {
-    let x = _mm_loadu_si128(image as *const __m128i);
+    let x = loadu(image.cast());
     let xx = _mm256_set_m128i(x, x);
 
     let hi = _mm256_unpackhi_epi8(zero!(), xx);
@@ -172,7 +170,7 @@ unsafe fn unpack_ui8_i16be_16x(image: *const u8) -> __m256i {
 /// stored in big endian (16-wide)
 #[inline(always)]
 unsafe fn unpack_ui8x2_i16be_16x(image: *const u8) -> (__m256i, __m256i) {
-    let x = _mm256_loadu_si256(image as *const __m256i);
+    let x = loadu(image.cast());
     (
         _mm256_slli_epi16(x, 8),
         _mm256_slli_epi16(_mm256_srli_epi16(x, 8), 8),
@@ -196,13 +194,14 @@ unsafe fn pack_i16x3_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m
         _mm256_unpackhi_epi16(rgbw_lo, rgbw_hi),
     );
 
-    _mm256_storeu_si256(
-        image as *mut __m256i,
+    let rgba: *mut __m256i = image.cast();
+    storeu(
+        rgba,
         _mm256_permute2x128_si256(rgbw_lo, rgbw_hi, PACK_LO_DQWORD_2X256),
     );
 
-    _mm256_storeu_si256(
-        image.add(LANE_COUNT) as *mut __m256i,
+    storeu(
+        rgba.add(1),
         _mm256_permute2x128_si256(rgbw_lo, rgbw_hi, PACK_HI_DQWORD_2X256),
     );
 }
@@ -212,13 +211,11 @@ unsafe fn pack_i16x3_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_8x(image: *const u8, sampler: Sampler) -> (__m256i, __m256i) {
     let line = match sampler {
-        Sampler::BgrOverflow => _mm256_set_epi64x(
-            0,
-            *(image.offset(16) as *const i64),
-            *(image.offset(8) as *const i64),
-            *(image as *const i64),
-        ),
-        _ => _mm256_loadu_si256(image as *const __m256i),
+        Sampler::BgrOverflow => {
+            let bgr: *const i64 = image.cast();
+            _mm256_set_epi64x(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
+        }
+        _ => loadu(image.cast()),
     };
 
     let aligned_line = match sampler {
@@ -257,7 +254,7 @@ unsafe fn pack_i32_8x(image: *mut u8, red: __m256i) {
     let x = _mm256_packs_epi32(red, red);
     let y = _mm256_packus_epi16(x, x);
     let z = _mm256_permutevar8x32_epi32(y, pack_lo_dword_2x128!());
-    *(image as *mut i64) = _mm256_extract_epi64(z, 0);
+    storeu(image.cast(), _mm256_extract_epi64(z, 0));
 }
 
 #[inline(always)]
@@ -357,7 +354,9 @@ unsafe fn lrgb_to_i420_8x(
 
     *(u as *mut u32) = uv_res as u32;
     *(v as *mut u32) = (uv_res >> 32) as u32;
-}
+        storeu(u.cast(), uv_res as u32);
+        storeu(v.cast(), (uv_res >> 32) as u32);
+    }
 
 #[inline(always)]
 unsafe fn lrgb_to_i444_8x(
@@ -622,31 +621,34 @@ unsafe fn bgra_to_rgb_avx2(
         let mut dst_offset = ((DST_DEPTH * width) + dst_stride_diff) * i;
 
         while y < limit_4x {
-            let bgra0 = _mm256_loadu_si256(src_group.add(src_offset) as *const __m256i);
-            let bgra1 = _mm256_loadu_si256(src_group.add(src_offset + 32) as *const __m256i);
-            let bgra2 = _mm256_loadu_si256(src_group.add(src_offset + 64) as *const __m256i);
-            let bgra3 = _mm256_loadu_si256(src_group.add(src_offset + 96) as *const __m256i);
+            let src_ptr: *const __m256i = src_group.add(src_offset).cast();
+            let dst_ptr: *mut __m256i = dst_group.add(dst_offset).cast();
+
+            let bgra0 = loadu(src_ptr);
+            let bgra1 = loadu(src_ptr.add(1));
+            let bgra2 = loadu(src_ptr.add(2));
+            let bgra3 = loadu(src_ptr.add(3));
 
             let rgb0 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra0, shf_mask), pk_mask);
             let rgb1 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra1, shf_mask), pk_mask);
             let rgb2 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra2, shf_mask), pk_mask);
             let rgb3 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra3, shf_mask), pk_mask);
 
-            _mm256_storeu_si256(
-                dst_group.add(dst_offset) as *mut __m256i,
+            storeu(
+                dst_ptr,
                 _mm256_or_si256(rgb0, _mm256_permute4x64_epi64(rgb1, shuffle(0, 3, 3, 3))),
             );
 
-            _mm256_storeu_si256(
-                dst_group.add(dst_offset + 32) as *mut __m256i,
+            storeu(
+                dst_ptr.add(1),
                 _mm256_or_si256(
                     _mm256_permute4x64_epi64(rgb1, shuffle(3, 3, 2, 1)),
                     _mm256_permute4x64_epi64(rgb2, shuffle(1, 0, 3, 3)),
                 ),
             );
 
-            _mm256_storeu_si256(
-                dst_group.add(dst_offset + 64) as *mut __m256i,
+            storeu(
+                dst_ptr.add(2),
                 _mm256_or_si256(
                     _mm256_permute4x64_epi64(rgb2, shuffle(3, 3, 3, 2)),
                     _mm256_permute4x64_epi64(rgb3, shuffle(2, 1, 0, 3)),
@@ -659,15 +661,18 @@ unsafe fn bgra_to_rgb_avx2(
         }
 
         while y < limit {
-            let bgra0 = _mm256_loadu_si256(src_group.add(src_offset) as *const __m256i);
+            let bgra0 = loadu(src_group.add(src_offset).cast());
             let rgb0 =
                 _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(bgra0, shf_mask_no_comb), pk_mask);
 
-            let lane1_128 = _mm256_extracti128_si256(rgb0, 0);
-            let lane2_64 = _mm256_extract_epi64(rgb0, 2);
-
-            _mm_storeu_si128(dst_group.add(dst_offset) as *mut __m128i, lane1_128);
-            *(dst_group.add(dst_offset + 16) as *mut i64) = lane2_64;
+            storeu(
+                dst_group.add(dst_offset).cast(),
+                _mm256_extracti128_si256(rgb0, 0),
+            );
+            storeu(
+                dst_group.add(dst_offset + 16).cast(),
+                _mm256_extract_epi64(rgb0, 2),
+            );
 
             src_offset += 4 * ITEMS_PER_ITERATION;
             dst_offset += 3 * ITEMS_PER_ITERATION;
@@ -738,25 +743,26 @@ unsafe fn rgb_to_bgra_avx2(
             //                                              ^---------------60----------------^
             //                   ^---------------72----------------^
             // ^---------------80----------------^
+            let src_ptr = src_group.add(src_offset);
 
-            let input = _mm256_loadu2_m128i(
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH)) as *const __m128i,
-                src_group.add(src_offset) as *const __m128i,
+            let input = _mm256_set_m128i(
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH).cast()),
+                loadu(src_ptr.cast()),
             );
 
-            let input1 = _mm256_loadu2_m128i(
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 3)) as *const __m128i,
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 2)) as *const __m128i,
+            let input1 = _mm256_set_m128i(
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 3).cast()),
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 2).cast()),
             );
 
-            let input2 = _mm256_loadu2_m128i(
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 5)) as *const __m128i,
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 4)) as *const __m128i,
+            let input2 = _mm256_set_m128i(
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 5).cast()),
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 4).cast()),
             );
 
-            let input3 = _mm256_loadu2_m128i(
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 7) - 4) as *const __m128i,
-                src_group.add(src_offset + (GROUP_SIZE * SRC_DEPTH * 6)) as *const __m128i,
+            let input3 = _mm256_set_m128i(
+                loadu(src_ptr.add((GROUP_SIZE * SRC_DEPTH * 7) - 4).cast()),
+                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 6).cast()),
             );
 
             let input3 =
@@ -767,16 +773,11 @@ unsafe fn rgb_to_bgra_avx2(
             let res2 = _mm256_or_si256(_mm256_shuffle_epi8(input2, shf_mask), alpha_mask);
             let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, shf_mask), alpha_mask);
 
-            _mm256_storeu_si256(dst_group.add(dst_offset) as *mut __m256i, res);
-            _mm256_storeu_si256(dst_group.add(dst_offset + LANE_COUNT) as *mut __m256i, res1);
-            _mm256_storeu_si256(
-                dst_group.add(dst_offset + (LANE_COUNT * 2)) as *mut __m256i,
-                res2,
-            );
-            _mm256_storeu_si256(
-                dst_group.add(dst_offset + (LANE_COUNT * 3)) as *mut __m256i,
-                res3,
-            );
+            let dst_ptr: *mut __m256i = dst_group.add(dst_offset).cast();
+            storeu(dst_ptr, res);
+            storeu(dst_ptr.add(1), res1);
+            storeu(dst_ptr.add(2), res2);
+            storeu(dst_ptr.add(3), res3);
 
             src_offset += LANE_COUNT * SRC_DEPTH;
             dst_offset += LANE_COUNT * DST_DEPTH;
@@ -929,9 +930,7 @@ unsafe fn yuv_to_lrgb_avx2(
             let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
             let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
 
-            let y0 = _mm256_loadu_si256(
-                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m256i
-            );
+            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
 
             let y00 = _mm256_mulhi_epu16(
                 _mm256_permute2x128_si256(
@@ -963,8 +962,10 @@ unsafe fn yuv_to_lrgb_avx2(
                 fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
             );
 
-            let y1 = _mm256_loadu_si256(
-                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m256i
+            let y1 = loadu(
+                y_group
+                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
+                    .cast(),
             );
 
             let y01 = _mm256_mulhi_epu16(
@@ -1049,9 +1050,7 @@ unsafe fn i420_to_lrgb_avx2(
             let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
             let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
 
-            let y0 = _mm256_loadu_si256(
-                y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)) as *const __m256i
-            );
+            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
 
             let y00 = _mm256_mulhi_epu16(
                 _mm256_permute2x128_si256(
@@ -1083,8 +1082,10 @@ unsafe fn i420_to_lrgb_avx2(
                 fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
             );
 
-            let y1 = _mm256_loadu_si256(
-                y_group.add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride)) as *const __m256i
+            let y1 = loadu(
+                y_group
+                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
+                    .cast(),
             );
 
             let y01 = _mm256_mulhi_epu16(
@@ -1155,17 +1156,17 @@ unsafe fn i444_to_lrgb_avx2(
 
     for y in 0..height {
         for x in 0..wg_width {
-            let cb = _mm256_loadu2_m128i(
-                &zero_128,
-                u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)) as *const __m128i,
+            let cb = _mm256_set_m128i(
+                zero_128,
+                loadu(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)).cast()),
             );
-            let cr = _mm256_loadu2_m128i(
-                &zero_128,
-                v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)) as *const __m128i,
+            let cr = _mm256_set_m128i(
+                zero_128,
+                loadu(v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)).cast()),
             );
-            let y0 = _mm256_loadu2_m128i(
-                &zero_128,
-                y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)) as *const __m128i,
+            let y0 = _mm256_set_m128i(
+                zero_128,
+                loadu(y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)).cast()),
             );
 
             let cb_lo = _mm256_permute2x128_si256(

@@ -17,6 +17,8 @@
 #![allow(clippy::wildcard_imports)] // We are importing everything
 use crate::convert_image::common::*;
 
+use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
+
 #[cfg(target_arch = "x86")]
 use core::arch::x86::_bswap;
 #[cfg(target_arch = "x86_64")]
@@ -314,10 +316,10 @@ pub fn lrgb_to_i420(
 
                 let v = v_group.add(wg_index(x, y, 1, v_stride));
                 *v = fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, C_OFFSET), FIX18) as u8;
+                }
             }
         }
     }
-}
 
 #[inline(never)]
 pub fn lrgb_to_i444(
@@ -358,16 +360,16 @@ pub fn lrgb_to_i444(
                 *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, Y_OFFSET), FIX16) as u8;
 
                 let u_data = u_group.add(wg_index(x, y, 1, u_stride));
-                *u_data =
-                    fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
+                    *u_data =
+                        fix_to_i32(affine_transform(r, g, b, yr, yg, yb, C_OFFSET16), FIX16) as u8;
 
                 let v_data = v_group.add(wg_index(x, y, 1, v_stride));
-                *v_data =
-                    fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
+                    *v_data =
+                        fix_to_i32(affine_transform(r, g, b, zr, zg, zb, C_OFFSET16), FIX16) as u8;
+                }
             }
         }
     }
-}
 
 #[inline(never)]
 pub fn i444_to_lrgb(
@@ -628,31 +630,28 @@ fn bgra_to_rgb(
             let mut dst_offset = ((DST_DEPTH * width) + dst_stride_diff) * i;
 
             while y < limit_4x {
-                let bgra0 = *(src_group.add(src_offset) as *const u64);
-                let bgra1 = *(src_group.add(src_offset + 8) as *const u64);
-                let bgra2 = *(src_group.add(src_offset + 16) as *const u64);
-                let bgra3 = *(src_group.add(src_offset + 24) as *const u64);
+                let src_ptr: *const u64 = src_group.add(src_offset).cast();
+                let bgra0 = loadu(src_ptr);
+                let bgra1 = loadu(src_ptr.add(1));
+                let bgra2 = loadu(src_ptr.add(2));
+                let bgra3 = loadu(src_ptr.add(3));
 
                 let rgb0 =
+                let (rgb0, rgb1, rgb2, rgb3) = (
                     _bswap64((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64)
-                        as u64;
-                let rgb1 =
+                        as u64,
                     _bswap64((((bgra1 << 40) & HIGH_MASK) | ((bgra1 >> 16) & LOW_MASK)) as i64)
-                        as u64;
-                let rgb2 =
+                        as u64,
                     _bswap64((((bgra2 << 40) & HIGH_MASK) | ((bgra2 >> 16) & LOW_MASK)) as i64)
-                        as u64;
-                let rgb3 =
+                        as u64,
                     _bswap64((((bgra3 << 40) & HIGH_MASK) | ((bgra3 >> 16) & LOW_MASK)) as i64)
-                        as u64;
+                        as u64,
+                );
 
-                let lane1 = (rgb1 << 48) | rgb0;
-                let lane2 = (rgb1 >> 16) | (rgb2 << 32);
-                let lane3 = (rgb2 >> 32) | (rgb3 << 16);
-
-                *(dst_group.add(dst_offset) as *mut u64) = lane1;
-                *(dst_group.add(dst_offset + 8) as *mut u64) = lane2;
-                *(dst_group.add(dst_offset + 16) as *mut u64) = lane3;
+                let dst_ptr: *mut u64 = dst_group.add(dst_offset).cast();
+                storeu(dst_ptr, (rgb1 << 48) | rgb0);
+                storeu(dst_ptr.add(1), (rgb1 >> 16) | (rgb2 << 32));
+                storeu(dst_ptr.add(2), (rgb2 >> 32) | (rgb3 << 16));
 
                 src_offset += SRC_DEPTH * ITEMS_PER_ITERATION_4X;
                 dst_offset += DST_DEPTH * ITEMS_PER_ITERATION_4X;
@@ -726,24 +725,43 @@ pub fn rgb_to_bgra(
 
             // Retrieves items_per_iteration colors per cycle if possible
             for _ in (0..multi_swap_iterations).step_by(ITEMS_PER_ITERATION) {
-                let rgb0 = *(src_group.add(src_offset) as *const u64);
-                let rgb1 = *(src_group.add(src_offset + 6) as *const u64);
-                let rgb2 = *(src_group.add(src_offset + 12) as *const u64);
-                let rgb3 = *(src_group.add(src_offset + 18) as *const u64);
-                let bgra = dst_group.add(dst_offset) as *mut i64;
+                let rgb0: u64 = loadu(src_group.add(src_offset).cast());
+                let rgb1: u64 = loadu(src_group.add(src_offset + 6).cast());
+                let rgb2: u64 = loadu(src_group.add(src_offset + 12).cast());
+                let rgb3: u64 = loadu(src_group.add(src_offset + 18).cast());
+
+                let bgra: *mut i64 = dst_group.add(dst_offset).cast();
 
                 *bgra = _bswap64(
                     (((rgb0 >> 16) & LOW_MASK) | ((rgb0 << 40) & HIGH_MASK) | ALPHA_MASK) as i64,
-                );
-                *(bgra.add(1)) = _bswap64(
-                    (((rgb1 >> 16) & LOW_MASK) | ((rgb1 << 40) & HIGH_MASK) | ALPHA_MASK) as i64,
-                );
-                *(bgra.add(2)) = _bswap64(
-                    (((rgb2 >> 16) & LOW_MASK) | ((rgb2 << 40) & HIGH_MASK) | ALPHA_MASK) as i64,
-                );
-                *(bgra.add(3)) = _bswap64(
-                    (((rgb3 >> 16) & LOW_MASK) | ((rgb3 << 40) & HIGH_MASK) | ALPHA_MASK) as i64,
-                );
+                    storeu(
+                        bgra,
+                        _bswap64(
+                            (((rgb0 >> 16) & LOW_MASK) | ((rgb0 << 40) & HIGH_MASK) | ALPHA_MASK)
+                                as i64,
+                        ),
+                    );
+                    storeu(
+                        bgra.add(1),
+                        _bswap64(
+                            (((rgb1 >> 16) & LOW_MASK) | ((rgb1 << 40) & HIGH_MASK) | ALPHA_MASK)
+                                as i64,
+                        ),
+                    );
+                    storeu(
+                        bgra.add(2),
+                        _bswap64(
+                            (((rgb2 >> 16) & LOW_MASK) | ((rgb2 << 40) & HIGH_MASK) | ALPHA_MASK)
+                                as i64,
+                        ),
+                    );
+                    storeu(
+                        bgra.add(3),
+                        _bswap64(
+                            (((rgb3 >> 16) & LOW_MASK) | ((rgb3 << 40) & HIGH_MASK) | ALPHA_MASK)
+                                as i64,
+                        ),
+                    );
 
                 x += ITEMS_PER_ITERATION;
                 src_offset += SRC_DEPTH * ITEMS_PER_ITERATION;
@@ -752,8 +770,14 @@ pub fn rgb_to_bgra(
 
             // Retrieves the ramaining colors in the line
             while x < single_swap_iterations {
+                let ptr: *const u32 = src_group.add(src_offset).cast();
+
                 *(dst_group.add(dst_offset) as *mut i32) =
                     _bswap(((*(src_group.add(src_offset) as *const u32) << 8) | 0xFF) as i32);
+                storeu(
+                    dst_group.add(dst_offset).cast(),
+                    _bswap(((loadu(ptr) << 8) | 0xFF) as i32),
+                );
 
                 x += 1;
                 src_offset += SRC_DEPTH;
