@@ -1,3 +1,7 @@
+News in 0.2.0
+-------------
+* Make the C api public
+
 News in 0.1.18
 --------------
 * Image conversion is now using the most performant available path (sse2 or avx2)
