@@ -19,26 +19,7 @@ jobs:
           python-version: 3.8
 
       - name: Generate bench input
-        run: python benches/geninput.py
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
-          components: rustfmt, clippy
-
-      - name: Format
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
-
-      - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets -- -D warnings
+        run: env
 
   build:
     name: Build (${{matrix.os}}, Rust ${{matrix.rust}})
