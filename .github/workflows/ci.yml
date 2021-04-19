@@ -45,40 +45,7 @@ jobs:
           toolchain: ${{matrix.rust}}
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --verbose --all
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose
-
-      - name: Test (instruction sets)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --tests --features "test_instruction_sets"
-
-      # Generate assembly for automatic inspection
-      - name: Emit ASM
-        uses: actions-rs/cargo@v1
-        with:
-          command: rustc
-          args: --release -- --emit asm
-
-      - name: Check ASM
-        run: |
-          # Check there are no undefined instructions in the crate.
-          # This is symptom of unhandled situations leading to panic or slice indices out of bounds
-          ! grep -q 'ud2' target/release/deps/dcv_color_primitives*.s
-
-          # Check for accidental performance degradation.
-          # For example, non-inlined avx2 code might produce function generation for every used intrinsic
-          ! grep -q 'call.*_mm256' target/release/deps/dcv_color_primitives*.s
-        shell: bash
+        run: env
 
   wasm:
     name: Build (WASM)
@@ -97,12 +64,7 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-
-      - name: Test
-        run: wasm-pack test --node
+        run: env
 
   coverage:
     name: Coverage
@@ -123,4 +85,4 @@ jobs:
           args: '-l --ignore-panics --tests --fail-under 90 --exclude-files benches --features "test_instruction_sets"'
 
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v1
+        run: env
