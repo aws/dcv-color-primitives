@@ -116,6 +116,7 @@ install_data(
 
 thread_dep = dependency('threads')
 dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
+libm_dep = cc.find_library('m', required: is_win == false)
 libdl_dep = cc.find_library('dl', required: is_win == false)
 ws2_32_dep = cc.find_library('ws2_32', required: is_win)
 userenv_dep = cc.find_library('userenv', required: is_win)
