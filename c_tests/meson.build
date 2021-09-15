@@ -1,6 +1,7 @@
 dcp_deps = [
   thread_dep,
   dcv_color_primitives_dep,
+  libm_dep,
   libdl_dep,
   ws2_32_dep,
   userenv_dep,
