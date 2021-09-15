@@ -11,14 +11,14 @@ use std::time::Instant;
 use dcp::*;
 use dcv_color_primitives as dcp;
 
-const NV12_OUTPUT: &str = &"./output.nv12";
-const BGRA_OUTPUT: &str = &"./output.bgra";
-const RGB_BGRA_OUTPUT: &str = &"./rgb_output.bgra";
-const BGRA_RGB_OUTPUT: &str = &"./bgra_rgb_output.rgb";
-const I420_OUTPUT: &str = &"./i420_output.bgra";
-const I444_OUTPUT: &str = &"./i444_output.bgra";
-const BGRA_I420_OUTPUT: &str = &"./bgra_i420_output.i420";
-const BGRA_I444_OUTPUT: &str = &"./bgra_i444_output.i444";
+const NV12_OUTPUT: &str = "./output.nv12";
+const BGRA_OUTPUT: &str = "./output.bgra";
+const RGB_BGRA_OUTPUT: &str = "./rgb_output.bgra";
+const BGRA_RGB_OUTPUT: &str = "./bgra_rgb_output.rgb";
+const I420_OUTPUT: &str = "./i420_output.bgra";
+const I444_OUTPUT: &str = "./i444_output.bgra";
+const BGRA_I420_OUTPUT: &str = "./bgra_i420_output.i420";
+const BGRA_I444_OUTPUT: &str = "./bgra_i444_output.i444";
 
 const SAMPLE_SIZE: usize = 22;
 const PAGE_SIZE: usize = 4096;
@@ -155,7 +155,7 @@ fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     let input_data: &[&[u8]] = &[&input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(w * h);
     let (u_data, v_data) = uv_data.split_at_mut(w * h / 4);
-    let output_data: &mut [&mut [u8]] = &mut [&mut y_data[..], &mut u_data[..], &mut v_data[..]];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -211,7 +211,7 @@ fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     let input_data: &[&[u8]] = &[&input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(w * h);
     let (u_data, v_data) = uv_data.split_at_mut(w * h);
-    let output_data: &mut [&mut [u8]] = &mut [&mut y_data[..], &mut u_data[..], &mut v_data[..]];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,

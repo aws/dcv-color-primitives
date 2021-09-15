@@ -110,7 +110,7 @@ const BACKWARD_WEIGHTS: [[i16; 8]; Colorimetry::Length as usize] = [
 /// Convert fixed point to int (4-wide)
 macro_rules! fix_to_i32_4x {
     ($fix:expr, $frac_bits:expr) => {
-        _mm_srai_epi32($fix, $frac_bits);
+        _mm_srai_epi32($fix, $frac_bits)
     };
 }
 
@@ -1044,7 +1044,7 @@ fn nv12_bgra_lrgb(
         src_buffers = src_buffers.0.split_at(src_strides.0 * h);
     }
 
-    let dst_buffer = &mut dst_buffers[0][..];
+    let dst_buffer = &mut *dst_buffers[0];
     if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
         || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, w)
         || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, rgb_stride)
@@ -1137,7 +1137,7 @@ fn i420_bgra_lrgb(
     // Ensure there is sufficient data in the buffers according
     // to the image dimensions and computed strides
     let src_buffers = (src_buffers[0], src_buffers[1], src_buffers[2]);
-    let dst_buffer = &mut dst_buffers[0][..];
+    let dst_buffer = &mut *dst_buffers[0];
     if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
         || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, cw)
         || out_of_bounds(src_buffers.2.len(), src_strides.2, ch - 1, cw)
@@ -1237,7 +1237,7 @@ fn i444_bgra_lrgb(
     // Ensure there is sufficient data in the buffers according
     // to the image dimensions and computed strides
     let src_buffers = (src_buffers[0], src_buffers[1], src_buffers[2]);
-    let dst_buffer = &mut dst_buffers[0][..];
+    let dst_buffer = &mut *dst_buffers[0];
     if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
         || out_of_bounds(src_buffers.1.len(), src_strides.1, h - 1, w)
         || out_of_bounds(src_buffers.2.len(), src_strides.2, h - 1, w)
@@ -1339,11 +1339,7 @@ fn lrgb_i444(
     let src_buffer = &src_buffers[0];
     let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
     let (u_plane, v_plane) = uv_plane.split_at_mut(1);
-    let (y_plane, u_plane, v_plane) = (
-        &mut y_plane[0][..],
-        &mut u_plane[0][..],
-        &mut v_plane[0][..],
-    );
+    let (y_plane, u_plane, v_plane) = (&mut *y_plane[0], &mut *u_plane[0], &mut *v_plane[0]);
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, h - 1, w)
@@ -1444,11 +1440,7 @@ fn lrgb_i420(
     let src_buffer = &src_buffers[0];
     let (y_plane, uv_plane) = dst_buffers.split_at_mut(1);
     let (u_plane, v_plane) = uv_plane.split_at_mut(1);
-    let (y_plane, u_plane, v_plane) = (
-        &mut y_plane[0][..],
-        &mut u_plane[0][..],
-        &mut v_plane[0][..],
-    );
+    let (y_plane, u_plane, v_plane) = (&mut *y_plane[0], &mut *u_plane[0], &mut *v_plane[0]);
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
         || out_of_bounds(u_plane.len(), dst_strides.1, ch - 1, cw)
@@ -1559,7 +1551,7 @@ fn lrgb_nv12(
     } else {
         let (y_plane, uv_plane) = dst_buffers.split_at_mut(last_dst_plane);
 
-        (&mut y_plane[0][..], &mut uv_plane[0][..])
+        (&mut *y_plane[0], &mut *uv_plane[0])
     };
 
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
@@ -1839,7 +1831,7 @@ pub fn rgb_lrgb_bgra_lrgb(
     // Ensure there is sufficient data in the buffers according
     // to the image dimensions and computed strides
     let src_buffer = src_buffers[0];
-    let dst_buffer = &mut dst_buffers[0][..];
+    let dst_buffer = &mut *dst_buffers[0];
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
         || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
     {

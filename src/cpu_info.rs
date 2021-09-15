@@ -83,12 +83,8 @@ pub fn get() -> (CpuManufacturer, InstructionSet) {
             // For now, disable the avx2 path even if supported.
             // See https://en.wikipedia.org/wiki/CPUID for additional details
             match manufacturer {
-                CpuManufacturer::Amd => {
-                    features[1] = 0;
-                }
-                _ => {
-                    cpuid(7, features);
-                }
+                CpuManufacturer::Amd => features[1] = 0,
+                _ => cpuid(7, features),
             }
 
             set = if (features[1] & (1 << 5)) == 0 {
