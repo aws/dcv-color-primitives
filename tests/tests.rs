@@ -1685,7 +1685,7 @@ fn over_4gb() {
             dst_image[dst_image.len() - 1] = 0;
 
             let src_buffers = &[&src_image[..]];
-            let dst_buffers = &mut [&mut dst_image[..]];
+            let dst_buffers = &mut [&mut *dst_image];
 
             assert!(convert_image(
                 WIDTH,
