@@ -139,7 +139,7 @@ jobs:
 
       - uses: actions-rs/tarpaulin@v0.1
         with:
-          args: '-l --ignore-panics --tests --fail-under 90 --exclude-files benches --features "test_instruction_sets"'
+          args: '-l --ignore-panics --tests --fail-under 85 --exclude-files benches --features "test_instruction_sets"'
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1
