@@ -42,7 +42,7 @@ The supported color models are:
 
 ## Requirements
 
-* Rust stable (at least 1.39)
+* Rust 1.55 and newer (until DCP 0.2: At least Rust 1.39)
 * Python3 and Fractions module (needed only if you want to execute the benchmark)
 
 ### Windows

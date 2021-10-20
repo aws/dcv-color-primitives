@@ -1,3 +1,8 @@
+News is 0.3.0
+-------------
+* Fix build issue by linking mathlib (Rust 1.55 and newer)
+* Updated dependencies
+
 News in 0.2.0
 -------------
 * Make the C api public
