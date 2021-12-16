@@ -120,6 +120,7 @@ libm_dep = cc.find_library('m', required: is_win == false)
 libdl_dep = cc.find_library('dl', required: is_win == false)
 ws2_32_dep = cc.find_library('ws2_32', required: is_win)
 userenv_dep = cc.find_library('userenv', required: is_win)
+bcrypt_dep = cc.find_library('bcrypt', required: is_win)
 
 clock_gettime_test_code = '''
   #include <time.h>
