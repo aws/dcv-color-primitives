@@ -131,7 +131,7 @@ fn get_plane_value(bpp: u32, plane: usize) -> u32 {
 }
 
 fn get_plane_mask(bpp: u32, plane: usize) -> usize {
-    (INVALID_PLANE != get_plane_value(bpp, plane)) as usize
+    usize::from(INVALID_PLANE != get_plane_value(bpp, plane))
 }
 
 fn get_plane_spec(dimension: u32, bpp: u32, plane: usize) -> usize {
