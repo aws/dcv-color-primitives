@@ -5,6 +5,7 @@ dcp_deps = [
   libdl_dep,
   ws2_32_dep,
   userenv_dep,
+  bcrypt_dep,
   librt_dep,
 ]
 
