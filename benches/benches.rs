@@ -87,8 +87,8 @@ fn pnm_data(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32, Vec<u8>)> {
     Ok((width, height, x))
 }
 
-fn bgra_nv12(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+fn bgra_nv12(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(input_file)? };
     width /= 4;
 
     // Allocate output
@@ -139,8 +139,8 @@ fn bgra_nv12(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     Ok(elapsed)
 }
 
-fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+fn bgra_i420(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(input_file)? };
     width /= 4;
     let w: usize = width as usize;
     let h: usize = height as usize;
@@ -195,8 +195,8 @@ fn bgra_i420(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     Ok(elapsed)
 }
 
-fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+fn bgra_i444(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(input_file)? };
     width /= 4;
     let w: usize = width as usize;
     let h: usize = height as usize;
@@ -251,8 +251,8 @@ fn bgra_i444(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     Ok(elapsed)
 }
 
-fn nv12_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (width, mut height, input_buffer) = { pnm_data(&mut input_file)? };
+fn nv12_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (width, mut height, input_buffer) = { pnm_data(input_file)? };
     height = 2 * height / 3;
 
     // Allocate output
@@ -304,8 +304,8 @@ fn nv12_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     Ok(elapsed)
 }
 
-fn rgb_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+fn rgb_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(input_file)? };
     width /= 3;
 
     // Allocate output
@@ -357,8 +357,8 @@ fn rgb_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkR
     Ok(elapsed)
 }
 
-fn bgra_rgb(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (mut width, height, input_buffer) = { pnm_data(&mut input_file)? };
+fn bgra_rgb(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (mut width, height, input_buffer) = { pnm_data(input_file)? };
     width /= 4;
 
     // Allocate output
@@ -410,8 +410,8 @@ fn bgra_rgb(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkR
     Ok(elapsed)
 }
 
-fn i420_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (width, mut height, input_buffer) = { pnm_data(&mut input_file)? };
+fn i420_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (width, mut height, input_buffer) = { pnm_data(input_file)? };
     height = 2 * height / 3;
 
     // Allocate output
@@ -469,8 +469,8 @@ fn i420_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> Benchmark
     Ok(elapsed)
 }
 
-fn i444_bgra(mut input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
-    let (width, mut height, input_buffer) = { pnm_data(&mut input_file)? };
+fn i444_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (width, mut height, input_buffer) = { pnm_data(input_file)? };
     height /= 3;
 
     // Allocate output

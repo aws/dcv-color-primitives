@@ -49,7 +49,7 @@ const ROWS: u32 = RGB_COUNT + (YUV_PIXEL_FORMAT_COUNT * YUV_COLOR_SPACE_COUNT);
 const COLUMNS: u32 = upper_power_of_two(ROWS);
 
 fn select_mode(a: u32, b: u32, cond: bool) -> u32 {
-    let c = cond as u32;
+    let c = u32::from(cond);
     c * a + (1 - c) * b
 }
 
