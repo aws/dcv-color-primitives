@@ -71,7 +71,7 @@ pub const FIX6: i32 = 6;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub const SHORT_HALF: i32 = 16384;
 
-// Coefficient table for 601
+// Cooefficient table for 601
 pub const XR_601: i32 = 16829;
 pub const XG_601: i32 = 33039;
 pub const XB_601: i32 = 6416;
@@ -91,7 +91,7 @@ pub const RN_601: i32 = 14234;
 pub const GP_601: i32 = 8709;
 pub const BN_601: i32 = 17685;
 
-// Coefficient table for 709
+// Cooefficient table for 709
 pub const XR_709: i32 = 11966;
 pub const XG_709: i32 = 40254;
 pub const XB_709: i32 = 4064;
@@ -111,31 +111,11 @@ pub const RN_709: i32 = 15846;
 pub const GP_709: i32 = 4952;
 pub const BN_709: i32 = 18465;
 
-// Coefficient table for jpeg
-pub const XR_JPEG: i32 = 19595;
-pub const XG_JPEG: i32 = 38470;
-pub const XB_JPEG: i32 = 7471;
-pub const YR_JPEG: i32 = -11057;
-pub const YG_JPEG: i32 = -21709;
-pub const YB_JPEG: i32 = 32768;
-pub const ZR_JPEG: i32 = 32768;
-pub const ZG_JPEG: i32 = -27438;
-pub const ZB_JPEG: i32 = -5328;
-
-pub const XXYM_JPEG: i32 = 16384;
-pub const RCRM_JPEG: i32 = 22970;
-pub const GCRM_JPEG: i32 = 11700;
-pub const GCBM_JPEG: i32 = 5638;
-pub const BCBM_JPEG: i32 = 29032;
-pub const RN_JPEG: i32 = 11363;
-pub const GP_JPEG: i32 = 8633;
-pub const BN_JPEG: i32 = 14370;
-
 // Other defines
-const Y_MIN: i32 = 16;
-const C_HALF: i32 = 128;
-const FIX16_Y_MIN: i32 = u8_to_fix(Y_MIN, FIX16);
-const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
+pub const Y_MIN: i32 = 16;
+pub const C_HALF: i32 = 128;
+pub const FIX16_Y_MIN: i32 = u8_to_fix(Y_MIN, FIX16);
+pub const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
 pub const FIX18_C_HALF: i32 = u8_to_fix(C_HALF, FIX18);
 pub const Y_OFFSET: i32 = FIX16_Y_MIN + FIX16_HALF;
 pub const C_OFFSET: i32 = FIX18_C_HALF + FIX18_HALF;
@@ -154,7 +134,6 @@ pub enum Sampler {
 pub enum Colorimetry {
     Bt601,
     Bt709,
-    Jpeg,
     Length,
 }
 

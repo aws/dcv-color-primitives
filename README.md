@@ -39,7 +39,6 @@ The supported color models are:
 
 * YCbCr, ITU-R Recommendation BT.601 (standard video system)
 * YCbCr, ITU-R Recommendation BT.709 (CSC systems)
-* YCbCr, Jpeg
 
 ## Requirements
 
