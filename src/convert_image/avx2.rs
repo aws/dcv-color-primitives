@@ -22,28 +22,30 @@ use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extracti128_si256,
-    _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32,
-    _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
-    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
-    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16,
-    _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
-    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
+    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
+    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x,
+    _mm256_set_epi16, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
+    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
+    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
+    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
+    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
+    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_cmpeq_epi32, _mm256_extract_epi64,
-    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
-    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi32,
-    _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
-    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_srai_epi16,
-    _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
-    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
+    _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
+    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
+    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
+    _mm256_set1_epi64x, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
+    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
+    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
+    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
+    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
+    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -79,7 +81,7 @@ macro_rules! align_dqword_2x96 {
     };
 }
 
-const FORWARD_WEIGHTS: [[i32; 6]; Colorimetry::Length as usize] = [
+const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
     [
         i32x2_to_i32(XG_601 - SHORT_HALF, XR_601),
         i32x2_to_i32(SHORT_HALF, XB_601),
@@ -87,6 +89,8 @@ const FORWARD_WEIGHTS: [[i32; 6]; Colorimetry::Length as usize] = [
         i32x2_to_i32(YG_601, YR_601),
         i32x2_to_i32(0, ZB_601),
         i32x2_to_i32(0, YB_601),
+        Y_OFFSET,
+        0,
     ],
     [
         i32x2_to_i32(XG_709 - SHORT_HALF, XR_709),
@@ -95,6 +99,18 @@ const FORWARD_WEIGHTS: [[i32; 6]; Colorimetry::Length as usize] = [
         i32x2_to_i32(YG_709, YR_709),
         i32x2_to_i32(0, ZB_709),
         i32x2_to_i32(0, YB_709),
+        Y_OFFSET,
+        0,
+    ],
+    [
+        i32x2_to_i32(XG_JPEG - SHORT_HALF, XR_JPEG),
+        i32x2_to_i32(SHORT_HALF, XB_JPEG),
+        i32x2_to_i32(ZG_JPEG, ZR_JPEG - SHORT_HALF),
+        i32x2_to_i32(YG_JPEG, YR_JPEG),
+        i32x2_to_i32(0, ZB_JPEG),
+        i32x2_to_i32(0, YB_JPEG - SHORT_HALF),
+        FIX16_HALF,
+        1,
     ],
 ];
 
@@ -118,6 +134,16 @@ const BACKWARD_WEIGHTS: [[i16; 8]; Colorimetry::Length as usize] = [
         i32_to_i16(RN_709),
         i32_to_i16(GP_709),
         i32_to_i16(BN_709),
+    ],
+    [
+        i32_to_i16(XXYM_JPEG),
+        i32_to_i16(RCRM_JPEG),
+        i32_to_i16(GCRM_JPEG),
+        i32_to_i16(GCBM_JPEG),
+        i32_to_i16(BCBM_JPEG),
+        i32_to_i16(RN_JPEG),
+        i32_to_i16(GP_JPEG),
+        i32_to_i16(BN_JPEG),
     ],
 ];
 
@@ -294,6 +320,7 @@ unsafe fn lrgb_to_yuv_8x(
     sampler: Sampler,
     y_weigths: &[__m256i; 3],
     uv_weights: &[__m256i; 3],
+    full_range: bool,
 ) {
     let (rg0, bg0) = unpack_ui8x3_i16x2_8x(rgb0, sampler);
     pack_i32_8x(
@@ -309,10 +336,21 @@ unsafe fn lrgb_to_yuv_8x(
 
     let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
-    pack_i32_8x(
-        uv,
-        fix_to_i32_8x!(affine_transform(srg, sbg, uv_weights), FIX18),
-    );
+    let mut t = affine_transform(srg, sbg, uv_weights);
+    if full_range {
+        t = _mm256_add_epi32(
+            t,
+            _mm256_slli_epi32(
+                _mm256_or_si256(
+                    _mm256_and_si256(sbg, _mm256_set1_epi64x(0xFFFF_i64)),
+                    _mm256_and_si256(srg, _mm256_set1_epi64x(0xFFFF_0000_0000_i64)),
+                ),
+                14,
+            ),
+        );
+    }
+
+    pack_i32_8x(uv, fix_to_i32_8x!(t, FIX18));
 }
 
 #[inline(always)]
@@ -326,6 +364,7 @@ unsafe fn lrgb_to_i420_8x(
     sampler: Sampler,
     y_weigths: &[__m256i; 3],
     uv_weights: &[__m256i; 3],
+    full_range: bool,
 ) {
     let (rg0, bg0) = unpack_ui8x3_i16x2_8x(rgb0, sampler);
     pack_i32_8x(
@@ -341,9 +380,22 @@ unsafe fn lrgb_to_i420_8x(
 
     let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
+    let mut t = affine_transform(srg, sbg, uv_weights);
+    if full_range {
+        t = _mm256_add_epi32(
+            t,
+            _mm256_slli_epi32(
+                _mm256_or_si256(
+                    _mm256_and_si256(sbg, _mm256_set1_epi64x(0xFFFF_i64)),
+                    _mm256_and_si256(srg, _mm256_set1_epi64x(0xFFFF_0000_0000_i64)),
+                ),
+                14,
+            ),
+        );
+    }
 
     let shuff = _mm256_permutevar8x32_epi32(
-        fix_to_i32_8x!(affine_transform(srg, sbg, uv_weights), FIX18),
+        fix_to_i32_8x!(t, FIX18),
         _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0),
     );
 
@@ -373,6 +425,7 @@ unsafe fn lrgb_to_i444_8x(
     y_weights: &[__m256i; 3],
     u_weights: &[__m256i; 3],
     v_weights: &[__m256i; 3],
+    full_range: bool,
 ) {
     let (rg, bg) = unpack_ui8x3_i16x2_8x(rgb, sampler);
     pack_i32_8x(
@@ -380,15 +433,15 @@ unsafe fn lrgb_to_i444_8x(
         fix_to_i32_8x!(affine_transform(rg, bg, y_weights), FIX16),
     );
 
-    pack_i32_8x(
-        u,
-        fix_to_i32_8x!(affine_transform(rg, bg, u_weights), FIX16),
-    );
+    let mut tu = affine_transform(rg, bg, u_weights);
+    let mut tv = affine_transform(rg, bg, v_weights);
+    if full_range {
+        tu = _mm256_add_epi32(tu, _mm256_srli_epi32(_mm256_slli_epi32(bg, 16), 2));
+        tv = _mm256_add_epi32(tv, _mm256_srli_epi32(_mm256_slli_epi32(rg, 16), 2));
+    }
 
-    pack_i32_8x(
-        v,
-        fix_to_i32_8x!(affine_transform(rg, bg, v_weights), FIX16),
-    );
+    pack_i32_8x(u, fix_to_i32_8x!(tu, FIX16));
+    pack_i32_8x(v, fix_to_i32_8x!(tv, FIX16));
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -408,7 +461,7 @@ unsafe fn lrgb_to_yuv_avx2(
     dst_strides: (usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8]),
     depth: usize,
-    weights: &[i32; 6],
+    weights: &[i32; 8],
     sampler: Sampler,
 ) {
     const DST_DEPTH: usize = LRGB_TO_YUV_WAVES;
@@ -418,7 +471,7 @@ unsafe fn lrgb_to_yuv_avx2(
     let y_weigths = [
         _mm256_set1_epi32(weights[0]),
         _mm256_set1_epi32(weights[1]),
-        _mm256_set1_epi32(Y_OFFSET),
+        _mm256_set1_epi32(weights[6]),
     ];
 
     let uv_weights = [
@@ -430,7 +483,7 @@ unsafe fn lrgb_to_yuv_avx2(
             weights[4], weights[5], weights[4], weights[5], weights[4], weights[5], weights[4],
             weights[5],
         ),
-        _mm256_set1_epi32(C_OFFSET),
+        _mm256_set1_epi32(C_OFFSET - FIX18_HALF * weights[7]),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -459,6 +512,7 @@ unsafe fn lrgb_to_yuv_avx2(
                 sampler,
                 &y_weigths,
                 &uv_weights,
+                weights[7] == 1,
             );
         }
     }
@@ -476,6 +530,7 @@ unsafe fn lrgb_to_yuv_avx2(
                 sampler,
                 &y_weigths,
                 &uv_weights,
+                weights[7] == 1,
             );
         }
 
@@ -489,6 +544,7 @@ unsafe fn lrgb_to_yuv_avx2(
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
+            weights[7] == 1,
         );
     }
 }
@@ -503,7 +559,7 @@ unsafe fn lrgb_to_i420_avx2(
     dst_strides: (usize, usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
     depth: usize,
-    weights: &[i32; 6],
+    weights: &[i32; 8],
     sampler: Sampler,
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
@@ -511,7 +567,7 @@ unsafe fn lrgb_to_i420_avx2(
     let y_weigths = [
         _mm256_set1_epi32(weights[0]),
         _mm256_set1_epi32(weights[1]),
-        _mm256_set1_epi32(Y_OFFSET),
+        _mm256_set1_epi32(weights[6]),
     ];
 
     let uv_weights = [
@@ -523,7 +579,7 @@ unsafe fn lrgb_to_i420_avx2(
             weights[4], weights[5], weights[4], weights[5], weights[4], weights[5], weights[4],
             weights[5],
         ),
-        _mm256_set1_epi32(C_OFFSET),
+        _mm256_set1_epi32(C_OFFSET - FIX18_HALF * weights[7]),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -554,6 +610,7 @@ unsafe fn lrgb_to_i420_avx2(
                 sampler,
                 &y_weigths,
                 &uv_weights,
+                weights[7] == 1,
             );
         }
     }
@@ -572,6 +629,7 @@ unsafe fn lrgb_to_i420_avx2(
                 sampler,
                 &y_weigths,
                 &uv_weights,
+                weights[7] == 1,
             );
         }
 
@@ -586,6 +644,7 @@ unsafe fn lrgb_to_i420_avx2(
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
+            weights[7] == 1,
         );
     }
 }
@@ -805,7 +864,7 @@ unsafe fn lrgb_to_i444_avx2(
     dst_strides: (usize, usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
     depth: usize,
-    weights: &[i32; 6],
+    weights: &[i32; 8],
     sampler: Sampler,
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
@@ -813,19 +872,19 @@ unsafe fn lrgb_to_i444_avx2(
     let y_weights = [
         _mm256_set1_epi32(weights[0]),
         _mm256_set1_epi32(weights[1]),
-        _mm256_set1_epi32(Y_OFFSET),
+        _mm256_set1_epi32(weights[6]),
     ];
 
     let u_weights = [
         _mm256_set1_epi32(weights[3]),
         _mm256_set1_epi32(weights[5]),
-        _mm256_set1_epi32(C_OFFSET16),
+        _mm256_set1_epi32(C_OFFSET16 - FIX16_HALF * weights[7]),
     ];
 
     let v_weights = [
         _mm256_set1_epi32(weights[2]),
         _mm256_set1_epi32(weights[4]),
-        _mm256_set1_epi32(C_OFFSET16),
+        _mm256_set1_epi32(C_OFFSET16 - FIX16_HALF * weights[7]),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -855,6 +914,7 @@ unsafe fn lrgb_to_i444_avx2(
                 &y_weights,
                 &u_weights,
                 &v_weights,
+                weights[7] == 1,
             );
         }
     }
@@ -872,6 +932,7 @@ unsafe fn lrgb_to_i444_avx2(
                 &y_weights,
                 &u_weights,
                 &v_weights,
+                weights[7] == 1,
             );
         }
 
@@ -885,6 +946,7 @@ unsafe fn lrgb_to_i444_avx2(
             &y_weights,
             &u_weights,
             &v_weights,
+            weights[7] == 1,
         );
     }
 }
@@ -2510,4 +2572,278 @@ pub fn bgra_lrgb_rgb_lrgb(
     }
 
     true
+}
+
+pub fn argb_lrgb_nv12_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Argb,
+    )
+}
+
+pub fn bgra_lrgb_nv12_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgr_lrgb_nv12_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_nv12(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        last_dst_plane as usize,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgr,
+    )
+}
+
+pub fn nv12_jpeg_bgra_lrgb(
+    width: u32,
+    height: u32,
+    last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    nv12_bgra_lrgb(
+        width,
+        height,
+        last_src_plane as usize,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Jpeg as usize,
+    )
+}
+
+pub fn i420_jpeg_bgra_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    i420_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Jpeg as usize,
+    )
+}
+
+pub fn i444_jpeg_bgra_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    i444_bgra_lrgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        Colorimetry::Jpeg as usize,
+    )
+}
+
+pub fn argb_lrgb_i420_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Argb,
+    )
+}
+
+pub fn bgra_lrgb_i420_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgr_lrgb_i420_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i420(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgr,
+    )
+}
+
+pub fn argb_lrgb_i444_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Argb,
+    )
+}
+
+pub fn bgra_lrgb_i444_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgr_lrgb_i444_jpeg(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    lrgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Jpeg as usize,
+        Sampler::Bgr,
+    )
 }

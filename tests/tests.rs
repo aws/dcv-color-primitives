@@ -56,7 +56,12 @@ const PIXEL_FORMATS: &[PixelFormat; 9] = &[
     PixelFormat::Nv12,
 ];
 
-const COLOR_SPACES: &[ColorSpace; 3] = &[ColorSpace::Lrgb, ColorSpace::Bt601, ColorSpace::Bt709];
+const COLOR_SPACES: &[ColorSpace; 4] = &[
+    ColorSpace::Lrgb,
+    ColorSpace::Bt601,
+    ColorSpace::Bt709,
+    ColorSpace::Bt601Full,
+];
 
 const PIXEL_FORMAT_I444: u32 = PixelFormat::I444 as u32;
 const PIXEL_FORMAT_I422: u32 = PixelFormat::I422 as u32;
@@ -242,6 +247,53 @@ const CR2_BT709_REF: &[&[u8]] = &[
     &[146, 131, 135, 127],
 ];
 
+const Y_JPEG_REF: &[&[u8]] = &[
+    &[67, 72, 99, 136, 119, 138, 83, 222],
+    &[90, 181, 116, 91, 100, 98, 180, 123],
+    &[146, 68, 214, 231, 95, 135, 57, 153],
+    &[145, 45, 198, 185, 161, 196, 75, 90],
+    &[119, 89, 127, 157, 28, 173, 192, 187],
+    &[144, 89, 110, 112, 135, 114, 165, 55],
+    &[113, 201, 99, 84, 104, 90, 130, 159],
+    &[134, 57, 37, 69, 132, 170, 118, 145],
+];
+
+const CB_JPEG_REF: &[&[u8]] = &[
+    &[114, 116, 214, 86, 136, 162, 92, 95],
+    &[95, 40, 185, 130, 165, 95, 115, 67],
+    &[53, 119, 144, 83, 149, 159, 191, 54],
+    &[117, 180, 134, 157, 133, 100, 192, 184],
+    &[201, 97, 199, 98, 200, 130, 74, 31],
+    &[50, 80, 208, 74, 181, 80, 52, 105],
+    &[89, 49, 121, 215, 77, 204, 123, 152],
+    &[192, 213, 192, 93, 141, 35, 205, 86],
+];
+
+const CR_JPEG_REF: &[&[u8]] = &[
+    &[194, 101, 183, 207, 219, 99, 117, 136],
+    &[242, 166, 149, 80, 72, 234, 116, 108],
+    &[195, 79, 113, 117, 142, 167, 171, 174],
+    &[168, 126, 83, 177, 77, 77, 74, 86],
+    &[190, 98, 68, 75, 119, 185, 92, 170],
+    &[76, 221, 223, 161, 190, 51, 82, 116],
+    &[135, 158, 87, 189, 62, 132, 182, 104],
+    &[161, 133, 118, 121, 194, 156, 56, 159],
+];
+
+const CB2_JPEG_REF: &[&[u8]] = &[
+    &[91, 154, 140, 93],
+    &[117, 130, 135, 155],
+    &[107, 145, 148, 65],
+    &[136, 155, 114, 142],
+];
+
+const CR2_JPEG_REF: &[&[u8]] = &[
+    &[176, 155, 156, 119],
+    &[142, 122, 116, 126],
+    &[146, 132, 136, 115],
+    &[147, 129, 136, 125],
+];
+
 // Largest group that uses neither avx2 nor sse2 is 62x64.
 // We can arrange the image as blocks:
 // y0 y0 | y1 y1 | ...
@@ -271,19 +323,33 @@ const CR2_BT709_REF: &[&[u8]] = &[
 // magenta  (255,   0, 255):    78, 214, 230
 // cyan     (  0, 255, 255):   188, 154,  16
 // white    (255, 255, 255):   235, 128, 128
-const Y_SRC: [[u8; 8]; 2] = [
+//
+// Color table (jpeg):
+//             r    g    b
+// black    (  0,   0,   0):     0, 128, 128
+// red      (255,   0,   0):    76,  84, 255
+// green    (  0, 255,   0):   149,  43,  21
+// yellow   (255, 255,   0):   225,   0, 148
+// blue     (  0,   0, 255):    29, 255, 107
+// magenta  (255,   0, 255):   105, 212, 234
+// cyan     (  0, 255, 255):   178, 171,   0
+// white    (255, 255, 255):   255, 128, 128
+const Y_SRC: [[u8; 8]; 3] = [
     [16, 82, 145, 210, 41, 107, 169, 235],
     [16, 63, 173, 219, 32, 78, 188, 235],
+    [0, 76, 149, 225, 29, 105, 178, 255],
 ];
 
-const U_SRC: [[u8; 8]; 2] = [
+const U_SRC: [[u8; 8]; 3] = [
     [128, 90, 54, 16, 240, 202, 166, 128],
     [128, 102, 42, 16, 240, 214, 154, 128],
+    [128, 84, 43, 0, 255, 212, 171, 128],
 ];
 
-const V_SRC: [[u8; 8]; 2] = [
+const V_SRC: [[u8; 8]; 3] = [
     [128, 240, 34, 146, 110, 222, 16, 128],
     [128, 240, 26, 138, 118, 230, 16, 128],
+    [128, 255, 21, 148, 107, 234, 0, 128],
 ];
 
 const NUM_LOG2_DEN: [[usize; 2]; 9] = [
@@ -727,7 +793,8 @@ fn rgb_to_yuv_size(
 }
 
 fn rgb_to_yuv_ok(pixel_format: PixelFormat, num_planes: u32) {
-    const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[ColorSpace::Bt601, ColorSpace::Bt709];
+    const SUPPORTED_COLOR_SPACES: &[ColorSpace] =
+        &[ColorSpace::Bt601, ColorSpace::Bt709, ColorSpace::Bt601Full];
     const MAX_WIDTH: u32 = 8;
     const MAX_HEIGHT: u32 = 8;
 
@@ -746,12 +813,14 @@ fn rgb_to_yuv_ok(pixel_format: PixelFormat, num_planes: u32) {
         let plane_ref = if let PixelFormat::I444 = pixel_format {
             match color_space {
                 ColorSpace::Bt601 => (Y_BT601_REF, CB_BT601_REF, CR_BT601_REF),
-                _ => (Y_BT709_REF, CB_BT709_REF, CR_BT709_REF),
+                ColorSpace::Bt709 => (Y_BT709_REF, CB_BT709_REF, CR_BT709_REF),
+                _ => (Y_JPEG_REF, CB_JPEG_REF, CR_JPEG_REF),
             }
         } else {
             match color_space {
                 ColorSpace::Bt601 => (Y_BT601_REF, CB2_BT601_REF, CR2_BT601_REF),
-                _ => (Y_BT709_REF, CB2_BT709_REF, CR2_BT709_REF),
+                ColorSpace::Bt709 => (Y_BT709_REF, CB2_BT709_REF, CR2_BT709_REF),
+                _ => (Y_JPEG_REF, CB2_JPEG_REF, CR2_JPEG_REF),
             }
         };
 
@@ -801,7 +870,8 @@ fn yuv_to_rgb_size_format_mode_stride(
     let dst_size = dst_stride * h;
     let color_space_index = match src_format.color_space {
         ColorSpace::Bt601 => 0,
-        _ => 1,
+        ColorSpace::Bt709 => 1,
+        _ => 2,
     };
 
     // Allocate and initialize input
@@ -1005,7 +1075,8 @@ fn yuv_to_rgb_size_format_mode(
 }
 
 fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
-    const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[ColorSpace::Bt601, ColorSpace::Bt709];
+    const SUPPORTED_COLOR_SPACES: &[ColorSpace] =
+        &[ColorSpace::Bt601, ColorSpace::Bt709, ColorSpace::Bt601Full];
     const MAX_WIDTH: u32 = 34;
     const MAX_HEIGHT: u32 = 4;
 

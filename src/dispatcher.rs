@@ -36,7 +36,7 @@ static_assert!(HI_RGB_PIXEL_FORMAT == LO_YUV_PIXEL_FORMAT - 1);
 const LO_RGB_COLOR_SPACE: u32 = ColorSpace::Lrgb as u32;
 const HI_RGB_COLOR_SPACE: u32 = ColorSpace::Lrgb as u32;
 const LO_YUV_COLOR_SPACE: u32 = ColorSpace::Bt601 as u32;
-const HI_YUV_COLOR_SPACE: u32 = ColorSpace::Bt709 as u32;
+const HI_YUV_COLOR_SPACE: u32 = ColorSpace::Bt601Full as u32;
 static_assert!(HI_RGB_COLOR_SPACE == LO_YUV_COLOR_SPACE - 1);
 
 const RGB_PIXEL_FORMAT_COUNT: u32 = enum_count(LO_RGB_PIXEL_FORMAT, HI_RGB_PIXEL_FORMAT);

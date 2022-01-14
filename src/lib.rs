@@ -53,6 +53,7 @@
 //! The supported color models are:
 //! * ycbcr, ITU-R Recommendation BT.601 (standard video system)
 //! * ycbcr, ITU-R Recommendation BT.709 (CSC systems)
+//! * ycbcr, Jpeg
 //!
 //! # Examples
 //!
@@ -358,10 +359,10 @@ impl error::Error for ErrorKind {
 /// `PixelFormat::Bgr`  | `ColorSpace::Lrgb`
 /// `PixelFormat::Rgba` | `ColorSpace::Lrgb`
 /// `PixelFormat::Rgb`  | `ColorSpace::Lrgb`
-/// `PixelFormat::I444` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::I422` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::I420` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::Nv12` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
+/// `PixelFormat::I444` | `ColorSpace::Bt601`, `ColorSpace::Bt709`, `ColorSpace::Bt601Full`
+/// `PixelFormat::I422` | `ColorSpace::Bt601`, `ColorSpace::Bt709`, `ColorSpace::Bt601Full`
+/// `PixelFormat::I420` | `ColorSpace::Bt601`, `ColorSpace::Bt709`, `ColorSpace::Bt601Full`
+/// `PixelFormat::Nv12` | `ColorSpace::Bt601`, `ColorSpace::Bt709`, `ColorSpace::Bt601Full`
 ///
 /// Some pixel formats might impose additional restrictions on the accepted number of
 /// planes and the image size:
@@ -438,6 +439,91 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, I444, Bt601, Bgra, Lrgb, i444_bt601_bgra_lrgb);
         set_dispatcher!($conv, $set, I444, Bt709, Bgra, Lrgb, i444_bt709_bgra_lrgb);
         set_dispatcher!($conv, $set, Bgra, Lrgb, Rgb, Lrgb, bgra_lrgb_rgb_lrgb);
+
+        set_dispatcher!(
+            $conv,
+            $set,
+            Argb,
+            Lrgb,
+            Nv12,
+            Bt601Full,
+            argb_lrgb_nv12_jpeg
+        );
+        set_dispatcher!(
+            $conv,
+            $set,
+            Bgra,
+            Lrgb,
+            Nv12,
+            Bt601Full,
+            bgra_lrgb_nv12_jpeg
+        );
+        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601Full, bgr_lrgb_nv12_jpeg);
+        set_dispatcher!(
+            $conv,
+            $set,
+            Argb,
+            Lrgb,
+            I420,
+            Bt601Full,
+            argb_lrgb_i420_jpeg
+        );
+        set_dispatcher!(
+            $conv,
+            $set,
+            Bgra,
+            Lrgb,
+            I420,
+            Bt601Full,
+            bgra_lrgb_i420_jpeg
+        );
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601Full, bgr_lrgb_i420_jpeg);
+        set_dispatcher!(
+            $conv,
+            $set,
+            Argb,
+            Lrgb,
+            I444,
+            Bt601Full,
+            argb_lrgb_i444_jpeg
+        );
+        set_dispatcher!(
+            $conv,
+            $set,
+            Bgra,
+            Lrgb,
+            I444,
+            Bt601Full,
+            bgra_lrgb_i444_jpeg
+        );
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601Full, bgr_lrgb_i444_jpeg);
+        set_dispatcher!(
+            $conv,
+            $set,
+            Nv12,
+            Bt601Full,
+            Bgra,
+            Lrgb,
+            nv12_jpeg_bgra_lrgb
+        );
+        set_dispatcher!(
+            $conv,
+            $set,
+            I420,
+            Bt601Full,
+            Bgra,
+            Lrgb,
+            i420_jpeg_bgra_lrgb
+        );
+        set_dispatcher!(
+            $conv,
+            $set,
+            I444,
+            Bt601Full,
+            Bgra,
+            Lrgb,
+            i444_jpeg_bgra_lrgb
+        );
     };
 }
 
@@ -791,6 +877,12 @@ pub fn get_buffers_size(
 /// y  =  0.213 * r + 0.715 * g + 0.072 * b + 16
 /// cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
 /// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
+///
+/// If the destination image color space is Bt601Full, the following formula is applied:
+/// ```text
+/// y  =  0.213 * r + 0.715 * g + 0.072 * b
+/// cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
+/// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
 /// ```
 ///
 /// # Algorithm 2
@@ -810,6 +902,12 @@ pub fn get_buffers_size(
 /// r = 1.164 * (y - 16) + 1.793 * (cr - 128)
 /// g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
+///
+/// If the source image color space is Bt601Full, the following formula is applied:
+/// ```text
+/// r = 1.164 * (y) + 1.596 * (cr - 128)
+/// g = 1.164 * (y) - 0.813 * (cr - 128) - 0.392 * (cb - 128)
+/// b = 1.164 * (y) + 2.017 * (cb - 128)
 /// ```
 ///
 /// # Algorithm 3
