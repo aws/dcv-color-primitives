@@ -36,6 +36,8 @@
  * - YCbCr, ITU-R Recommendation BT.601 (standard video system)
  * - YCbCr, ITU-R Recommendation BT.709 (CSC systems)
  *
+ * Both standard range (0-235) and full range (0-255) are supported.
+ *
  * # Examples
  *
  * Initialize the library:
@@ -328,6 +330,8 @@ typedef enum {
  * @DCP_COLOR_SPACE_LRGB: Gamma-corrected RGB
  * @DCP_COLOR_SPACE_BT601: YCbCr, ITU-R Recommendation BT.601 (standard video system)
  * @DCP_COLOR_SPACE_BT709: YCbCr, ITU-R Recommendation BT.709 (CSC systems)
+ * @DCP_COLOR_SPACE_BT601FR: YCbCr, BT.601 (full range)
+ * @DCP_COLOR_SPACE_BT709FR: YCbCr, BT.709 (full range)
  *
  * An enumeration of supported color models.
  *
@@ -342,6 +346,8 @@ typedef enum {
     DCP_COLOR_SPACE_LRGB,
     DCP_COLOR_SPACE_BT601,
     DCP_COLOR_SPACE_BT709,
+    DCP_COLOR_SPACE_BT601FR,
+    DCP_COLOR_SPACE_BT709FR,
 } DcpColorSpace;
 
 /**
@@ -366,10 +372,10 @@ typedef enum {
  * DCP_PIXEL_FORMAT_BGR  | DCP_COLOR_SPACE_LRGB
  * DCP_PIXEL_FORMAT_RGBA | DCP_COLOR_SPACE_LRGB
  * DCP_PIXEL_FORMAT_RGB  | DCP_COLOR_SPACE_LRGB
- * DCP_PIXEL_FORMAT_I444 | DCP_COLOR_SPACE_BT601, DCP_COLOR_SPACE_BT709
- * DCP_PIXEL_FORMAT_I422 | DCP_COLOR_SPACE_BT601, DCP_COLOR_SPACE_BT709
- * DCP_PIXEL_FORMAT_I420 | DCP_COLOR_SPACE_BT601, DCP_COLOR_SPACE_BT709
- * DCP_PIXEL_FORMAT_NV12 | DCP_COLOR_SPACE_BT601, DCP_COLOR_SPACE_BT709
+ * DCP_PIXEL_FORMAT_I444 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
+ * DCP_PIXEL_FORMAT_I422 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
+ * DCP_PIXEL_FORMAT_I420 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
+ * DCP_PIXEL_FORMAT_NV12 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  *
  * Some pixel formats might impose additional restrictions on the accepted number of
  * planes and the image size:
@@ -426,7 +432,7 @@ void                dcp_initialize              (void);
  * Returns a description of the algorithms that are best for the running cpu and
  * available instruction sets
  *
- * Returns: a null-terminated string that contains the description, or %NULL if the library was not 
+ * Returns: a null-terminated string that contains the description, or %NULL if the library was not
  *          initialized before. String has to freed using function(dcp_unref_string)
  *
  * # Examples
@@ -633,10 +639,18 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *
  *   Source image pixel format         | Supported destination image pixel formats
  *   ----------------------------------|------------------------------------------
+ *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_I420 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
- *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_I420 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_RGB  [4][algo-4]
+ *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_I420 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_I444 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
  *   DCP_PIXEL_FORMAT_I420             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
+ *   DCP_PIXEL_FORMAT_I444             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_RGB              | DCP_PIXEL_FORMAT_BGRA [3][algo-3]
  *
@@ -671,6 +685,22 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
  * ]|
  *
+ * If the destination image color space is Bt601FR, the following formula is applied:
+ *
+ * |[
+ * y  =  0.299 * r + 0.587 * g + 0.114 * b
+ * cb = -0.169 * r - 0.331 * g + 0.500 * b + 128
+ * cr =  0.500 * r - 0.419 * g - 0.081 * b + 128
+ * ]|
+ *
+ * If the destination image color space is Bt709FR, the following formula is applied:
+ *
+ * |[
+ * y  =  0.213 * r + 0.715 * g + 0.072 * b
+ * cb = -0.115 * r - 0.385 * g + 0.500 * b + 128
+ * cr =  0.500 * r - 0.454 * g - 0.046 * b + 128
+ * ]|
+ *
  * # Algorithm 2 # {#algo-2}
  *
  * Conversion from YCbCr model to linear RGB model, with 4:4:4 upsampling
@@ -693,9 +723,29 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * b = 1.164 * (y - 16) + 2.115 * (cb - 128)
  * ]|
  *
+ * If the source image color space is Bt601FR, the following formula is applied:
+ *
+ * |[
+ * r = y + 1.402 * (cr - 128)
+ * g = y - 0.714 * (cr - 128) - 0.344 * (cb - 128)
+ * b = y + 1.772 * (cb - 128)
+ * ]|
+ *
+ * If the source image color space is Bt709FR, the following formula is applied:
+ *
+ * |[
+ * r = y + 1.575 * (cr - 128)
+ * g = y - 0.468 * (cr - 128) - 0.187 * (cb - 128)
+ * b = y + 1.856 * (cb - 128)
+ * ]|
+ *
  * # Algorithm 3 # {#algo-3}
  *
  * Conversion from RGB to BGRA
+ *
+ * # Algorithm 4 # {#algo-4}
+ *
+ * Conversion from BGRA to RGB
  */
 DcpResult           dcp_convert_image           (uint32_t               width,
                                                  uint32_t               height,

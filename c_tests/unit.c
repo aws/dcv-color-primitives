@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
@@ -150,6 +151,9 @@ typedef struct {
     uint8_t b;
 } rgb;
 
+typedef uint8_t uint8_mat8_t[8][8];
+typedef uint8_t uint8_mat4_t[4][4];
+
 static const rgba rgb_to_yuv_input[8][8] = {
     {
         { 161, 24, 44, 58 },
@@ -226,7 +230,7 @@ static const rgba rgb_to_yuv_input[8][8] = {
     }
 };
 
-static const uint8_t rgb_to_yuv_y_bt601_output[8][8] = {
+static const uint8_mat8_t rgb_to_yuv_y_bt601_output = {
     { 74, 78, 101, 133, 118, 135, 87, 206 },
     { 93, 171, 116, 94, 102, 100, 171, 122 },
     { 141, 74, 200, 214, 98, 132, 65, 147 },
@@ -237,7 +241,7 @@ static const uint8_t rgb_to_yuv_y_bt601_output[8][8] = {
     { 131, 65, 48, 76, 129, 162, 117, 141 },
 };
 
-static const uint8_t rgb_to_yuv_cb_bt601_output[8][8] = {
+static const uint8_mat8_t rgb_to_yuv_cb_bt601_output = {
     { 116, 118, 204, 91, 136, 159, 97, 100 },
     { 99, 51, 179, 130, 161, 99, 117, 75 },
     { 63, 120, 143, 89, 147, 155, 184, 64 },
@@ -248,7 +252,7 @@ static const uint8_t rgb_to_yuv_cb_bt601_output[8][8] = {
     { 184, 203, 185, 98, 140, 47, 196, 92 },
 };
 
-static const uint8_t rgb_to_yuv_cr_bt601_output[8][8] = {
+static const uint8_mat8_t rgb_to_yuv_cr_bt601_output = {
     { 187, 105, 177, 198, 208, 103, 119, 135 },
     { 229, 162, 147, 87, 79, 221, 118, 111 },
     { 187, 86, 115, 119, 141, 163, 166, 169 },
@@ -259,21 +263,21 @@ static const uint8_t rgb_to_yuv_cr_bt601_output[8][8] = {
     { 157, 133, 120, 122, 186, 153, 65, 155 },
 };
 
-static const uint8_t rgb_to_yuv_cb2_bt601_output[4][4] = {
+static const uint8_mat4_t rgb_to_yuv_cb2_bt601_output = {
     { 96, 151, 139, 97 },
     { 119, 130, 135, 153 },
     { 110, 143, 146, 73 },
     { 135, 152, 116, 140 },
 };
 
-static const uint8_t rgb_to_yuv_cr2_bt601_output[4][4] = {
+static const uint8_mat4_t rgb_to_yuv_cr2_bt601_output = {
     { 171, 152, 153, 121 },
     { 141, 124, 118, 127 },
     { 145, 132, 135, 117 },
     { 145, 129, 135, 126 },
 };
 
-static const uint8_t rgb_to_yuv_y_bt709_output[8][8] = {
+static const uint8_mat8_t rgb_to_yuv_y_bt709_output = {
     { 63, 84, 82, 123, 101, 137, 93, 208 },
     { 75, 173, 106, 103, 108, 84, 174, 132 },
     { 136, 84, 201, 221, 93, 121, 51, 146 },
@@ -284,18 +288,18 @@ static const uint8_t rgb_to_yuv_y_bt709_output[8][8] = {
     { 118, 56, 43, 80, 116, 166, 122, 139 },
 };
 
-static const uint8_t rgb_to_yuv_cb_bt709_output[8][8] = {
-    {123, 115, 211, 98, 145, 156, 95, 100 },
-    {110, 53, 182, 126, 156, 109, 116, 72 },
-    {68, 115, 141, 87, 149, 160, 189, 67 },
-    {122, 174, 130, 160, 128, 98, 181, 174 },
-    {200, 97, 186, 96, 192, 136, 77, 46 },
-    {53, 95, 209, 84, 182, 78, 56, 107 },
-    {95, 60, 118, 212, 76, 197, 129, 148 },
-    {189, 205, 185, 97, 147, 48, 190, 94 },
+static const uint8_mat8_t rgb_to_yuv_cb_bt709_output = {
+    { 123, 115, 211, 98, 145, 156, 95, 100 },
+    { 110, 53, 182, 126, 156, 109, 116, 72 },
+    { 68, 115, 141, 87, 149, 160, 189, 67 },
+    { 122, 174, 130, 160, 128, 98, 181, 174 },
+    { 200, 97, 186, 96, 192, 136, 77, 46 },
+    { 53, 95, 209, 84, 182, 78, 56, 107 },
+    { 95, 60, 118, 212, 76, 197, 129, 148 },
+    { 189, 205, 185, 97, 147, 48, 190, 94 },
 };
 
-static const uint8_t rgb_to_yuv_cr_bt709_output[8][8] = {
+static const uint8_mat8_t rgb_to_yuv_cr_bt709_output = {
     { 187, 103, 184, 197, 211, 104, 116, 133 },
     { 229, 157, 151, 86, 80, 221, 117, 106 },
     { 184, 84, 116, 115, 143, 166, 171, 165 },
@@ -306,18 +310,112 @@ static const uint8_t rgb_to_yuv_cr_bt709_output[8][8] = {
     { 162, 139, 124, 120, 189, 148, 69, 153 },
 };
 
-static const uint8_t rgb_to_yuv_cb2_bt709_output[4][4] = {
+static const uint8_mat4_t rgb_to_yuv_cb2_bt709_output = {
     { 100, 154, 142, 96 },
     { 120, 130, 134, 153 },
     { 112, 144, 147, 71 },
     { 137, 153, 117, 140 },
 };
 
-static const uint8_t rgb_to_yuv_cr2_bt709_output[4][4] = {
+static const uint8_mat4_t rgb_to_yuv_cr2_bt709_output = {
     { 169, 154, 154, 118 },
     { 140, 124, 118, 129 },
     { 144, 133, 137, 113 },
     { 146, 131, 135, 127 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_y_bt601fr_output = {
+    { 67, 72, 99, 136, 119, 138, 83, 222 },
+    { 90, 181, 116, 91, 100, 98, 180, 123 },
+    { 146, 68, 214, 231, 95, 135, 57, 153 },
+    { 145, 45, 198, 185, 161, 196, 75, 90 },
+    { 119, 89, 127, 157, 28, 173, 192, 187 },
+    { 144, 89, 110, 112, 135, 114, 165, 55 },
+    { 113, 201, 99, 84, 104, 90, 130, 159 },
+    { 134, 57, 37, 69, 132, 170, 118, 145 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_cb_bt601fr_output = {
+    { 114, 116, 214, 86, 136, 162, 92, 95 },
+    { 95, 40, 185, 130, 165, 95, 115, 67 },
+    { 53, 119, 144, 83, 149, 159, 191, 54 },
+    { 117, 180, 134, 157, 133, 100, 192, 184 },
+    { 201, 97, 199, 98, 200, 130, 74, 31 },
+    { 50, 80, 208, 74, 181, 80, 52, 105 },
+    { 89, 49, 121, 215, 77, 204, 123, 152 },
+    { 192, 213, 192, 93, 141, 35, 205, 86 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_cr_bt601fr_output = {
+    { 194, 101, 183, 207, 219, 99, 117, 136 },
+    { 242, 166, 149, 80, 72, 234, 116, 108 },
+    { 195, 79, 113, 117, 142, 167, 171, 174 },
+    { 168, 126, 83, 177, 77, 77, 74, 86 },
+    { 190, 98, 68, 75, 119, 185, 92, 170 },
+    { 76, 221, 223, 161, 190, 51, 82, 116 },
+    { 135, 158, 87, 189, 62, 132, 182, 104 },
+    { 161, 133, 118, 121, 194, 156, 56, 159 },
+};
+
+static const uint8_mat4_t rgb_to_yuv_cb2_bt601fr_output = {
+    { 91, 154, 140, 93 },
+    { 117, 130, 135, 155 },
+    { 107, 145, 148, 65 },
+    { 136, 155, 114, 142 },
+};
+
+static const uint8_mat4_t rgb_to_yuv_cr2_bt601fr_output = {
+    { 176, 155, 156, 119 },
+    { 142, 122, 116, 126 },
+    { 146, 132, 136, 115 },
+    { 147, 129, 136, 125 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_y_bt709fr_output = {
+    { 55, 79, 77, 124, 99, 140, 90, 224 },
+    { 69, 183, 105, 101, 108, 80, 184, 135 },
+    { 140, 79, 215, 239, 89, 123, 40, 152 },
+    { 138, 39, 206, 171, 171, 210, 79, 92 },
+    { 97, 98, 131, 172, 21, 160, 206, 189 },
+    { 164, 75, 80, 111, 115, 136, 183, 60 },
+    { 116, 204, 108, 60, 124, 80, 119, 162 },
+    { 119, 46, 31, 75, 116, 175, 124, 143 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_cb_bt709fr_output = {
+    { 122, 112, 222, 94, 147, 160, 90, 96 },
+    { 107, 43, 189, 125, 160, 106, 114, 64 },
+    { 60, 113, 143, 81, 151, 164, 197, 58 },
+    { 121, 180, 129, 163, 127, 94, 187, 180 },
+    { 209, 93, 193, 91, 201, 137, 69, 34 },
+    { 42, 90, 220, 77, 189, 71, 45, 104 },
+    { 90, 51, 116, 223, 68, 206, 129, 150 },
+    { 197, 215, 192, 92, 149, 37, 198, 89 },
+};
+
+static const uint8_mat8_t rgb_to_yuv_cr_bt709fr_output = {
+    { 195, 100, 191, 206, 222, 101, 114, 133 },
+    { 243, 161, 154, 79, 73, 234, 115, 103 },
+    { 191, 77, 114, 113, 144, 170, 177, 170 },
+    { 168, 130, 83, 180, 76, 73, 78, 89 },
+    { 197, 95, 72, 71, 124, 186, 87, 164 },
+    { 69, 220, 232, 158, 195, 45, 75, 115 },
+    { 132, 153, 86, 197, 57, 138, 183, 105 },
+    { 167, 140, 123, 118, 197, 150, 60, 156 },
+};
+
+static const uint8_mat4_t rgb_to_yuv_cb2_bt709fr_output = {
+    { 96, 157, 143, 91 },
+    { 119, 129, 134, 156 },
+    { 109, 145, 149, 63 },
+    { 138, 156, 115, 142 },
+};
+
+static const uint8_mat4_t rgb_to_yuv_cr2_bt709fr_output = {
+    { 175, 157, 157, 116 },
+    { 142, 122, 116, 128 },
+    { 145, 133, 138, 110 },
+    { 148, 131, 135, 126 },
 };
 
 #define MAX_NUMBER_OF_PLANES 3
@@ -376,21 +474,66 @@ static const size_t num_log2_den_per_plane[][3 * MAX_NUMBER_OF_PLANES] = {
  * magenta  (255,   0, 255):    78, 214, 230
  * cyan     (  0, 255, 255):   188, 154,  16
  * white    (255, 255, 255):   235, 128, 128
+ *
+ * Color table (bt601 full range):
+ *             r    g    b
+ * black    (  0,   0,   0):     0, 128, 128
+ * red      (255,   0,   0):    76,  84, 255
+ * green    (  0, 255,   0):   149,  43,  21
+ * yellow   (255, 255,   0):   225,   0, 148
+ * blue     (  0,   0, 255):    29, 255, 107
+ * magenta  (255,   0, 255):   105, 212, 234
+ * cyan     (  0, 255, 255):   178, 171,   0
+ * white    (255, 255, 255):   255, 128, 128
+ *
+ * Color table (bt709 full range):
+ *             r    g    b
+ * black    (  0,   0,   0):     0, 128, 128
+ * red      (255,   0,   0):    54,  98, 255
+ * green    (  0, 255,   0):   182,  29,  12
+ * yellow   (255, 255,   0):   237,   0, 139
+ * blue     (  0,   0, 255):    18, 255, 116
+ * magenta  (255,   0, 255):    73, 226, 243
+ * cyan     (  0, 255, 255):   201, 157,   0
+ * white    (255, 255, 255):   255, 128, 128
  */
-static const uint8_t y_to_rgb_input[2][8] = {
+static const uint8_t y_to_rgb_input[4][8] = {
     {  16,  82, 145, 210,  41, 107, 169, 235 },
-    {  16,  63, 173, 219,  32,  78, 188, 235 }
+    {  16,  63, 173, 219,  32,  78, 188, 235 },
+    {   0,  76, 149, 225,  29, 105, 178, 255 },
+    {   0,  54, 182, 237,  18,  73, 201, 255 },
 };
 
-static const uint8_t cb_to_rgb_input[2][8] = {
+static const uint8_t cb_to_rgb_input[4][8] = {
     { 128,  90,  54,  16, 240, 202, 166, 128 },
-    { 128, 102,  42,  16, 240, 214, 154, 128 }
+    { 128, 102,  42,  16, 240, 214, 154, 128 },
+    { 128,  84,  43,   0, 255, 212, 171, 128 },
+    { 128,  98,  29,   0, 255, 226, 157, 128 },
 };
 
-static const uint8_t cr_to_rgb_input[2][8] = {
+static const uint8_t cr_to_rgb_input[4][8] = {
     { 128, 240,  34, 146, 110, 222,  16, 128 },
-    { 128, 240,  26, 138, 118, 230,  16, 128 }
+    { 128, 240,  26, 138, 118, 230,  16, 128 },
+    { 128, 255,  21, 148, 107, 234,   0, 128 },
+    { 128, 255,  12, 139, 116, 243,   0, 128 },
 };
+
+static bool
+is_valid_format(const DcpImageFormat *format,
+                uint32_t              width,
+                uint32_t              height)
+{
+   if (format->pixel_format == DCP_PIXEL_FORMAT_I444) {
+        return format->num_planes != 3;
+   } else if (format->pixel_format == DCP_PIXEL_FORMAT_I422 || format->pixel_format == DCP_PIXEL_FORMAT_I420) {
+        return format->num_planes != 3 || (width & 1) == 1 || (height & 1) == 1;
+   } else if (format->pixel_format == DCP_PIXEL_FORMAT_NV12) {
+        return (format->num_planes < 1 || format->num_planes > 2) ||
+                (width & 1) == 1 || (height & 1) == 1;
+   } else {
+       return format->num_planes != 1;
+   }
+}
 
 static void
 init(void)
@@ -551,11 +694,16 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
     output = test_output;
 
     /* Check all luma samples are correct */
+    const uint8_mat8_t *expected_y = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_y_bt601_output:
+                                      color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_y_bt709_output:
+                                      color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_y_bt601fr_output:
+                                                                               &rgb_to_yuv_y_bt709fr_output);
+
     for (y = 0; y < height; y++) {
         size_t x;
 
         for (x = 0; x < width; x++, count++, output++) {
-            TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_y_bt601_output : rgb_to_yuv_y_bt709_output)[y][x]);
+            TEST_ASSERT_EQ(*output, (*expected_y)[y][x]);
         }
 
         for (x = 0; x < luma_fill_bytes; x++, count++, output++) {
@@ -564,11 +712,20 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
     }
 
     if (dst_pixel_format == DCP_PIXEL_FORMAT_I444) {
+        const uint8_mat8_t *expected_cb = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cb_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cb_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cb_bt601fr_output:
+                                                                                    &rgb_to_yuv_cb_bt709fr_output);
+        const uint8_mat8_t *expected_cr = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cr_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cr_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cr_bt601fr_output:
+                                                                                    &rgb_to_yuv_cr_bt709fr_output);
+
         for (y = 0; y < height; y++) {
             size_t x;
 
             for (x = 0; x < width; x++, count++, output++) {
-                TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb_bt601_output : rgb_to_yuv_cb_bt709_output)[y][x]);
+                TEST_ASSERT_EQ(*output, (*expected_cb)[y][x]);
             }
 
             for (x = 0; x < u_chroma_fill_bytes; x++, count++, output++) {
@@ -580,7 +737,7 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
             size_t x;
 
             for (x = 0; x < width; x++, count++, output++) {
-                TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr_bt601_output : rgb_to_yuv_cr_bt709_output)[y][x]);
+                TEST_ASSERT_EQ(*output, (*expected_cr)[y][x]);
             }
 
             for (x = 0; x < v_chroma_fill_bytes; x++, count++, output++) {
@@ -588,12 +745,21 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
             }
         }
     } else if (dst_pixel_format == DCP_PIXEL_FORMAT_NV12) {
+        const uint8_mat4_t *expected_cb = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cb2_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cb2_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cb2_bt601fr_output:
+                                                                                    &rgb_to_yuv_cb2_bt709fr_output);
+        const uint8_mat4_t *expected_cr = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cr2_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cr2_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cr2_bt601fr_output:
+                                                                                    &rgb_to_yuv_cr2_bt709fr_output);
+
         for (y = 0; y < chroma_height; y++) {
             size_t x;
 
             for (x = 0; x < width / 2; x++, count += 2, output += 2) {
-                TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb2_bt601_output : rgb_to_yuv_cb2_bt709_output)[y][x]);
-                TEST_ASSERT_EQ(*(output + 1), (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr2_bt601_output : rgb_to_yuv_cr2_bt709_output)[y][x]);
+                TEST_ASSERT_EQ(*output, (*expected_cb)[y][x]);
+                TEST_ASSERT_EQ(*(output + 1), (*expected_cr)[y][x]);
             }
 
             for (x = 0; x < u_chroma_fill_bytes; x++, count++, output++) {
@@ -601,11 +767,20 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
             }
         }
     } else {
+        const uint8_mat4_t *expected_cb = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cb2_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cb2_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cb2_bt601fr_output:
+                                                                                    &rgb_to_yuv_cb2_bt709fr_output);
+        const uint8_mat4_t *expected_cr = (color_space == DCP_COLOR_SPACE_BT601 ? &rgb_to_yuv_cr2_bt601_output:
+                                           color_space == DCP_COLOR_SPACE_BT709 ? &rgb_to_yuv_cr2_bt709_output:
+                                           color_space == DCP_COLOR_SPACE_BT601FR ? &rgb_to_yuv_cr2_bt601fr_output:
+                                                                                    &rgb_to_yuv_cr2_bt709fr_output);
+
         for (y = 0; y < chroma_height; y++) {
             size_t x;
 
             for (x = 0; x < width / 2; x++, count++, output++) {
-                TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cb2_bt601_output : rgb_to_yuv_cb2_bt709_output)[y][x]);
+                TEST_ASSERT_EQ(*output, (*expected_cb)[y][x]);
             }
 
             for (x = 0; x < u_chroma_fill_bytes; x++, count++, output++) {
@@ -617,7 +792,7 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
             size_t x;
 
             for (x = 0; x < width / 2; x++, count++, output++) {
-                TEST_ASSERT_EQ(*output, (color_space == DCP_COLOR_SPACE_BT601 ? rgb_to_yuv_cr2_bt601_output : rgb_to_yuv_cr2_bt709_output)[y][x]);
+                TEST_ASSERT_EQ(*output, (*expected_cr)[y][x]);
             }
 
             for (x = 0; x < v_chroma_fill_bytes; x++, count++, output++) {
@@ -723,7 +898,7 @@ convert_image_rgb_to_yuv_size(uint32_t       num_planes,
 
     TEST_BEGIN_GROUP("%ux%u", width, height);
 
-    for (color_space = DCP_COLOR_SPACE_BT601; color_space <= DCP_COLOR_SPACE_BT709; color_space++) {
+    for (color_space = DCP_COLOR_SPACE_BT601; color_space <= DCP_COLOR_SPACE_BT709FR; color_space++) {
         size_t i;
 
         for (i = 0; i < supported_pixel_formats_count; i++) {
@@ -1086,7 +1261,7 @@ convert_image_yuv_to_rgb_size(DcpPixelFormat format,
 
     TEST_BEGIN_GROUP("%ux%u", width, height);
 
-    for (color_space = DCP_COLOR_SPACE_BT601; color_space <= DCP_COLOR_SPACE_BT709; color_space++) {
+    for (color_space = DCP_COLOR_SPACE_BT601; color_space <= DCP_COLOR_SPACE_BT709FR; color_space++) {
         convert_image_yuv_to_rgb_size_format(format, width, height, color_space);
     }
 
@@ -1144,16 +1319,18 @@ unit_convert_image_rgb_to_yuv_errors(void)
         for (src_pixel_format = 0; src_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; src_pixel_format++) {
             int32_t src_color_space;
 
-            for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709 + 1; src_color_space++) {
+            for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
                 int32_t dst_color_space;
 
-                for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709 + 1; dst_color_space++) {
+                for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
                     int32_t corrupt;
 
                     for (corrupt = 0; corrupt < 4; corrupt++) {
                         uint8_t *src_buffer;
                         size_t dst_strides[2];
                         uint8_t *dst_buffers[2];
+                        bool src_pf_rgb;
+                        bool src_cs_rgb;
 
                         DcpImageFormat src_format = {
                             src_pixel_format,
@@ -1203,22 +1380,21 @@ unit_convert_image_rgb_to_yuv_errors(void)
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
+                        src_pf_rgb = src_pixel_format < DCP_PIXEL_FORMAT_I444;
+                        src_cs_rgb = src_color_space == DCP_COLOR_SPACE_LRGB;
                         expected = dcp_status();
 
                         SET_EXPECTED(src_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED((width & 1) != 0, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED((height & 1) != 0, DCP_ERROR_KIND_INVALID_VALUE);
-
-                        SET_EXPECTED((src_pixel_format >= DCP_PIXEL_FORMAT_I444) && (src_color_space <= DCP_COLOR_SPACE_LRGB), DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED((src_pixel_format < DCP_PIXEL_FORMAT_I444) && (src_color_space > DCP_COLOR_SPACE_LRGB), DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(!src_pf_rgb && src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(src_pf_rgb && !src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
 
                         SET_EXPECTED(dst_color_space <= DCP_COLOR_SPACE_LRGB, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(num_planes < 1, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(num_planes > 2, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(is_valid_format(&src_format, width, height), DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(is_valid_format(&dst_format, width, height), DCP_ERROR_KIND_INVALID_VALUE);
 
                         SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
 
@@ -1275,16 +1451,18 @@ unit_convert_image_yuv_to_rgb_errors(void)
         for (dst_pixel_format = 0; dst_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; dst_pixel_format++) {
             int32_t dst_color_space;
 
-            for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709 + 1; dst_color_space++) {
+            for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
                 int32_t src_color_space;
 
-                for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709 + 1; src_color_space++) {
+                for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
                     int32_t corrupt;
 
                     for (corrupt = 0; corrupt < 4; corrupt++) {
                         size_t src_strides[2];
                         uint8_t *src_buffers[2];
                         uint8_t *dst_buffer;
+                        bool dst_pf_rgb;
+                        bool dst_cs_rgb;
 
                         DcpImageFormat src_format = {
                             DCP_PIXEL_FORMAT_NV12,
@@ -1334,22 +1512,21 @@ unit_convert_image_yuv_to_rgb_errors(void)
 
                         TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
+                        dst_pf_rgb = dst_pixel_format < DCP_PIXEL_FORMAT_I444;
+                        dst_cs_rgb = dst_color_space == DCP_COLOR_SPACE_LRGB;
                         expected = dcp_status();
 
-                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
                         SET_EXPECTED(dst_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709, DCP_ERROR_KIND_INVALID_VALUE);
-
-                        SET_EXPECTED((width & 1) != 0, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED((height & 1) != 0, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
 
                         SET_EXPECTED(src_color_space <= DCP_COLOR_SPACE_LRGB, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED((dst_pixel_format >= DCP_PIXEL_FORMAT_I444) && (dst_color_space <= DCP_COLOR_SPACE_LRGB), DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED((dst_pixel_format < DCP_PIXEL_FORMAT_I444) && (dst_color_space > DCP_COLOR_SPACE_LRGB), DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(is_valid_format(&src_format, width, height), DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(is_valid_format(&dst_format, width, height), DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(num_planes < 1, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(num_planes > 2, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(!dst_pf_rgb && dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                        SET_EXPECTED(dst_pf_rgb && !dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
 
                         SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
 
@@ -1410,7 +1587,7 @@ unit_get_buffers_plane(int32_t num_planes)
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
         SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I422, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(is_valid_format(&format, valid_width, valid_height), DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(1, valid_height, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
 
@@ -1418,14 +1595,14 @@ unit_get_buffers_plane(int32_t num_planes)
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
         SET_EXPECTED(pf >= DCP_PIXEL_FORMAT_I420, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(is_valid_format(&format, valid_width, valid_height), DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(valid_width, 1, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
 
         /* Test size is valid */
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(num_planes != 1 && num_planes != max_number_of_planes, DCP_ERROR_KIND_INVALID_VALUE);
+        SET_EXPECTED(is_valid_format(&format, valid_width, valid_height), DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(valid_width, valid_height, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
         if (expected.result == DCP_RESULT_OK) {
