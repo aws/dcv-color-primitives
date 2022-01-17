@@ -855,8 +855,12 @@ fn rgb_to_yuv_size(
 }
 
 fn rgb_to_yuv_ok(pixel_format: PixelFormat, num_planes: u32) {
-    const SUPPORTED_COLOR_SPACES: &[ColorSpace] =
-        &[ColorSpace::Bt601, ColorSpace::Bt709, ColorSpace::Bt601FR, ColorSpace::Bt709FR];
+    const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
+        ColorSpace::Bt601,
+        ColorSpace::Bt709,
+        ColorSpace::Bt601FR,
+        ColorSpace::Bt709FR,
+    ];
     const MAX_WIDTH: u32 = 8;
     const MAX_HEIGHT: u32 = 8;
 
@@ -1140,8 +1144,12 @@ fn yuv_to_rgb_size_format_mode(
 }
 
 fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
-    const SUPPORTED_COLOR_SPACES: &[ColorSpace] =
-        &[ColorSpace::Bt601, ColorSpace::Bt709, ColorSpace::Bt601FR, ColorSpace::Bt709FR];
+    const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
+        ColorSpace::Bt601,
+        ColorSpace::Bt709,
+        ColorSpace::Bt601FR,
+        ColorSpace::Bt709FR,
+    ];
     const MAX_WIDTH: u32 = 34;
     const MAX_HEIGHT: u32 = 4;
 
