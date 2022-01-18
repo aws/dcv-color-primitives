@@ -71,7 +71,7 @@ pub const FIX6: i32 = 6;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub const SHORT_HALF: i32 = 16384;
 
-// Cooefficient table for 601
+// Coefficient table for 601
 pub const XR_601: i32 = 16829;
 pub const XG_601: i32 = 33039;
 pub const XB_601: i32 = 6416;
@@ -91,7 +91,7 @@ pub const RN_601: i32 = 14234;
 pub const GP_601: i32 = 8709;
 pub const BN_601: i32 = 17685;
 
-// Cooefficient table for 709
+// Coefficient table for 709
 pub const XR_709: i32 = 11966;
 pub const XG_709: i32 = 40254;
 pub const XB_709: i32 = 4064;
