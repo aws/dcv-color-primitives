@@ -1,3 +1,9 @@
+News in 0.4.0
+-------------
+* YCbCr full range support
+* Fixed C bindings documentation
+* Fixed C bindings unit tests
+
 News in 0.3.1
 -------------
 * Fix build issue by linking bcrypt
