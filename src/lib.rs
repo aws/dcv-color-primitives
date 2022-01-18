@@ -54,6 +54,8 @@
 //! * ycbcr, ITU-R Recommendation BT.601 (standard video system)
 //! * ycbcr, ITU-R Recommendation BT.709 (CSC systems)
 //!
+//! Both standard range (0-235) and full range (0-255) are supported.
+//!
 //! # Examples
 //!
 //! Initialize the library:
@@ -359,10 +361,10 @@ impl error::Error for ErrorKind {
 /// `PixelFormat::Bgr`  | `ColorSpace::Lrgb`
 /// `PixelFormat::Rgba` | `ColorSpace::Lrgb`
 /// `PixelFormat::Rgb`  | `ColorSpace::Lrgb`
-/// `PixelFormat::I444` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::I422` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::I420` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
-/// `PixelFormat::Nv12` | `ColorSpace::Bt601`, `ColorSpace::Bt709`
+/// `PixelFormat::I444` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
+/// `PixelFormat::I422` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
+/// `PixelFormat::I420` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
+/// `PixelFormat::Nv12` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 ///
 /// Some pixel formats might impose additional restrictions on the accepted number of
 /// planes and the image size:
@@ -397,17 +399,17 @@ type ConvertDispatcher =
 macro_rules! set_dispatcher {
     ($conv:expr, $set:ident, $src_pf:ident, $src_cs:ident, $dst_pf:ident, $dst_cs:ident) => {
         paste! {
-        $conv[dispatcher::get_index(
-            dispatcher::get_image_index(
-                PixelFormat::$src_pf as u32,
-                ColorSpace::$src_cs as u32,
-                dispatcher::get_pixel_format_mode(PixelFormat::$src_pf as u32),
-            ),
-            dispatcher::get_image_index(
-                PixelFormat::$dst_pf as u32,
-                ColorSpace::$dst_cs as u32,
-                dispatcher::get_pixel_format_mode(PixelFormat::$dst_pf as u32),
-            ),
+            $conv[dispatcher::get_index(
+                dispatcher::get_image_index(
+                    PixelFormat::$src_pf as u32,
+                    ColorSpace::$src_cs as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$src_pf as u32),
+                ),
+                dispatcher::get_image_index(
+                    PixelFormat::$dst_pf as u32,
+                    ColorSpace::$dst_cs as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$dst_pf as u32),
+                ),
             )] = Some(convert_image::$set::[<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower _ $dst_cs:lower>])
         }
     };
@@ -441,6 +443,31 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb);
         set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb);
         set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb);
+
+        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, I420, Bt601FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, I420, Bt709FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, I444, Bt601FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, I444, Bt709FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, Nv12, Bt601FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, Nv12, Bt709FR, Bgra, Lrgb);
     };
 }
 
@@ -794,6 +821,18 @@ pub fn get_buffers_size(
 /// y  =  0.213 * r + 0.715 * g + 0.072 * b + 16
 /// cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
 /// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
+///
+/// If the destination image color space is Bt601FR, the following formula is applied:
+/// ```text
+/// y  =  0.299 * r + 0.587 * g + 0.114 * b
+/// cb = -0.169 * r - 0.331 * g + 0.500 * b + 128
+/// cr =  0.500 * r - 0.419 * g - 0.081 * b + 128
+///
+/// If the destination image color space is Bt709FR, the following formula is applied:
+/// ```text
+/// y  =  0.213 * r + 0.715 * g + 0.072 * b
+/// cb = -0.115 * r - 0.385 * g + 0.500 * b + 128
+/// cr =  0.500 * r - 0.454 * g - 0.046 * b + 128
 /// ```
 ///
 /// # Algorithm 2
@@ -813,6 +852,18 @@ pub fn get_buffers_size(
 /// r = 1.164 * (y - 16) + 1.793 * (cr - 128)
 /// g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
+///
+/// If the source image color space is Bt601FR, the following formula is applied:
+/// ```text
+/// r = y + 1.402 * (cr - 128)
+/// g = y - 0.714 * (cr - 128) - 0.344 * (cb - 128)
+/// b = y + 1.772 * (cb - 128)
+///
+/// If the source image color space is Bt709FR, the following formula is applied:
+/// ```text
+/// r = y + 1.575 * (cr - 128)
+/// g = y - 0.468 * (cr - 128) - 0.187 * (cb - 128)
+/// b = y + 1.856 * (cb - 128)
 /// ```
 ///
 /// # Algorithm 3

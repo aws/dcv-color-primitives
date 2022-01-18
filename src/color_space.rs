@@ -30,4 +30,8 @@ pub enum ColorSpace {
     Bt601,
     /// YCbCr, ITU-R Recommendation BT.709 (CSC systems)
     Bt709,
+    /// YCbCr, BT.601 (full range)
+    Bt601FR,
+    /// YCbCr, BT.709 (full range)
+    Bt709FR,
 }

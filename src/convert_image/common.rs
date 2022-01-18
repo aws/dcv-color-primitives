@@ -111,6 +111,46 @@ pub const RN_709: i32 = 15846;
 pub const GP_709: i32 = 4952;
 pub const BN_709: i32 = 18465;
 
+// Coefficient table for 601 (full range)
+pub const XR_601FR: i32 = 19595;
+pub const XG_601FR: i32 = 38470;
+pub const XB_601FR: i32 = 7471;
+pub const YR_601FR: i32 = -11057;
+pub const YG_601FR: i32 = -21709;
+pub const YB_601FR: i32 = 32768;
+pub const ZR_601FR: i32 = 32768;
+pub const ZG_601FR: i32 = -27438;
+pub const ZB_601FR: i32 = -5328;
+
+pub const XXYM_601FR: i32 = 16384;
+pub const RCRM_601FR: i32 = 22970;
+pub const GCRM_601FR: i32 = 11700;
+pub const GCBM_601FR: i32 = 5638;
+pub const BCBM_601FR: i32 = 29032;
+pub const RN_601FR: i32 = 11363;
+pub const GP_601FR: i32 = 8633;
+pub const BN_601FR: i32 = 14370;
+
+// Coefficient table for 709 (full range)
+pub const XR_709FR: i32 = 13933;
+pub const XG_709FR: i32 = 46871;
+pub const XB_709FR: i32 = 4732;
+pub const YR_709FR: i32 = -7508;
+pub const YG_709FR: i32 = -25258;
+pub const YB_709FR: i32 = 32768;
+pub const ZR_709FR: i32 = 32768;
+pub const ZG_709FR: i32 = -29762;
+pub const ZB_709FR: i32 = -3004;
+
+pub const XXYM_709FR: i32 = 16384;
+pub const RCRM_709FR: i32 = 25802;
+pub const GCRM_709FR: i32 = 7670;
+pub const GCBM_709FR: i32 = 3069;
+pub const BCBM_709FR: i32 = 30402;
+pub const RN_709FR: i32 = 12768;
+pub const GP_709FR: i32 = 5359;
+pub const BN_709FR: i32 = 15050;
+
 // Other defines
 const Y_MIN: i32 = 16;
 const C_HALF: i32 = 128;
@@ -134,6 +174,8 @@ pub enum Sampler {
 pub enum Colorimetry {
     Bt601,
     Bt709,
+    Bt601FR,
+    Bt709FR,
     Length,
 }
 

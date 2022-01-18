@@ -40,6 +40,8 @@ The supported color models are:
 * YCbCr, ITU-R Recommendation BT.601 (standard video system)
 * YCbCr, ITU-R Recommendation BT.709 (CSC systems)
 
+Both standard range (0-235) and full range (0-255) are supported.
+
 ## Requirements
 
 * Rust 1.55 and newer (until DCP 0.2: At least Rust 1.39)
@@ -427,8 +429,8 @@ default build.
 
 In order to include DCV Color Primitives inside your application library, you need to:
 * Statically link to dcv_color_primitives
-* Link to ws2_32.lib and userenv.lib, for Windows
-* Link to dl, for Linux
+* Link to ws2_32.lib, userenv.lib and bcrypt.lib, for Windows
+* Link to libdl and libm, for Linux
 
 The API is slightly different than the rust one. Check dcv_color_primitives.h for examples and further information.
 
