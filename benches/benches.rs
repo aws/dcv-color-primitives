@@ -1,4 +1,4 @@
-use affinity::set_process_affinity;
+use affinity::set_thread_affinity;
 use criterion::*;
 use std::alloc::{alloc, dealloc, Layout};
 use std::error;
@@ -181,7 +181,7 @@ fn bgra_i420_input(width: usize, height: usize, output_buffer: &mut [u8]) -> Ben
     let input_buffer = alloc_buffer(src_size, false);
     load_buffer(input_buffer, BGRA_INPUT, true)?;
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height / 4);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -219,7 +219,7 @@ fn bgra_i444_input(width: usize, height: usize, output_buffer: &mut [u8]) -> Ben
     let input_buffer = alloc_buffer(src_size, false);
     load_buffer(input_buffer, BGRA_INPUT, true)?;
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -260,7 +260,7 @@ fn bgra_i420(output_path: &str, width: usize, height: usize) -> BenchmarkResult<
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height / 4);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -301,7 +301,7 @@ fn bgra_i444(output_path: &str, width: usize, height: usize) -> BenchmarkResult<
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -342,7 +342,7 @@ fn bgr_i420(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height / 4);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -383,7 +383,7 @@ fn bgr_i444(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
+    let input_data: &[&[u8]] = &[input_buffer];
     let (y_data, uv_data) = output_buffer.split_at_mut(width * height);
     let (u_data, v_data) = uv_data.split_at_mut(width * height);
     let output_data: &mut [&mut [u8]] = &mut [&mut *y_data, &mut *u_data, &mut *v_data];
@@ -436,7 +436,7 @@ fn i420_bgra(
         &input_buffer[y_plane_size..(y_plane_size + u_plane_size)],
         &input_buffer[(y_plane_size + u_plane_size)..],
     ];
-    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *output_buffer];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::I420,
@@ -486,7 +486,7 @@ fn i444_bgra(
         &input_buffer[y_plane_size..(y_plane_size + u_plane_size)],
         &input_buffer[(y_plane_size + u_plane_size)..],
     ];
-    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *output_buffer];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::I444,
@@ -524,8 +524,8 @@ fn bgra_rgb(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
-    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+    let input_data: &[&[u8]] = &[input_buffer];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *output_buffer];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -563,8 +563,8 @@ fn rgb_bgra(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 
     let output_buffer = alloc_buffer(dst_size, true);
 
-    let input_data: &[&[u8]] = &[&input_buffer];
-    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+    let input_data: &[&[u8]] = &[input_buffer];
+    let output_data: &mut [&mut [u8]] = &mut [&mut *output_buffer];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Rgb,
@@ -596,7 +596,7 @@ fn rgb_bgra(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 fn configure_process() {
     let cores: Vec<usize> = (0..1).collect();
 
-    set_process_affinity(&cores).unwrap();
+    set_thread_affinity(&cores).unwrap();
     set_current_thread_priority(ThreadPriority::Max).unwrap();
 }
 
@@ -623,6 +623,7 @@ fn convert_to(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn convert_from_to(
     group: &mut BenchmarkGroup<measurement::WallTime>,
     name: &str,
