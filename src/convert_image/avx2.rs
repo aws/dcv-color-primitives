@@ -19,6 +19,9 @@ use crate::convert_image::common::*; // We are importing everything
 use crate::convert_image::x86;
 use crate::{rgb_to_yuv_converter, yuv_to_rgb_converter};
 
+#[cfg(target_arch = "x86_64")]
+use core::arch::asm;
+
 use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 
 #[cfg(target_arch = "x86")]
@@ -466,6 +469,7 @@ unsafe fn lrgb_to_i444_8x(
 }
 
 #[cfg(not(tarpaulin_include))]
+#[cfg(target_arch = "x86")]
 #[allow(clippy::cast_possible_wrap)]
 const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     // Checked: we want to reinterpret the bits
@@ -671,6 +675,7 @@ unsafe fn lrgb_to_i420_avx2(
 }
 
 #[inline]
+#[cfg(target_arch = "x86")]
 #[target_feature(enable = "avx2")]
 unsafe fn bgra_to_rgb_avx2(
     width: usize,
@@ -828,6 +833,7 @@ unsafe fn rgb_to_bgra_avx2(
 }
 
 #[inline]
+#[cfg(target_arch = "x86")]
 #[target_feature(enable = "avx2")]
 unsafe fn argb_to_rgb_avx2(
     width: usize,
@@ -894,6 +900,197 @@ unsafe fn argb_to_rgb_avx2(
             y += 1;
         }
     }
+}
+
+#[inline]
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx", enable = "avx2")]
+unsafe fn bgra_to_rgb_avx2(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    let shuffle_mask = _mm256_setr_epi8(
+        2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, -128, -128, -128, -128, 2, 1, 0, 6, 5, 4, 10, 9, 8,
+        14, 13, 12, -128, -128, -128, -128,
+    );
+    let perm_mask = _mm256_setr_epi32(0, 1, 2, 4, 5, 6, 3, 7);
+
+    asm!(
+        "3:",
+            "cmp {width:e},$32",
+            "jl 4f",
+            "mov eax,$32",
+            "xor edx,edx",
+            "2:",
+                "vmovdqu ymm0,ymmword ptr [{src} + 4*rax - 128]",
+                "vmovdqu ymm1,ymmword ptr [{src} + 4*rax - 96]",
+                "vmovdqu ymm2,ymmword ptr [{src} + 4*rax - 64]",
+                "vmovdqu ymm3,ymmword ptr [{src} + 4*rax - 32]",
+                "add eax,$32",
+                "vpshufb ymm0,ymm0,{shuffle_mask}",
+                "vpshufb ymm1,ymm1,{shuffle_mask}",
+                "vpshufb ymm2,ymm2,{shuffle_mask}",
+                "vpshufb ymm3,ymm3,{shuffle_mask}",
+                "vpermd ymm0,{perm_mask},ymm0",
+                "vpermd ymm1,{perm_mask},ymm1",
+                "vpermd ymm2,{perm_mask},ymm2",
+                "vpermd ymm3,{perm_mask},ymm3",
+                "vpermq ymm4,ymm1,$0x3f",
+                "vpor ymm0,ymm0,ymm4",
+                "vmovdqu ymmword ptr [{dst} + rdx],ymm0",
+                "vpermq ymm1,ymm1,$0xf9",
+                "vpermq ymm4,ymm2,$0x4f",
+                "vpor ymm1,ymm1,ymm4",
+                "vmovdqu ymmword ptr [{dst} + rdx + 32],ymm1",
+                "vpermq ymm2,ymm2,$0xfe",
+                "vpermq ymm3,ymm3,$0x93",
+                "vpor ymm2,ymm2,ymm3",
+                "vmovdqu ymmword ptr [{dst} + rdx + 64],ymm2",
+                "add edx,$96",
+                "cmp eax,{width:e}",
+            "jng 2b",
+            "4:",
+            "mov eax,{width:e}",
+            "and eax,$-32",
+            "cmp eax,{width:e}",
+            "jge 5f",
+            "lea edx, [rax + 2*rax]",
+            "6:",
+                "mov ecx,dword ptr [{src} + 4*rax]",
+                "add eax,$1",
+                "bswap ecx",
+                "sar ecx,8",
+                "mov word ptr [{dst} + rdx],cx",
+                "sar ecx,8",
+                "mov word ptr [{dst} + rdx + 1],cx",
+                "add edx,$3",
+                "cmp eax,{width:e}",
+            "jl 6b",
+            "5:",
+            "add {src},{src_stride}",
+            "add {dst},{dst_stride}",
+            "sub {height:e},$1",
+        "jg 3b",
+
+        src = in(reg) src_buffer.as_ptr(),
+        dst = in(reg) dst_buffer.as_mut_ptr(),
+        width = in(reg) width,
+        height = in(reg) height,
+        src_stride = in(reg) src_stride,
+        dst_stride = in(reg) dst_stride,
+        shuffle_mask = in(ymm_reg) shuffle_mask,
+        perm_mask = in(ymm_reg) perm_mask,
+
+        out("ecx") _,
+        out("rax") _,
+        out("rdx") _,
+        out("ymm0") _,
+        out("ymm1") _,
+        out("ymm2") _,
+        out("ymm3") _,
+        out("ymm4") _,
+
+        options(nostack),
+    );
+}
+
+#[inline]
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx", enable = "avx2")]
+unsafe fn argb_to_rgb_avx2(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    let shuffle_mask = _mm256_setr_epi8(
+        1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, -128, -128, -128, -128, 1, 2, 3, 5, 6, 7, 9, 10,
+        11, 13, 14, 15, -128, -128, -128, -128,
+    );
+    let perm_mask = _mm256_setr_epi32(0, 1, 2, 4, 5, 6, 3, 7);
+
+    asm!(
+        "3:",
+            "cmp {width:e},$32",
+            "jl 4f",
+            "mov eax,$32",
+            "xor edx,edx",
+            "2:",
+                "vmovdqu ymm0,ymmword ptr [{src} + 4*rax - 128]",
+                "vmovdqu ymm1,ymmword ptr [{src} + 4*rax - 96]",
+                "vmovdqu ymm2,ymmword ptr [{src} + 4*rax - 64]",
+                "vmovdqu ymm3,ymmword ptr [{src} + 4*rax - 32]",
+                "add eax,$32",
+                "vpshufb ymm0,ymm0,{shuffle_mask}",
+                "vpshufb ymm1,ymm1,{shuffle_mask}",
+                "vpshufb ymm2,ymm2,{shuffle_mask}",
+                "vpshufb ymm3,ymm3,{shuffle_mask}",
+                "vpermd ymm0,{perm_mask},ymm0",
+                "vpermd ymm1,{perm_mask},ymm1",
+                "vpermd ymm2,{perm_mask},ymm2",
+                "vpermd ymm3,{perm_mask},ymm3",
+                "vpermq ymm4,ymm1,$0x3f",
+                "vpor ymm0,ymm0,ymm4",
+                "vmovdqu ymmword ptr [{dst} + rdx],ymm0",
+                "vpermq ymm1,ymm1,$0xf9",
+                "vpermq ymm4,ymm2,$0x4f",
+                "vpor ymm1,ymm1,ymm4",
+                "vmovdqu ymmword ptr [{dst} + rdx + 32],ymm1",
+                "vpermq ymm2,ymm2,$0xfe",
+                "vpermq ymm3,ymm3,$0x93",
+                "vpor ymm2,ymm2,ymm3",
+                "vmovdqu ymmword ptr [{dst} + rdx + 64],ymm2",
+                "add edx,$96",
+                "cmp eax,{width:e}",
+            "jng 2b",
+            "4:",
+            "mov eax,{width:e}",
+            "and eax,$-32",
+            "cmp eax,{width:e}",
+            "jge 5f",
+            "lea edx, [rax + 2*rax]",
+            "6:",
+                "mov ecx,dword ptr [{src} + 4*rax]",
+                "add eax,$1",
+                "sar ecx,8",
+                "mov word ptr [{dst} + rdx],cx",
+                "sar ecx,8",
+                "mov word ptr [{dst} + rdx + 1],cx",
+                "add edx,$3",
+                "cmp eax,{width:e}",
+            "jl 6b",
+            "5:",
+            "add {src},{src_stride}",
+            "add {dst},{dst_stride}",
+            "sub {height:e},$1",
+        "jg 3b",
+
+        src = in(reg) src_buffer.as_ptr(),
+        dst = in(reg) dst_buffer.as_mut_ptr(),
+        width = in(reg) width,
+        height = in(reg) height,
+        src_stride = in(reg) src_stride,
+        dst_stride = in(reg) dst_stride,
+        shuffle_mask = in(ymm_reg) shuffle_mask,
+        perm_mask = in(ymm_reg) perm_mask,
+
+        out("ecx") _,
+        out("rax") _,
+        out("rdx") _,
+        out("ymm0") _,
+        out("ymm1") _,
+        out("ymm2") _,
+        out("ymm3") _,
+        out("ymm4") _,
+
+        options(nostack),
+    );
 }
 
 #[inline]
