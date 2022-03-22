@@ -642,29 +642,22 @@ fn bgra_to_rgb(
 ) {
     const SRC_DEPTH: usize = 4;
     const DST_DEPTH: usize = 3;
-    const ITEMS_PER_ITERATION_4X: usize = 8;
-    const HIGH_MASK: u64 = 0xFFFF_FF00_0000_0000;
+    const ITEMS_PER_ITERATION: usize = 8;
     const LOW_MASK: u64 = 0x0000_00FF_FFFF_0000;
 
-    let src_stride_diff = src_stride - (SRC_DEPTH * width);
-    let dst_stride_diff = dst_stride - (DST_DEPTH * width);
-    let limit_4x = lower_multiple_of_pot(width, ITEMS_PER_ITERATION_4X);
+    let limit = lower_multiple_of_pot(width, ITEMS_PER_ITERATION);
 
     unsafe {
-        let src_group = src_buffer.as_ptr();
-        let dst_group = dst_buffer.as_mut_ptr();
-
         for i in 0..height {
+            let src_group = src_buffer.as_ptr().add(src_stride * i);
+            let dst_group = dst_buffer.as_mut_ptr().add(dst_stride * i);
             let mut y = 0;
-            let mut src_offset = ((SRC_DEPTH * width) + src_stride_diff) * i;
-            let mut dst_offset = ((DST_DEPTH * width) + dst_stride_diff) * i;
 
-            while y < limit_4x {
-                let src_ptr: *const u64 = src_group.add(src_offset).cast();
-                let bgra0 = loadu(src_ptr);
-                let bgra1 = loadu(src_ptr.add(1));
-                let bgra2 = loadu(src_ptr.add(2));
-                let bgra3 = loadu(src_ptr.add(3));
+            while y < limit {
+                let bgra0: u64 = loadu(src_group.add(y * SRC_DEPTH).cast());
+                let bgra1: u64 = loadu(src_group.add(y * SRC_DEPTH + 8).cast());
+                let bgra2: u64 = loadu(src_group.add(y * SRC_DEPTH + 16).cast());
+                let bgra3: u64 = loadu(src_group.add(y * SRC_DEPTH + 24).cast());
 
                 // Checked: we want to reinterpret the bits
                 #[allow(
@@ -673,33 +666,28 @@ fn bgra_to_rgb(
                     clippy::cast_possible_wrap
                 )]
                 let (rgb0, rgb1, rgb2, rgb3) = (
-                    _bswap64((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64)
-                        as u64,
-                    _bswap64((((bgra1 << 40) & HIGH_MASK) | ((bgra1 >> 16) & LOW_MASK)) as i64)
-                        as u64,
-                    _bswap64((((bgra2 << 40) & HIGH_MASK) | ((bgra2 >> 16) & LOW_MASK)) as i64)
-                        as u64,
-                    _bswap64((((bgra3 << 40) & HIGH_MASK) | ((bgra3 >> 16) & LOW_MASK)) as i64)
-                        as u64,
+                    _bswap64(((bgra0 << 40) | ((bgra0 >> 16) & LOW_MASK)) as i64) as u64,
+                    _bswap64(((bgra1 << 40) | ((bgra1 >> 16) & LOW_MASK)) as i64) as u64,
+                    _bswap64(((bgra2 << 40) | ((bgra2 >> 16) & LOW_MASK)) as i64) as u64,
+                    _bswap64(((bgra3 << 40) | ((bgra3 >> 16) & LOW_MASK)) as i64) as u64,
                 );
 
-                let dst_ptr: *mut u64 = dst_group.add(dst_offset).cast();
-                storeu(dst_ptr, (rgb1 << 48) | rgb0);
-                storeu(dst_ptr.add(1), (rgb1 >> 16) | (rgb2 << 32));
-                storeu(dst_ptr.add(2), (rgb2 >> 32) | (rgb3 << 16));
-
-                src_offset += SRC_DEPTH * ITEMS_PER_ITERATION_4X;
-                dst_offset += DST_DEPTH * ITEMS_PER_ITERATION_4X;
-                y += ITEMS_PER_ITERATION_4X;
+                storeu(dst_group.add(y * DST_DEPTH).cast(), (rgb1 << 48) | rgb0);
+                storeu(
+                    dst_group.add(y * DST_DEPTH + 8).cast(),
+                    (rgb1 >> 16) | (rgb2 << 32),
+                );
+                storeu(
+                    dst_group.add(y * DST_DEPTH + 16).cast(),
+                    (rgb2 >> 32) | (rgb3 << 16),
+                );
+                y += ITEMS_PER_ITERATION;
             }
 
             while y < width {
-                *dst_group.add(dst_offset) = *src_group.add(src_offset + 2);
-                *dst_group.add(dst_offset + 1) = *src_group.add(src_offset + 1);
-                *dst_group.add(dst_offset + 2) = *src_group.add(src_offset);
-
-                src_offset += SRC_DEPTH;
-                dst_offset += DST_DEPTH;
+                *dst_group.add(y * DST_DEPTH) = *src_group.add(y * SRC_DEPTH + 2);
+                *dst_group.add(y * DST_DEPTH + 1) = *src_group.add(y * SRC_DEPTH + 1);
+                *dst_group.add(y * DST_DEPTH + 2) = *src_group.add(y * SRC_DEPTH);
                 y += 1;
             }
         }
