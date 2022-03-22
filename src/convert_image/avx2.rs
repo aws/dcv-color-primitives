@@ -27,29 +27,29 @@ use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
     __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
-    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
-    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
+    _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32,
+    _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
     _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x,
-    _mm256_set_epi16, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
-    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
-    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
+    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
+    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
+    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
+    _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
     __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
-    _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
-    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
-    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
-    _mm256_set1_epi64x, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
-    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
-    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    _mm256_extract_epi64, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
+    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x,
+    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
+    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
+    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
+    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
+    _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -187,9 +187,10 @@ macro_rules! fix_to_i16_16x {
 
 #[cfg(target_arch = "x86")]
 #[inline(always)]
-unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64 {
+unsafe fn _mm256_extract_epi64(a: __m256i, index: usize) -> i64 {
     let slice = std::mem::transmute::<__m256i, [i64; 4]>(a);
-    return slice[index as usize];
+
+    slice[index]
 }
 
 /// Convert short to 2D short vector (16-wide)

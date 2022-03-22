@@ -49,7 +49,16 @@ fn _bswap(x: i32) -> i32 {
 
 #[cfg(not(target_arch = "x86_64"))]
 unsafe fn _bswap64(x: i64) -> i64 {
-    (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
+    // Checked: we want to reinterpret the bits
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation
+    )]
+    {
+        (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFF_FFFF))
+            as i64
+    }
 }
 
 pub const FORWARD_WEIGHTS: [[i32; 11]; Colorimetry::Length as usize] = [
