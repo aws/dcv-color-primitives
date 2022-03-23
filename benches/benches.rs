@@ -1,4 +1,4 @@
-use affinity::set_process_affinity;
+use affinity::set_thread_affinity;
 use criterion::*;
 use std::alloc::{alloc, dealloc, Layout};
 use std::error;
@@ -596,7 +596,7 @@ fn rgb_bgra(output_path: &str, width: usize, height: usize) -> BenchmarkResult<D
 fn configure_process() {
     let cores: Vec<usize> = (0..1).collect();
 
-    set_process_affinity(&cores).unwrap();
+    set_thread_affinity(&cores).unwrap();
     set_current_thread_priority(ThreadPriority::Max).unwrap();
 }
 
