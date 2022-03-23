@@ -44,15 +44,15 @@ Both standard range (0-235) and full range (0-255) are supported.
 
 ## Requirements
 
-* Rust 1.55 and newer (until DCP 0.2: At least Rust 1.39)
-* Python3 and Fractions module (needed only if you want to execute the benchmark)
+* Rust 1.59 and newer (until DCP 0.2: At least Rust 1.39)
+* Criterion module (needed only if you want to execute the benchmark)
 
 ### Windows
 
 * Install rustup: https://www.rust-lang.org/tools/install
 * If you want to execute the benchmark:
+    * Install criterion: cargo install cargo-criterion
     * Install Python 3: https://www.python.org/downloads/
-    * Install fraction module: `pip install Fraction`
 
 ### Linux
 
@@ -61,8 +61,8 @@ Both standard range (0-235) and full range (0-255) are supported.
     curl https://sh.rustup.rs -sSf | sh
     ```
 * If you want to execute the benchmark:
+    * Install criterion: cargo install cargo-criterion
     * Install Python 3 (example for Ubuntu): `apt install python3`
-    * Install fraction module: `pip install Fraction`
 
 You may require administrative privileges.
 
@@ -88,7 +88,7 @@ cargo test
 Run benchmark:
 ```
 python benches/geninput.py
-cargo bench
+cargo criterion
 ```
 
 ## WebAssembly

@@ -12,3 +12,4 @@ __pycache__
 /.cargo*
 /.vscode*
 Cargo.lock
+benches/output*
