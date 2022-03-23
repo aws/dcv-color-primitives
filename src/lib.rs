@@ -42,7 +42,7 @@
 //!
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
-//! | ARGB                 | I420, I444, NV12           |
+//! | ARGB                 | I420, I444, NV12, RGB      |
 //! | BGR                  | I420, I444, NV12           |
 //! | BGRA                 | I420, I444, NV12, RGB      |
 //! | I420                 | BGRA                       |
@@ -178,7 +178,7 @@
 //! }
 //! ```
 //!
-//! Provide image planes to hangle data scattered in multiple buffers that are not
+//! Provide image planes to handle data scattered in multiple buffers that are not
 //! necessarily contiguous:
 //! ```
 //! use dcv_color_primitives as dcp;
@@ -423,6 +423,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt709);
         set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt601);
         set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt709);
+        set_dispatcher!($conv, $set, Argb, Lrgb, Rgb, Lrgb);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709);
         set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601);
@@ -781,6 +782,7 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Argb`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Argb`             | `PixelFormat::Rgb`  [`4`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::Nv12` [`1`]
@@ -870,7 +872,7 @@ pub fn get_buffers_size(
 /// Conversion from RGB to BGRA
 ///
 /// # Algorithm 4
-/// Conversion from BGRA to RGB
+/// Conversion from 32-bit RGB to 24-bit RGB (discards alpha channel)
 ///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
@@ -881,6 +883,7 @@ pub fn get_buffers_size(
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
 /// [`3`]: ./fn.convert_image.html#algorithm-3
+/// [`4`]: ./fn.convert_image.html#algorithm-4
 pub fn convert_image(
     width: u32,
     height: u32,

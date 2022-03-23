@@ -1223,11 +1223,25 @@ fn lrgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelForm
             for x in 0..w {
                 let offset = y * src_stride + x * src_depth;
 
-                src_image[offset] = rng.gen::<u8>();
-                src_image[offset + 1] = rng.gen::<u8>();
-                src_image[offset + 2] = rng.gen::<u8>();
-                if src_depth == 4 {
-                    src_image[offset + 3] = 255;
+                match src_pixel_format {
+                    PixelFormat::Rgb => {
+                        src_image[offset] = rng.gen::<u8>();
+                        src_image[offset + 1] = rng.gen::<u8>();
+                        src_image[offset + 2] = rng.gen::<u8>();
+                    }
+                    PixelFormat::Bgra => {
+                        src_image[offset] = rng.gen::<u8>();
+                        src_image[offset + 1] = rng.gen::<u8>();
+                        src_image[offset + 2] = rng.gen::<u8>();
+                        src_image[offset + 3] = 255;
+                    }
+                    _ => {
+                        // PixelFormat::Argb
+                        src_image[offset] = 255;
+                        src_image[offset + 1] = rng.gen::<u8>();
+                        src_image[offset + 2] = rng.gen::<u8>();
+                        src_image[offset + 3] = rng.gen::<u8>();
+                    }
                 }
             }
         }
@@ -1249,11 +1263,25 @@ fn lrgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelForm
                 let input_index = y * src_stride + x * src_depth;
                 let output_index = y * dst_stride + x * dst_depth;
 
-                assert_eq!(dst_image[output_index], src_image[input_index + 2]);
-                assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
-                assert_eq!(dst_image[output_index + 2], src_image[input_index]);
-                if dst_depth == 4 {
-                    assert_eq!(dst_image[output_index + 3], 255);
+                match dst_pixel_format {
+                    PixelFormat::Rgb => match src_pixel_format {
+                        PixelFormat::Bgra => {
+                            assert_eq!(dst_image[output_index], src_image[input_index + 2]);
+                            assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
+                            assert_eq!(dst_image[output_index + 2], src_image[input_index]);
+                        }
+                        _ => {
+                            assert_eq!(dst_image[output_index], src_image[input_index + 1]);
+                            assert_eq!(dst_image[output_index + 1], src_image[input_index + 2]);
+                            assert_eq!(dst_image[output_index + 2], src_image[input_index + 3]);
+                        }
+                    },
+                    _ => {
+                        assert_eq!(dst_image[output_index], src_image[input_index + 2]);
+                        assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
+                        assert_eq!(dst_image[output_index + 2], src_image[input_index]);
+                        assert_eq!(dst_image[output_index + 3], 255);
+                    }
                 }
             }
         }
@@ -1289,6 +1317,7 @@ fn i444_to_rgb_ok() {
 fn lrgb_ok() {
     lrgb_conversion_ok(PixelFormat::Rgb, PixelFormat::Bgra);
     lrgb_conversion_ok(PixelFormat::Bgra, PixelFormat::Rgb);
+    lrgb_conversion_ok(PixelFormat::Argb, PixelFormat::Rgb);
 }
 
 fn rgb_to_bgra_errors() {
@@ -1362,59 +1391,62 @@ fn bgra_to_rgb_errors() {
     const DST_STRIDE: usize = (WIDTH as usize) * 3;
     const SRC_SIZE: usize = SRC_STRIDE * (HEIGHT as usize);
     const DST_SIZE: usize = DST_STRIDE * (HEIGHT as usize);
+    const SUPPORTED_PIXEL_FORMATS: &[PixelFormat] = &[PixelFormat::Bgra, PixelFormat::Argb];
 
     let src_image = &[0_u8; SRC_SIZE];
     let dst_image = &mut [0_u8; DST_SIZE];
 
-    for num_planes in 0..4 {
-        let src_format = ImageFormat {
-            pixel_format: PixelFormat::Bgra,
-            color_space: ColorSpace::Lrgb,
-            num_planes: 1,
-        };
-        let dst_format = ImageFormat {
-            pixel_format: PixelFormat::Rgb,
-            color_space: ColorSpace::Lrgb,
-            num_planes,
-        };
+    for pixel_format in SUPPORTED_PIXEL_FORMATS {
+        for num_planes in 0..4 {
+            let src_format = ImageFormat {
+                pixel_format: *pixel_format,
+                color_space: ColorSpace::Lrgb,
+                num_planes: 1,
+            };
+            let dst_format = ImageFormat {
+                pixel_format: PixelFormat::Rgb,
+                color_space: ColorSpace::Lrgb,
+                num_planes,
+            };
 
-        let src_buffers = &[&src_image[..]];
-        let dst_buffers = &mut [&mut dst_image[..]];
+            let src_buffers = &[&src_image[..]];
+            let dst_buffers = &mut [&mut dst_image[..]];
 
-        let mut expected = Ok(());
-        set_expected!(
-            expected,
-            is_valid_format(&src_format, WIDTH, HEIGHT),
-            ErrorKind::InvalidValue
-        );
-        set_expected!(
-            expected,
-            is_valid_format(&dst_format, WIDTH, HEIGHT),
-            ErrorKind::InvalidValue
-        );
+            let mut expected = Ok(());
+            set_expected!(
+                expected,
+                is_valid_format(&src_format, WIDTH, HEIGHT),
+                ErrorKind::InvalidValue
+            );
+            set_expected!(
+                expected,
+                is_valid_format(&dst_format, WIDTH, HEIGHT),
+                ErrorKind::InvalidValue
+            );
 
-        let status = convert_image(
-            WIDTH,
-            HEIGHT,
-            &src_format,
-            Some(&[SRC_STRIDE; 1]),
-            src_buffers,
-            &dst_format,
-            Some(&[DST_STRIDE; 1]),
-            dst_buffers,
-        );
-
-        assert_eq!(expected.is_ok(), status.is_ok());
-        match status {
-            Ok(_) => check_bounds(
+            let status = convert_image(
                 WIDTH,
                 HEIGHT,
                 &src_format,
+                Some(&[SRC_STRIDE; 1]),
                 src_buffers,
                 &dst_format,
+                Some(&[DST_STRIDE; 1]),
                 dst_buffers,
-            ),
-            Err(err) => check_err(err, expected.unwrap_err()),
+            );
+
+            assert_eq!(expected.is_ok(), status.is_ok());
+            match status {
+                Ok(_) => check_bounds(
+                    WIDTH,
+                    HEIGHT,
+                    &src_format,
+                    src_buffers,
+                    &dst_format,
+                    dst_buffers,
+                ),
+                Err(err) => check_err(err, expected.unwrap_err()),
+            }
         }
     }
 }

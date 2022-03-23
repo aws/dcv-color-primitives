@@ -24,7 +24,7 @@
  *
  * | Source pixel format  | Destination pixel formats  |
  * | -------------------- | -------------------------- |
- * | ARGB                 | I420, I444, NV12           |
+ * | ARGB                 | I420, I444, NV12, RGB      |
  * | BGR                  | I420, I444, NV12           |
  * | BGRA                 | I420, I444, NV12, RGB      |
  * | I420                 | BGRA                       |
@@ -145,7 +145,7 @@
  * }
  * ]|
  *
- * Provide image planes to hangle data scattered in multiple buffers that are not
+ * Provide image planes to handle data scattered in multiple buffers that are not
  * necessarily contiguous:
  *
  * |[<!-- language="C" -->
@@ -642,6 +642,7 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_I420 [1][algo-1]
  *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCV_PIXEL_FORMAT_ARGB             | DCP_PIXEL_FORMAT_RGB  [4][algo-4]
  *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_I420 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGRA             | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
@@ -745,7 +746,7 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *
  * # Algorithm 4 # {#algo-4}
  *
- * Conversion from BGRA to RGB
+ * Conversion from 32-bit RGB to 24-bit RGB (discards alpha channel)
  */
 DcpResult           dcp_convert_image           (uint32_t               width,
                                                  uint32_t               height,

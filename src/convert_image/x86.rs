@@ -827,6 +827,63 @@ pub fn rgb_to_bgra(
     }
 }
 
+fn argb_to_rgb(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+    const ITEMS_PER_ITERATION: usize = 8;
+    const HIGH_MASK: u64 = 0x0000_FFFF_FF00_0000;
+    const LOW_MASK: u64 = 0x0000_0000_00FF_FFFF;
+
+    let limit = lower_multiple_of_pot(width, ITEMS_PER_ITERATION);
+
+    unsafe {
+        for i in 0..height {
+            let src_group = src_buffer.as_ptr().add(src_stride * i);
+            let dst_group = dst_buffer.as_mut_ptr().add(dst_stride * i);
+            let mut y = 0;
+
+            while y < limit {
+                let argb0: u64 = loadu(src_group.add(y * SRC_DEPTH).cast());
+                let argb1: u64 = loadu(src_group.add(y * SRC_DEPTH + 8).cast());
+                let argb2: u64 = loadu(src_group.add(y * SRC_DEPTH + 16).cast());
+                let argb3: u64 = loadu(src_group.add(y * SRC_DEPTH + 24).cast());
+
+                let (rgb0, rgb1, rgb2, rgb3) = (
+                    ((argb0 >> 16) & HIGH_MASK) | ((argb0 >> 8) & LOW_MASK),
+                    ((argb1 >> 16) & HIGH_MASK) | ((argb1 >> 8) & LOW_MASK),
+                    ((argb2 >> 16) & HIGH_MASK) | ((argb2 >> 8) & LOW_MASK),
+                    ((argb3 >> 16) & HIGH_MASK) | ((argb3 >> 8) & LOW_MASK),
+                );
+
+                storeu(dst_group.add(y * DST_DEPTH).cast(), (rgb1 << 48) | rgb0);
+                storeu(
+                    dst_group.add(y * DST_DEPTH + 8).cast(),
+                    (rgb1 >> 16) | (rgb2 << 32),
+                );
+                storeu(
+                    dst_group.add(y * DST_DEPTH + 16).cast(),
+                    (rgb2 >> 32) | (rgb3 << 16),
+                );
+                y += ITEMS_PER_ITERATION;
+            }
+
+            while y < width {
+                *dst_group.add(y * DST_DEPTH) = *src_group.add(y * SRC_DEPTH + 1);
+                *dst_group.add(y * DST_DEPTH + 1) = *src_group.add(y * SRC_DEPTH + 2);
+                *dst_group.add(y * DST_DEPTH + 2) = *src_group.add(y * SRC_DEPTH + 3);
+                y += 1;
+            }
+        }
+    }
+}
+
 #[inline(never)]
 fn nv12_bgra_lrgb(
     width: u32,
@@ -1402,6 +1459,55 @@ pub fn bgra_lrgb_rgb_lrgb(
     }
 
     bgra_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
+
+    true
+}
+
+pub fn argb_lrgb_rgb_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], SRC_DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DST_DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut *dst_buffers[0];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    argb_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
 
     true
 }
