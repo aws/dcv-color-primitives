@@ -1263,25 +1263,21 @@ fn lrgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelForm
                 let input_index = y * src_stride + x * src_depth;
                 let output_index = y * dst_stride + x * dst_depth;
 
-                match dst_pixel_format {
-                    PixelFormat::Rgb => match src_pixel_format {
-                        PixelFormat::Bgra => {
-                            assert_eq!(dst_image[output_index], src_image[input_index + 2]);
-                            assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
-                            assert_eq!(dst_image[output_index + 2], src_image[input_index]);
-                        }
-                        _ => {
-                            assert_eq!(dst_image[output_index], src_image[input_index + 1]);
-                            assert_eq!(dst_image[output_index + 1], src_image[input_index + 2]);
-                            assert_eq!(dst_image[output_index + 2], src_image[input_index + 3]);
-                        }
-                    },
-                    _ => {
+                if let PixelFormat::Rgb = dst_pixel_format {
+                    if let PixelFormat::Bgra = src_pixel_format {
                         assert_eq!(dst_image[output_index], src_image[input_index + 2]);
                         assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
                         assert_eq!(dst_image[output_index + 2], src_image[input_index]);
-                        assert_eq!(dst_image[output_index + 3], 255);
+                    } else {
+                        assert_eq!(dst_image[output_index], src_image[input_index + 1]);
+                        assert_eq!(dst_image[output_index + 1], src_image[input_index + 2]);
+                        assert_eq!(dst_image[output_index + 2], src_image[input_index + 3]);
                     }
+                } else {
+                    assert_eq!(dst_image[output_index], src_image[input_index + 2]);
+                    assert_eq!(dst_image[output_index + 1], src_image[input_index + 1]);
+                    assert_eq!(dst_image[output_index + 2], src_image[input_index]);
+                    assert_eq!(dst_image[output_index + 3], 255);
                 }
             }
         }
