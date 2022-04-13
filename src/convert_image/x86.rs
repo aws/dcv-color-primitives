@@ -749,11 +749,20 @@ fn bgr_to_rgb(
                 );
 
                 // rgb0: G2 R2 B1 G1 R1 B0 G0 R0
-                let rgb0 = (swap_rgb0 >> 40) | ((swap_rgb0 << 8) & 0x0000_FFFF_FF00_0000) | (swap_rgb0 << 56) | ((swap_rgb1 & 0xFF00_0000_0000_0000) >> 8);
+                let rgb0 = (swap_rgb0 >> 40)
+                    | ((swap_rgb0 << 8) & 0x0000_FFFF_FF00_0000)
+                    | (swap_rgb0 << 56)
+                    | ((swap_rgb1 & 0xFF00_0000_0000_0000) >> 8);
                 // rgb1: R5 B4 G4 R4 B3 G3 R3 B2
-                let rgb1 = ((swap_rgb1 >> 24) & 0xFFFF_FF00) | ((swap_rgb1 << 24) & 0x00FF_FFFF_0000_0000) | ((swap_rgb2 & 0x00FF_0000_0000_0000) << 8) | ((swap_rgb0 & 0xFF00) >> 8);
+                let rgb1 = ((swap_rgb1 >> 24) & 0xFFFF_FF00)
+                    | ((swap_rgb1 << 24) & 0x00FF_FFFF_0000_0000)
+                    | ((swap_rgb2 & 0x00FF_0000_0000_0000) << 8)
+                    | ((swap_rgb0 & 0xFF00) >> 8);
                 // rgb2: B7 G7 R7 B6 G6 R6 B5 G5
-                let rgb2 = ((swap_rgb2 & 0xFF_FFFF) << 40 ) | ((swap_rgb2 >> 8) & 0xFF_FFFF_0000) | (swap_rgb2 >> 56) | ((swap_rgb1 & 0xFF) << 8);
+                let rgb2 = ((swap_rgb2 & 0xFF_FFFF) << 40)
+                    | ((swap_rgb2 >> 8) & 0xFF_FFFF_0000)
+                    | (swap_rgb2 >> 56)
+                    | ((swap_rgb1 & 0xFF) << 8);
 
                 let dst_ptr: *mut u64 = dst_group.add(dst_offset).cast();
                 storeu(dst_ptr, rgb0);
@@ -1563,14 +1572,7 @@ pub fn bgr_lrgb_rgb_lrgb(
         return false;
     }
 
-    bgr_to_rgb(
-        w,
-        h,
-        src_stride,
-        src_buffer,
-        dst_stride,
-        dst_buffer,
-    );
+    bgr_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
 
     true
 }
