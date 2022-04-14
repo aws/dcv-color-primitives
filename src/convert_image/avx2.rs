@@ -671,6 +671,141 @@ unsafe fn lrgb_to_i420_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
+#[allow(clippy::too_many_lines)]
+unsafe fn bgr_to_rgb_avx2(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const DEPTH: usize = 3;
+
+    let swap_mask_bgr0 = _mm256_setr_epi8(
+        2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, -128, 0, -128, 4, 3, 2, 7, 6, 5, 10, 9,
+        8, 13, 12, 11, -128, 15,
+    );
+
+    let swap_mask_bgr1 = _mm256_setr_epi8(
+        -128, 3, 2, 1, 6, 5, 4, 9, 8, 7, 12, 11, 10, 15, 14, 13, 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10,
+        9, 14, 13, 12, -128,
+    );
+
+    let swap_mask_bgr2 = _mm256_setr_epi8(
+        0, -128, 4, 3, 2, 7, 6, 5, 10, 9, 8, 13, 12, 11, -128, 15, -128, 3, 2, 1, 6, 5, 4, 9, 8, 7,
+        12, 11, 10, 15, 14, 13,
+    );
+
+    let border_mask_bgr0 = _mm256_setr_epi8(
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        13, -128, 3, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128,
+    );
+
+    let border_mask_bgr0_bgr1 = _mm256_setr_epi8(
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        12, -128,
+    );
+
+    let border_mask_bgr1_bgr0 = _mm256_setr_epi8(
+        2, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128,
+    );
+
+    let border_mask_bgr1_bgr2 = _mm256_setr_epi8(
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, 13,
+    );
+
+    let border_mask_bgr2 = _mm256_setr_epi8(
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, 12,
+        -128, 2, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128,
+    );
+
+    let border_mask_bgr2_bgr1 = _mm256_setr_epi8(
+        -128, 3, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128,
+        -128, -128,
+    );
+
+    let sh_mask_intra_lane = _mm256_setr_epi32(0, 1, 2, 4, 3, 5, 6, 7);
+    let sh_mask_set_last = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 0);
+    let sh_mask_set_first = _mm256_setr_epi32(7, 1, 2, 3, 4, 5, 6, 7);
+
+    let src_group = src_buffer.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
+
+    for i in 0..height {
+        let mut src_offset = src_stride * i;
+        let mut dst_offset = dst_stride * i;
+
+        for _ in (0..width).step_by(LANE_COUNT) {
+            let src_ptr: *const __m256i = src_group.add(src_offset).cast();
+            let dst_ptr: *mut __m256i = dst_group.add(dst_offset).cast();
+
+            let bgr0 = loadu(src_ptr);
+            let bgr1 = loadu(src_ptr.add(1));
+            let bgr2 = loadu(src_ptr.add(2));
+
+            let rgb0 = _mm256_or_si256(
+                _mm256_or_si256(
+                    _mm256_shuffle_epi8(bgr0, swap_mask_bgr0),
+                    _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(bgr0, sh_mask_intra_lane),
+                        border_mask_bgr0,
+                    ),
+                ),
+                _mm256_shuffle_epi8(
+                    _mm256_permutevar8x32_epi32(bgr1, sh_mask_set_last),
+                    border_mask_bgr0_bgr1,
+                ),
+            );
+
+            let rgb1 = _mm256_or_si256(
+                _mm256_or_si256(
+                    _mm256_shuffle_epi8(bgr1, swap_mask_bgr1),
+                    _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(bgr0, sh_mask_set_first),
+                        border_mask_bgr1_bgr0,
+                    ),
+                ),
+                _mm256_shuffle_epi8(
+                    _mm256_permutevar8x32_epi32(bgr2, sh_mask_set_last),
+                    border_mask_bgr1_bgr2,
+                ),
+            );
+
+            let rgb2 = _mm256_or_si256(
+                _mm256_or_si256(
+                    _mm256_shuffle_epi8(bgr2, swap_mask_bgr2),
+                    _mm256_shuffle_epi8(
+                        _mm256_permutevar8x32_epi32(bgr2, sh_mask_intra_lane),
+                        border_mask_bgr2,
+                    ),
+                ),
+                _mm256_shuffle_epi8(
+                    _mm256_permutevar8x32_epi32(bgr1, sh_mask_set_first),
+                    border_mask_bgr2_bgr1,
+                ),
+            );
+
+            storeu(dst_ptr, rgb0);
+            storeu(dst_ptr.add(1), rgb1);
+            storeu(dst_ptr.add(2), rgb2);
+
+            src_offset += DEPTH * LANE_COUNT;
+            dst_offset += DEPTH * LANE_COUNT;
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn bgra_to_rgb_avx2(
     width: usize,
     height: usize,
@@ -2058,23 +2193,83 @@ pub fn bgr_lrgb_nv12_bt709(
 pub fn bgr_lrgb_rgb_lrgb(
     width: u32,
     height: u32,
-    last_src_plane: u32,
+    _last_src_plane: u32,
     src_strides: &[usize],
     src_buffers: &[&[u8]],
-    last_dst_plane: u32,
+    _last_dst_plane: u32,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    x86::bgr_lrgb_rgb_lrgb(
-        width,
-        height,
-        last_src_plane,
-        src_strides,
-        src_buffers,
-        last_dst_plane,
-        dst_strides,
-        dst_buffers,
-    )
+    const DEPTH: usize = PixelFormatChannels::Three as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut *dst_buffers[0];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    let vector_part = lower_multiple_of_pot(w, LANE_COUNT);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            bgr_to_rgb_avx2(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_stride,
+                dst_buffer,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let x = vector_part;
+        let sx = x * DEPTH;
+        let dx = x * DEPTH;
+
+        // The compiler is not smart here
+        // This condition should never happen
+        if sx >= src_buffer.len() || dx >= dst_buffer.len() {
+            return false;
+        }
+
+        x86::bgr_to_rgb(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sx..],
+            dst_stride,
+            &mut dst_buffer[dx..],
+        );
+    }
+
+    true
 }
 
 pub fn nv12_bt601_bgra_lrgb(

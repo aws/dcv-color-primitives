@@ -705,7 +705,7 @@ fn bgra_to_rgb(
     }
 }
 
-fn bgr_to_rgb(
+pub fn bgr_to_rgb(
     width: usize,
     height: usize,
     src_stride: usize,
