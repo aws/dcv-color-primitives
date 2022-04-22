@@ -649,6 +649,7 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_I420 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
+ *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_RGB  [5][algo-5]
  *   DCP_PIXEL_FORMAT_I420             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_I444             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
  *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
@@ -746,6 +747,10 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * # Algorithm 4 # {#algo-4}
  *
  * Conversion from BGRA to RGB
+ *
+ * # Algorithm 5 # {#algo-5}
+ *
+ * Conversion from BGR to RGB
  */
 DcpResult           dcp_convert_image           (uint32_t               width,
                                                  uint32_t               height,
