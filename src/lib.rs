@@ -43,7 +43,7 @@
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
 //! | ARGB                 | I420, I444, NV12           |
-//! | BGR                  | I420, I444, NV12           |
+//! | BGR                  | I420, I444, NV12, RGB      |
 //! | BGRA                 | I420, I444, NV12, RGB      |
 //! | I420                 | BGRA                       |
 //! | I444                 | BGRA                       |
@@ -429,6 +429,7 @@ macro_rules! set_dispatch_table {
         set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709);
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601);
         set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709);
+        set_dispatcher!($conv, $set, Bgr, Lrgb, Rgb, Lrgb);
         set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt601);
         set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709);
         set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601);
@@ -788,6 +789,7 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Bgr`              | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Bgr`              | `PixelFormat::Rgb`  [`5`]
 ///   `PixelFormat::I420`             | `PixelFormat::Bgra` [`2`]
 ///   `PixelFormat::I444`             | `PixelFormat::Bgra` [`2`]
 ///   `PixelFormat::Nv12`             | `PixelFormat::Bgra` [`2`]
@@ -871,6 +873,9 @@ pub fn get_buffers_size(
 ///
 /// # Algorithm 4
 /// Conversion from BGRA to RGB
+///
+/// # Algorithm 5
+/// Conversion from BGR to RGB
 ///
 /// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue

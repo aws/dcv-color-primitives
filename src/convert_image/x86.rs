@@ -705,6 +705,88 @@ fn bgra_to_rgb(
     }
 }
 
+pub fn bgr_to_rgb(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const DEPTH: usize = 3;
+    const ITEMS_PER_ITERATION: usize = 8;
+
+    let limit_iterations = lower_multiple_of_pot(width, ITEMS_PER_ITERATION);
+
+    unsafe {
+        let src_group = src_buffer.as_ptr();
+        let dst_group = dst_buffer.as_mut_ptr();
+
+        for i in 0..height {
+            let mut y = 0;
+            let mut src_offset = src_stride * i;
+            let mut dst_offset = dst_stride * i;
+
+            while y < limit_iterations {
+                let src_ptr: *const u64 = src_group.add(src_offset).cast();
+                let bgr0 = loadu(src_ptr);
+                let bgr1 = loadu(src_ptr.add(1));
+                let bgr2 = loadu(src_ptr.add(2));
+
+                // Checked: we want to reinterpret the bits
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    clippy::cast_possible_wrap
+                )]
+                let (swap_rgb0, swap_rgb1, swap_rgb2) = (
+                    // swap_rgb0: B0 G0 R0 B1 G1 R1 B2 G2
+                    _bswap64(bgr0 as i64) as u64,
+                    // swap_rgb1: R2 B3 G3 R3 B4 G4 R4 B5
+                    _bswap64(bgr1 as i64) as u64,
+                    // swap_rgb2: G5 R5 B6 G6 R6 B7 G7 R7
+                    _bswap64(bgr2 as i64) as u64,
+                );
+
+                // rgb0: G2 R2 B1 G1 R1 B0 G0 R0
+                let rgb0 = (swap_rgb0 >> 40)
+                    | ((swap_rgb0 << 8) & 0x0000_FFFF_FF00_0000)
+                    | (swap_rgb0 << 56)
+                    | ((swap_rgb1 & 0xFF00_0000_0000_0000) >> 8);
+                // rgb1: R5 B4 G4 R4 B3 G3 R3 B2
+                let rgb1 = ((swap_rgb1 >> 24) & 0xFFFF_FF00)
+                    | ((swap_rgb1 << 24) & 0x00FF_FFFF_0000_0000)
+                    | ((swap_rgb2 & 0x00FF_0000_0000_0000) << 8)
+                    | ((swap_rgb0 & 0xFF00) >> 8);
+                // rgb2: B7 G7 R7 B6 G6 R6 B5 G5
+                let rgb2 = ((swap_rgb2 & 0xFF_FFFF) << 40)
+                    | ((swap_rgb2 >> 8) & 0xFF_FFFF_0000)
+                    | (swap_rgb2 >> 56)
+                    | ((swap_rgb1 & 0xFF) << 8);
+
+                let dst_ptr: *mut u64 = dst_group.add(dst_offset).cast();
+                storeu(dst_ptr, rgb0);
+                storeu(dst_ptr.add(1), rgb1);
+                storeu(dst_ptr.add(2), rgb2);
+
+                src_offset += DEPTH * ITEMS_PER_ITERATION;
+                dst_offset += DEPTH * ITEMS_PER_ITERATION;
+                y += ITEMS_PER_ITERATION;
+            }
+
+            while y < width {
+                *dst_group.add(dst_offset) = *src_group.add(src_offset + 2);
+                *dst_group.add(dst_offset + 1) = *src_group.add(src_offset + 1);
+                *dst_group.add(dst_offset + 2) = *src_group.add(src_offset);
+
+                src_offset += DEPTH;
+                dst_offset += DEPTH;
+                y += 1;
+            }
+        }
+    }
+}
+
 #[inline(never)]
 pub fn rgb_to_bgra(
     width: usize,
@@ -1445,6 +1527,54 @@ pub fn bgr_lrgb_nv12_bt709(
         Colorimetry::Bt709 as usize,
         Sampler::Bgr,
     )
+}
+
+pub fn bgr_lrgb_rgb_lrgb(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    const DEPTH: usize = PixelFormatChannels::Three as usize;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut *dst_buffers[0];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    bgr_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
+
+    true
 }
 
 pub fn nv12_bt601_bgra_lrgb(
