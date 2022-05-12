@@ -104,7 +104,7 @@ fn bgra_nv12(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -160,7 +160,7 @@ fn bgra_i420(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -216,7 +216,7 @@ fn bgra_i444(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -274,7 +274,7 @@ fn nv12_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -321,13 +321,13 @@ fn bgr_rgb(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgr,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Rgb,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -374,13 +374,13 @@ fn rgb_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResul
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Rgb,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -427,13 +427,13 @@ fn bgra_rgb(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResul
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Rgb,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -492,7 +492,7 @@ fn i420_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -550,7 +550,7 @@ fn i444_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 

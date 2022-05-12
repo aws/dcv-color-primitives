@@ -60,7 +60,7 @@
  *
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
- *     DCP_COLOR_SPACE_LRGB,
+ *     DCP_COLOR_SPACE_RGB,
  *     1,
  * };
  *
@@ -91,7 +91,7 @@
  *
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
- *     DCP_COLOR_SPACE_LRGB,
+ *     DCP_COLOR_SPACE_RGB,
  *     1,
  * };
  *
@@ -126,7 +126,7 @@
  *
  * DcpImageFormat format = {
  *     DCP_PIXEL_FORMAT_BGRA,
- *     DCP_COLOR_SPACE_LRGB,
+ *     DCP_COLOR_SPACE_RGB,
  *     NUM_PLANES,
  * };
  *
@@ -162,7 +162,7 @@
  *
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
- *     DCP_COLOR_SPACE_LRGB,
+ *     DCP_COLOR_SPACE_RGB,
  *     NUM_DST_PLANES,
  * };
  *
@@ -209,7 +209,7 @@
  *
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGR,
- *     DCP_COLOR_SPACE_LRGB,
+ *     DCP_COLOR_SPACE_RGB,
  *     NUM_SRC_PLANES,
  * };
  *
@@ -327,11 +327,17 @@ typedef enum {
 
 /**
  * DcpColorSpace:
- * @DCP_COLOR_SPACE_LRGB: Gamma-corrected RGB
+ * @DCP_COLOR_SPACE_RGB: Gamma-corrected R'G'B'.
+ *                       The gamma is the one defined in ITU-R Recommendation BT.709-6 page 3, item 1.2
+ *                       The relationship between gamma-corrected component (C') and its linear value (C)
+ *                       is the following one:
+ *                       C' = 4.5 * C                      if C < 0.018,
+ *                            1.099 * pow(C, 0.45) - 0.099 otherwise.
  * @DCP_COLOR_SPACE_BT601: YCbCr, ITU-R Recommendation BT.601 (standard video system)
  * @DCP_COLOR_SPACE_BT709: YCbCr, ITU-R Recommendation BT.709 (CSC systems)
  * @DCP_COLOR_SPACE_BT601FR: YCbCr, BT.601 (full range)
  * @DCP_COLOR_SPACE_BT709FR: YCbCr, BT.709 (full range)
+ * @DCP_COLOR_SPACE_LRGB: Deprecated: 0.5.0: Use @DCP_COLOR_SPACE_RGB instead
  *
  * An enumeration of supported color models.
  *
@@ -343,11 +349,12 @@ typedef enum {
  * - Primaries
  */
 typedef enum {
-    DCP_COLOR_SPACE_LRGB,
+    DCP_COLOR_SPACE_RGB,
     DCP_COLOR_SPACE_BT601,
     DCP_COLOR_SPACE_BT709,
     DCP_COLOR_SPACE_BT601FR,
     DCP_COLOR_SPACE_BT709FR,
+    DCP_COLOR_SPACE_LRGB = DCP_COLOR_SPACE_RGB, /* Preserve backwards compatibility */
 } DcpColorSpace;
 
 /**
@@ -367,11 +374,11 @@ typedef enum {
  *
  * pixel_format          | color_space
  * ----------------------|---------------------------------------------
- * DCP_PIXEL_FORMAT_ARGB | DCP_COLOR_SPACE_LRGB
- * DCP_PIXEL_FORMAT_BGRA | DCP_COLOR_SPACE_LRGB
- * DCP_PIXEL_FORMAT_BGR  | DCP_COLOR_SPACE_LRGB
- * DCP_PIXEL_FORMAT_RGBA | DCP_COLOR_SPACE_LRGB
- * DCP_PIXEL_FORMAT_RGB  | DCP_COLOR_SPACE_LRGB
+ * DCP_PIXEL_FORMAT_ARGB | DCP_COLOR_SPACE_RGB
+ * DCP_PIXEL_FORMAT_BGRA | DCP_COLOR_SPACE_RGB
+ * DCP_PIXEL_FORMAT_BGR  | DCP_COLOR_SPACE_RGB
+ * DCP_PIXEL_FORMAT_RGBA | DCP_COLOR_SPACE_RGB
+ * DCP_PIXEL_FORMAT_RGB  | DCP_COLOR_SPACE_RGB
  * DCP_PIXEL_FORMAT_I444 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  * DCP_PIXEL_FORMAT_I422 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  * DCP_PIXEL_FORMAT_I420 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)

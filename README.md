@@ -142,7 +142,7 @@ fn main() {
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: NUM_PLANES,
     };
 
@@ -335,7 +335,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: NUM_DST_PLANES,
     };
 
@@ -380,7 +380,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgr,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: NUM_SRC_PLANES,
     };
 
