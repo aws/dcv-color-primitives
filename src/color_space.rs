@@ -24,8 +24,13 @@
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum ColorSpace {
-    /// Gamma-corrected RGB
-    Lrgb,
+    /// Gamma-corrected R'G'B'.
+    /// The gamma is the one defined in ITU-R Recommendation BT.709-6 page 3, item 1.2
+    /// The relationship between gamma-corrected component (C') and its linear value (C)
+    /// is the following one:
+    /// C' = 4.5 * C                      if C < 0.018,
+    ///      1.099 * pow(C, 0.45) - 0.099 otherwise.
+    Rgb,
     /// YCbCr, ITU-R Recommendation BT.601 (standard video system)
     Bt601,
     /// YCbCr, ITU-R Recommendation BT.709 (CSC systems)
@@ -34,4 +39,11 @@ pub enum ColorSpace {
     Bt601FR,
     /// YCbCr, BT.709 (full range)
     Bt709FR,
+}
+
+impl ColorSpace {
+    #[deprecated(since = "0.5.0", note = "Lrgb is the same as Rgb. Use ColorSpace::Rgb")]
+    #[allow(non_upper_case_globals)]
+    /// Deprecated. Same as `ColorSpace::Rgb`
+    pub const Lrgb: ColorSpace = ColorSpace::Rgb;
 }

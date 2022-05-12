@@ -57,7 +57,7 @@ const PIXEL_FORMATS: &[PixelFormat; 9] = &[
 ];
 
 const COLOR_SPACES: &[ColorSpace; 5] = &[
-    ColorSpace::Lrgb,
+    ColorSpace::Rgb,
     ColorSpace::Bt601,
     ColorSpace::Bt709,
     ColorSpace::Bt601FR,
@@ -67,7 +67,7 @@ const COLOR_SPACES: &[ColorSpace; 5] = &[
 const PIXEL_FORMAT_I444: u32 = PixelFormat::I444 as u32;
 const PIXEL_FORMAT_I422: u32 = PixelFormat::I422 as u32;
 const PIXEL_FORMAT_I420: u32 = PixelFormat::I420 as u32;
-const COLOR_SPACE_LRGB: u32 = ColorSpace::Lrgb as u32;
+const COLOR_SPACE_RGB: u32 = ColorSpace::Rgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
 const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
 const PIXEL_FORMAT_BGR: u32 = PixelFormat::Bgr as u32;
@@ -608,12 +608,12 @@ fn bootstrap(set: &str) {
                 let dst_buffers: &mut [&mut [u8]] = &mut [&mut [0_u8; 3 * PIXELS]];
                 let src_format = ImageFormat {
                     pixel_format: PixelFormat::Bgra,
-                    color_space: ColorSpace::Lrgb,
+                    color_space: ColorSpace::Rgb,
                     num_planes: 1,
                 };
                 let dst_format = ImageFormat {
                     pixel_format: PixelFormat::Rgb,
-                    color_space: ColorSpace::Lrgb,
+                    color_space: ColorSpace::Rgb,
                     num_planes: 1,
                 };
                 let sizes = &mut [0_usize; 1];
@@ -845,7 +845,7 @@ fn rgb_to_yuv_size(
             image_size,
             &ImageFormat {
                 pixel_format: *pixel_format,
-                color_space: ColorSpace::Lrgb,
+                color_space: ColorSpace::Rgb,
                 num_planes: 1,
             },
             dst_image_format,
@@ -1159,7 +1159,7 @@ fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -1178,7 +1178,7 @@ fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
     }
 }
 
-fn lrgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
+fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
     const WIDTH: u32 = 33;
     const HEIGHT: u32 = 1;
 
@@ -1195,12 +1195,12 @@ fn lrgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: Pixel
     for num_planes in 0..4 {
         let src_format = ImageFormat {
             pixel_format: src_pixel_format,
-            color_space: ColorSpace::Lrgb,
+            color_space: ColorSpace::Rgb,
             num_planes: 1,
         };
         let dst_format = ImageFormat {
             pixel_format: dst_pixel_format,
-            color_space: ColorSpace::Lrgb,
+            color_space: ColorSpace::Rgb,
             num_planes,
         };
 
@@ -1245,7 +1245,7 @@ fn lrgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: Pixel
     }
 }
 
-fn lrgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
+fn rgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
     const MAX_WIDTH: u32 = 49;
     const MAX_HEIGHT: u32 = 8;
     const MAX_PAD: usize = 3;
@@ -1255,12 +1255,12 @@ fn lrgb_conversion_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelForm
 
     let src_format = ImageFormat {
         pixel_format: src_pixel_format,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
     let dst_format = ImageFormat {
         pixel_format: dst_pixel_format,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
     let mut rng = rand::thread_rng();
@@ -1353,16 +1353,16 @@ fn i444_to_rgb_ok() {
     yuv_to_rgb_ok(PixelFormat::I444, 3);
 }
 
-fn lrgb_ok() {
-    lrgb_conversion_ok(PixelFormat::Rgb, PixelFormat::Bgra);
-    lrgb_conversion_ok(PixelFormat::Bgra, PixelFormat::Rgb);
-    lrgb_conversion_ok(PixelFormat::Bgr, PixelFormat::Rgb);
+fn rgb_ok() {
+    rgb_conversion_ok(PixelFormat::Rgb, PixelFormat::Bgra);
+    rgb_conversion_ok(PixelFormat::Bgra, PixelFormat::Rgb);
+    rgb_conversion_ok(PixelFormat::Bgr, PixelFormat::Rgb);
 }
 
-fn lrgb_errors() {
-    lrgb_conversion_errors(PixelFormat::Rgb, PixelFormat::Bgra);
-    lrgb_conversion_errors(PixelFormat::Bgra, PixelFormat::Rgb);
-    lrgb_conversion_errors(PixelFormat::Bgr, PixelFormat::Rgb);
+fn rgb_errors() {
+    rgb_conversion_errors(PixelFormat::Rgb, PixelFormat::Bgra);
+    rgb_conversion_errors(PixelFormat::Bgra, PixelFormat::Rgb);
+    rgb_conversion_errors(PixelFormat::Bgr, PixelFormat::Rgb);
 }
 
 fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
@@ -1432,8 +1432,8 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             let src_cs = *src_color_space as u32;
             let dst_cs = *dst_color_space as u32;
             let src_pf_rgb = src_pf < PIXEL_FORMAT_I444;
-            let src_cs_rgb = src_cs == COLOR_SPACE_LRGB;
-            let dst_cs_rgb = dst_cs == COLOR_SPACE_LRGB;
+            let src_cs_rgb = src_cs == COLOR_SPACE_RGB;
+            let dst_cs_rgb = dst_cs == COLOR_SPACE_RGB;
 
             set_expected!(expected, !src_pf_rgb && src_cs_rgb, ErrorKind::InvalidValue);
             set_expected!(expected, src_pf_rgb && !src_cs_rgb, ErrorKind::InvalidValue);
@@ -1457,7 +1457,7 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             );
             set_expected!(
                 expected,
-                src_cs != COLOR_SPACE_LRGB,
+                src_cs != COLOR_SPACE_RGB,
                 ErrorKind::InvalidOperation
             );
 
@@ -1552,8 +1552,8 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         let dst_cs = *dst_color_space as u32;
         let src_cs = *src_color_space as u32;
         let dst_pf_rgb = dst_pf < PIXEL_FORMAT_I444;
-        let dst_cs_rgb = dst_cs == COLOR_SPACE_LRGB;
-        let src_cs_rgb = src_cs == COLOR_SPACE_LRGB;
+        let dst_cs_rgb = dst_cs == COLOR_SPACE_RGB;
+        let src_cs_rgb = src_cs == COLOR_SPACE_RGB;
 
         set_expected!(expected, src_cs_rgb, ErrorKind::InvalidValue);
         set_expected!(expected, !dst_pf_rgb && dst_cs_rgb, ErrorKind::InvalidValue);
@@ -1575,7 +1575,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         );
         set_expected!(
             expected,
-            dst_cs != COLOR_SPACE_LRGB,
+            dst_cs != COLOR_SPACE_RGB,
             ErrorKind::InvalidOperation
         );
 
@@ -1607,7 +1607,7 @@ fn buffers_size() {
         let pf = *pixel_format as u32;
         let format = ImageFormat {
             pixel_format: *pixel_format,
-            color_space: ColorSpace::Lrgb,
+            color_space: ColorSpace::Rgb,
             num_planes,
         };
 
@@ -1734,7 +1734,7 @@ fn over_4gb() {
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Lrgb,
+        color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
 
@@ -1815,7 +1815,7 @@ fn functional_tests() {
         rgb_to_yuv_errors(PixelFormat::Nv12);
         rgb_to_yuv_errors(PixelFormat::I420);
         rgb_to_yuv_errors(PixelFormat::I444);
-        lrgb_errors();
+        rgb_errors();
 
         i444_to_rgb_ok();
         i420_to_rgb_ok();
@@ -1824,7 +1824,7 @@ fn functional_tests() {
         rgb_to_i420_ok();
         rgb_to_nv12_ok();
 
-        lrgb_ok();
+        rgb_ok();
     }
 
     #[cfg(target_arch = "x86_64")]

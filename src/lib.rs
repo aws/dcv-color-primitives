@@ -81,7 +81,7 @@
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
-//!         color_space: ColorSpace::Lrgb,
+//!         color_space: ColorSpace::Rgb,
 //!         num_planes: 1,
 //!     };
 //!
@@ -162,7 +162,7 @@
 //!
 //!     let format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
-//!         color_space: ColorSpace::Lrgb,
+//!         color_space: ColorSpace::Rgb,
 //!         num_planes: NUM_PLANES,
 //!     };
 //!
@@ -208,7 +208,7 @@
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
-//!         color_space: ColorSpace::Lrgb,
+//!         color_space: ColorSpace::Rgb,
 //!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
@@ -250,7 +250,7 @@
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgr,
-//!         color_space: ColorSpace::Lrgb,
+//!         color_space: ColorSpace::Rgb,
 //!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
@@ -356,11 +356,11 @@ impl error::Error for ErrorKind {
 ///
 /// pixel format        | color space
 /// --------------------|--------------------------------------
-/// `PixelFormat::Argb` | `ColorSpace::Lrgb`
-/// `PixelFormat::Bgra` | `ColorSpace::Lrgb`
-/// `PixelFormat::Bgr`  | `ColorSpace::Lrgb`
-/// `PixelFormat::Rgba` | `ColorSpace::Lrgb`
-/// `PixelFormat::Rgb`  | `ColorSpace::Lrgb`
+/// `PixelFormat::Argb` | `ColorSpace::Rgb`
+/// `PixelFormat::Bgra` | `ColorSpace::Rgb`
+/// `PixelFormat::Bgr`  | `ColorSpace::Rgb`
+/// `PixelFormat::Rgba` | `ColorSpace::Rgb`
+/// `PixelFormat::Rgb`  | `ColorSpace::Rgb`
 /// `PixelFormat::I444` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 /// `PixelFormat::I422` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 /// `PixelFormat::I420` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
@@ -417,58 +417,58 @@ macro_rules! set_dispatcher {
 
 macro_rules! set_dispatch_table {
     ($conv:expr, $set:ident) => {
-        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, Rgb, Lrgb);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, Rgb, Lrgb);
-        set_dispatcher!($conv, $set, I420, Bt601, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I420, Bt709, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I444, Bt601, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I444, Bt709, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, Rgb, Lrgb, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt601);
+        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt709);
+        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt601);
+        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt709);
+        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt601);
+        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt709);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt601);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt709);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt601);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt709);
+        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt601);
+        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt709);
+        set_dispatcher!($conv, $set, Bgr, Rgb, Rgb, Rgb);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt601);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt709);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt601);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt709);
+        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt601);
+        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt709);
+        set_dispatcher!($conv, $set, Bgra, Rgb, Rgb, Rgb);
+        set_dispatcher!($conv, $set, I420, Bt601, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I420, Bt709, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I444, Bt601, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I444, Bt709, Bgra, Rgb);
+        set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Rgb);
+        set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Rgb);
+        set_dispatcher!($conv, $set, Rgb, Rgb, Bgra, Rgb);
 
-        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Lrgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Lrgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Lrgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Lrgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, I420, Bt601FR, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I420, Bt709FR, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I444, Bt601FR, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, I444, Bt709FR, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, Nv12, Bt601FR, Bgra, Lrgb);
-        set_dispatcher!($conv, $set, Nv12, Bt709FR, Bgra, Lrgb);
+        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt709FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt601FR);
+        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt709FR);
+        set_dispatcher!($conv, $set, I420, Bt601FR, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I420, Bt709FR, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I444, Bt601FR, Bgra, Rgb);
+        set_dispatcher!($conv, $set, I444, Bt709FR, Bgra, Rgb);
+        set_dispatcher!($conv, $set, Nv12, Bt601FR, Bgra, Rgb);
+        set_dispatcher!($conv, $set, Nv12, Bt709FR, Bgra, Rgb);
     };
 }
 

@@ -49,10 +49,10 @@ use core::arch::x86_64::{
 };
 
 const LANE_COUNT: usize = 32;
-const LRGB_TO_YUV_WG_SIZE: usize = 4;
-const YUV_TO_LRGB_WG_SIZE: usize = 1;
-const LRGB_TO_YUV_WAVES: usize = LANE_COUNT / LRGB_TO_YUV_WG_SIZE;
-const YUV_TO_LRGB_WAVES: usize = LANE_COUNT / YUV_TO_LRGB_WG_SIZE;
+const RGB_TO_YUV_WG_SIZE: usize = 4;
+const YUV_TO_RGB_WG_SIZE: usize = 1;
+const RGB_TO_YUV_WAVES: usize = LANE_COUNT / RGB_TO_YUV_WG_SIZE;
+const YUV_TO_RGB_WAVES: usize = LANE_COUNT / YUV_TO_RGB_WG_SIZE;
 
 const PACK_LO_DQWORD_2X256: i32 = 0x20;
 const PACK_HI_DQWORD_2X256: i32 = 0x31;
@@ -331,7 +331,7 @@ unsafe fn sum_i16x2_neighborhood_4x(xy0: __m256i, xy1: __m256i) -> __m256i {
 
 /// Convert linear rgb to yuv colorspace (8-wide)
 #[inline(always)]
-unsafe fn lrgb_to_yuv_8x(
+unsafe fn rgb_to_yuv_8x(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -374,7 +374,7 @@ unsafe fn lrgb_to_yuv_8x(
 }
 
 #[inline(always)]
-unsafe fn lrgb_to_i420_8x(
+unsafe fn rgb_to_i420_8x(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -436,7 +436,7 @@ unsafe fn lrgb_to_i420_8x(
 }
 
 #[inline(always)]
-unsafe fn lrgb_to_i444_8x(
+unsafe fn rgb_to_i444_8x(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
@@ -473,7 +473,7 @@ const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn lrgb_to_yuv_avx2(
+unsafe fn rgb_to_yuv_avx2(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -484,7 +484,7 @@ unsafe fn lrgb_to_yuv_avx2(
     weights: &[i32; 8],
     sampler: Sampler,
 ) {
-    const DST_DEPTH: usize = LRGB_TO_YUV_WAVES;
+    const DST_DEPTH: usize = RGB_TO_YUV_WAVES;
 
     let (y_stride, uv_stride) = dst_strides;
 
@@ -510,20 +510,20 @@ unsafe fn lrgb_to_yuv_avx2(
     let y_group = dst_buffers.0.as_mut_ptr();
     let uv_group = dst_buffers.1.as_mut_ptr();
 
-    let src_depth = depth * LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
+    let src_depth = depth * RGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
     let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 2
     };
 
-    let wg_width = width / LRGB_TO_YUV_WAVES;
+    let wg_width = width / RGB_TO_YUV_WAVES;
     let wg_height = y_start / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            lrgb_to_yuv_8x(
+            rgb_to_yuv_8x(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
@@ -539,9 +539,9 @@ unsafe fn lrgb_to_yuv_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            lrgb_to_yuv_8x(
+            rgb_to_yuv_8x(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
@@ -555,7 +555,7 @@ unsafe fn lrgb_to_yuv_avx2(
         }
 
         // Handle leftover pixels
-        lrgb_to_yuv_8x(
+        rgb_to_yuv_8x(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
@@ -571,7 +571,7 @@ unsafe fn lrgb_to_yuv_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn lrgb_to_i420_avx2(
+unsafe fn rgb_to_i420_avx2(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -607,26 +607,26 @@ unsafe fn lrgb_to_i420_avx2(
     let u_group = dst_buffers.1.as_mut_ptr();
     let v_group = dst_buffers.2.as_mut_ptr();
 
-    let src_depth = depth * LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
+    let src_depth = depth * RGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
     let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 2
     };
 
-    let wg_width = width / LRGB_TO_YUV_WAVES;
+    let wg_width = width / RGB_TO_YUV_WAVES;
     let wg_height = y_start / 2;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            lrgb_to_i420_8x(
+            rgb_to_i420_8x(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, 2 * y, LRGB_TO_YUV_WAVES, y_stride)),
-                y_group.add(wg_index(x, 2 * y + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES / 2, v_stride)),
+                y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
+                y_group.add(wg_index(x, 2 * y + 1, RGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
+                v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
                 sampler,
                 &y_weigths,
                 &uv_weights,
@@ -637,15 +637,15 @@ unsafe fn lrgb_to_i420_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            lrgb_to_i420_8x(
+            rgb_to_i420_8x(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
+                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
+                y_group.add(wg_index(x, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
+                v_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
                 sampler,
                 &y_weigths,
                 &uv_weights,
@@ -654,13 +654,13 @@ unsafe fn lrgb_to_i420_avx2(
         }
 
         // Handle leftover pixels
-        lrgb_to_i420_8x(
+        rgb_to_i420_8x(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-            y_group.add(wg_index(rem, y_start + 1, LRGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, wg_height, LRGB_TO_YUV_WAVES / 2, u_stride)),
-            v_group.add(wg_index(rem, wg_height, LRGB_TO_YUV_WAVES / 2, v_stride)),
+            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
+            y_group.add(wg_index(rem, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
+            v_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
             Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
@@ -1011,7 +1011,7 @@ unsafe fn rgb_to_bgra_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn lrgb_to_i444_avx2(
+unsafe fn rgb_to_i444_avx2(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -1047,24 +1047,24 @@ unsafe fn lrgb_to_i444_avx2(
     let u_group = dst_buffers.1.as_mut_ptr();
     let v_group = dst_buffers.2.as_mut_ptr();
 
-    let rgb_depth = depth * LRGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / LRGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
+    let rgb_depth = depth * RGB_TO_YUV_WAVES;
+    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
     let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 1
     };
 
-    let wg_width = width / LRGB_TO_YUV_WAVES;
+    let wg_width = width / RGB_TO_YUV_WAVES;
     let wg_height = y_start;
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            lrgb_to_i444_8x(
+            rgb_to_i444_8x(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
-                y_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, u_stride)),
-                v_group.add(wg_index(x, y, LRGB_TO_YUV_WAVES, v_stride)),
+                y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
+                v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, v_stride)),
                 sampler,
                 &y_weights,
                 &u_weights,
@@ -1076,13 +1076,13 @@ unsafe fn lrgb_to_i444_avx2(
 
     // Handle leftover line
     if y_start != height {
-        let rem = (width - LRGB_TO_YUV_WAVES) / LRGB_TO_YUV_WAVES;
+        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            lrgb_to_i444_8x(
+            rgb_to_i444_8x(
                 src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, u_stride)),
-                v_group.add(wg_index(x, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
+                u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
+                v_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, v_stride)),
                 sampler,
                 &y_weights,
                 &u_weights,
@@ -1092,11 +1092,11 @@ unsafe fn lrgb_to_i444_avx2(
         }
 
         // Handle leftover pixels
-        lrgb_to_i444_8x(
+        rgb_to_i444_8x(
             src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, u_stride)),
-            v_group.add(wg_index(rem, y_start, LRGB_TO_YUV_WAVES, v_stride)),
+            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
+            u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
+            v_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, v_stride)),
             Sampler::BgrOverflow,
             &y_weights,
             &u_weights,
@@ -1108,7 +1108,7 @@ unsafe fn lrgb_to_i444_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn yuv_to_lrgb_avx2(
+unsafe fn yuv_to_rgb_avx2(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
@@ -1117,8 +1117,8 @@ unsafe fn yuv_to_lrgb_avx2(
     dst_buffer: &mut [u8],
     weights: &[i16; 8],
 ) {
-    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES;
-    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
+    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
+    const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, uv_stride) = src_strides;
 
@@ -1135,7 +1135,7 @@ unsafe fn yuv_to_lrgb_avx2(
     let uv_group = src_buffers.1.as_ptr();
     let dst_group = dst_buffer.as_mut_ptr();
 
-    let wg_width = width / YUV_TO_LRGB_WAVES;
+    let wg_width = width / YUV_TO_RGB_WAVES;
     let wg_height = height / 2;
 
     for y in 0..wg_height {
@@ -1227,7 +1227,7 @@ unsafe fn yuv_to_lrgb_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i420_to_lrgb_avx2(
+unsafe fn i420_to_rgb_avx2(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1236,8 +1236,8 @@ unsafe fn i420_to_lrgb_avx2(
     dst_buffer: &mut [u8],
     weights: &[i16; 8],
 ) {
-    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES;
-    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
+    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
+    const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, u_stride, v_stride) = src_strides;
 
@@ -1255,7 +1255,7 @@ unsafe fn i420_to_lrgb_avx2(
     let v_group = src_buffers.2.as_ptr();
     let dst_group = dst_buffer.as_mut_ptr();
 
-    let wg_width = width / YUV_TO_LRGB_WAVES;
+    let wg_width = width / YUV_TO_RGB_WAVES;
     let wg_height = height / 2;
 
     for y in 0..wg_height {
@@ -1347,7 +1347,7 @@ unsafe fn i420_to_lrgb_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i444_to_lrgb_avx2(
+unsafe fn i444_to_rgb_avx2(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1356,8 +1356,8 @@ unsafe fn i444_to_lrgb_avx2(
     dst_buffer: &mut [u8],
     weights: &[i16; 8],
 ) {
-    const SRC_DEPTH: usize = YUV_TO_LRGB_WAVES / 2;
-    const DST_DEPTH: usize = 2 * YUV_TO_LRGB_WAVES;
+    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES / 2;
+    const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, u_stride, v_stride) = src_strides;
 
@@ -1434,7 +1434,7 @@ unsafe fn i444_to_lrgb_avx2(
 }
 
 #[inline(never)]
-fn nv12_bgra_lrgb(
+fn nv12_bgra_rgb(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1493,11 +1493,11 @@ fn nv12_bgra_lrgb(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES);
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            yuv_to_lrgb_avx2(
+            yuv_to_rgb_avx2(
                 vector_part,
                 h,
                 src_strides,
@@ -1519,7 +1519,7 @@ fn nv12_bgra_lrgb(
             return false;
         }
 
-        x86::nv12_to_lrgb(
+        x86::nv12_to_rgb(
             scalar_part,
             h,
             src_strides,
@@ -1534,7 +1534,7 @@ fn nv12_bgra_lrgb(
 }
 
 #[inline(never)]
-fn i420_bgra_lrgb(
+fn i420_bgra_rgb(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -1587,11 +1587,11 @@ fn i420_bgra_lrgb(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES);
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i420_to_lrgb_avx2(
+            i420_to_rgb_avx2(
                 vector_part,
                 h,
                 src_strides,
@@ -1618,7 +1618,7 @@ fn i420_bgra_lrgb(
             return false;
         }
 
-        x86::i420_to_lrgb(
+        x86::i420_to_rgb(
             scalar_part,
             h,
             src_strides,
@@ -1637,7 +1637,7 @@ fn i420_bgra_lrgb(
 }
 
 #[inline(never)]
-fn i444_bgra_lrgb(
+fn i444_bgra_rgb(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -1687,11 +1687,11 @@ fn i444_bgra_lrgb(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, YUV_TO_LRGB_WAVES / 2);
+    let vector_part = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES / 2);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i444_to_lrgb_avx2(
+            i444_to_rgb_avx2(
                 vector_part,
                 h,
                 src_strides,
@@ -1717,7 +1717,7 @@ fn i444_bgra_lrgb(
             return false;
         }
 
-        x86::i444_to_lrgb(
+        x86::i444_to_rgb(
             scalar_part,
             h,
             src_strides,
@@ -1736,7 +1736,7 @@ fn i444_bgra_lrgb(
 }
 
 #[inline(never)]
-fn lrgb_i444(
+fn rgb_i444(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -1789,11 +1789,11 @@ fn lrgb_i444(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            lrgb_to_i444_avx2(
+            rgb_to_i444_avx2(
                 vector_part,
                 h,
                 src_stride,
@@ -1818,7 +1818,7 @@ fn lrgb_i444(
             return false;
         }
 
-        x86::lrgb_to_i444(
+        x86::rgb_to_i444(
             scalar_part,
             h,
             src_stride,
@@ -1835,7 +1835,7 @@ fn lrgb_i444(
 }
 
 #[inline(never)]
-fn lrgb_i420(
+fn rgb_i420(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -1890,11 +1890,11 @@ fn lrgb_i420(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            lrgb_to_i420_avx2(
+            rgb_to_i420_avx2(
                 vector_part,
                 h,
                 src_stride,
@@ -1923,7 +1923,7 @@ fn lrgb_i420(
             return false;
         }
 
-        x86::lrgb_to_i420(
+        x86::rgb_to_i420(
             scalar_part,
             h,
             src_stride,
@@ -1940,7 +1940,7 @@ fn lrgb_i420(
 }
 
 #[inline(never)]
-fn lrgb_nv12(
+fn rgb_nv12(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -2002,11 +2002,11 @@ fn lrgb_nv12(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, LRGB_TO_YUV_WAVES);
+    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            lrgb_to_yuv_avx2(
+            rgb_to_yuv_avx2(
                 vector_part,
                 h,
                 src_stride,
@@ -2030,7 +2030,7 @@ fn lrgb_nv12(
             return false;
         }
 
-        x86::lrgb_to_nv12(
+        x86::rgb_to_nv12(
             scalar_part,
             h,
             src_stride,
@@ -2046,7 +2046,7 @@ fn lrgb_nv12(
     true
 }
 
-pub fn argb_lrgb_nv12_bt601(
+pub fn argb_rgb_nv12_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2056,7 +2056,7 @@ pub fn argb_lrgb_nv12_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2070,7 +2070,7 @@ pub fn argb_lrgb_nv12_bt601(
     )
 }
 
-pub fn argb_lrgb_nv12_bt709(
+pub fn argb_rgb_nv12_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2080,7 +2080,7 @@ pub fn argb_lrgb_nv12_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2094,7 +2094,7 @@ pub fn argb_lrgb_nv12_bt709(
     )
 }
 
-pub fn bgra_lrgb_nv12_bt601(
+pub fn bgra_rgb_nv12_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2104,7 +2104,7 @@ pub fn bgra_lrgb_nv12_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2118,7 +2118,7 @@ pub fn bgra_lrgb_nv12_bt601(
     )
 }
 
-pub fn bgra_lrgb_nv12_bt709(
+pub fn bgra_rgb_nv12_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2128,7 +2128,7 @@ pub fn bgra_lrgb_nv12_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2142,7 +2142,7 @@ pub fn bgra_lrgb_nv12_bt709(
     )
 }
 
-pub fn bgr_lrgb_nv12_bt601(
+pub fn bgr_rgb_nv12_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2152,7 +2152,7 @@ pub fn bgr_lrgb_nv12_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2166,7 +2166,7 @@ pub fn bgr_lrgb_nv12_bt601(
     )
 }
 
-pub fn bgr_lrgb_nv12_bt709(
+pub fn bgr_rgb_nv12_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2176,7 +2176,7 @@ pub fn bgr_lrgb_nv12_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2190,7 +2190,7 @@ pub fn bgr_lrgb_nv12_bt709(
     )
 }
 
-pub fn bgr_lrgb_rgb_lrgb(
+pub fn bgr_rgb_rgb_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2272,7 +2272,7 @@ pub fn bgr_lrgb_rgb_lrgb(
     true
 }
 
-pub fn nv12_bt601_bgra_lrgb(
+pub fn nv12_bt601_bgra_rgb(
     width: u32,
     height: u32,
     last_src_plane: u32,
@@ -2282,7 +2282,7 @@ pub fn nv12_bt601_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    nv12_bgra_lrgb(
+    nv12_bgra_rgb(
         width,
         height,
         last_src_plane as usize,
@@ -2294,7 +2294,7 @@ pub fn nv12_bt601_bgra_lrgb(
     )
 }
 
-pub fn nv12_bt709_bgra_lrgb(
+pub fn nv12_bt709_bgra_rgb(
     width: u32,
     height: u32,
     last_src_plane: u32,
@@ -2304,7 +2304,7 @@ pub fn nv12_bt709_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    nv12_bgra_lrgb(
+    nv12_bgra_rgb(
         width,
         height,
         last_src_plane as usize,
@@ -2316,7 +2316,7 @@ pub fn nv12_bt709_bgra_lrgb(
     )
 }
 
-pub fn rgb_lrgb_bgra_lrgb(
+pub fn rgb_rgb_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2400,7 +2400,7 @@ pub fn rgb_lrgb_bgra_lrgb(
     true
 }
 
-pub fn i420_bt601_bgra_lrgb(
+pub fn i420_bt601_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2410,7 +2410,7 @@ pub fn i420_bt601_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i420_bgra_lrgb(
+    i420_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2421,7 +2421,7 @@ pub fn i420_bt601_bgra_lrgb(
     )
 }
 
-pub fn i420_bt709_bgra_lrgb(
+pub fn i420_bt709_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2431,7 +2431,7 @@ pub fn i420_bt709_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i420_bgra_lrgb(
+    i420_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2442,7 +2442,7 @@ pub fn i420_bt709_bgra_lrgb(
     )
 }
 
-pub fn i444_bt601_bgra_lrgb(
+pub fn i444_bt601_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2452,7 +2452,7 @@ pub fn i444_bt601_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i444_bgra_lrgb(
+    i444_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2463,7 +2463,7 @@ pub fn i444_bt601_bgra_lrgb(
     )
 }
 
-pub fn i444_bt709_bgra_lrgb(
+pub fn i444_bt709_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2473,7 +2473,7 @@ pub fn i444_bt709_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i444_bgra_lrgb(
+    i444_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2484,7 +2484,7 @@ pub fn i444_bt709_bgra_lrgb(
     )
 }
 
-pub fn argb_lrgb_i420_bt601(
+pub fn argb_rgb_i420_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2494,7 +2494,7 @@ pub fn argb_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2507,7 +2507,7 @@ pub fn argb_lrgb_i420_bt601(
     )
 }
 
-pub fn argb_lrgb_i420_bt709(
+pub fn argb_rgb_i420_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2517,7 +2517,7 @@ pub fn argb_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2530,7 +2530,7 @@ pub fn argb_lrgb_i420_bt709(
     )
 }
 
-pub fn bgra_lrgb_i420_bt601(
+pub fn bgra_rgb_i420_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2540,7 +2540,7 @@ pub fn bgra_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2553,7 +2553,7 @@ pub fn bgra_lrgb_i420_bt601(
     )
 }
 
-pub fn bgra_lrgb_i420_bt709(
+pub fn bgra_rgb_i420_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2563,7 +2563,7 @@ pub fn bgra_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2576,7 +2576,7 @@ pub fn bgra_lrgb_i420_bt709(
     )
 }
 
-pub fn bgr_lrgb_i420_bt601(
+pub fn bgr_rgb_i420_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2586,7 +2586,7 @@ pub fn bgr_lrgb_i420_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2599,7 +2599,7 @@ pub fn bgr_lrgb_i420_bt601(
     )
 }
 
-pub fn bgr_lrgb_i420_bt709(
+pub fn bgr_rgb_i420_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2609,7 +2609,7 @@ pub fn bgr_lrgb_i420_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -2622,7 +2622,7 @@ pub fn bgr_lrgb_i420_bt709(
     )
 }
 
-pub fn argb_lrgb_i444_bt601(
+pub fn argb_rgb_i444_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2632,7 +2632,7 @@ pub fn argb_lrgb_i444_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2645,7 +2645,7 @@ pub fn argb_lrgb_i444_bt601(
     )
 }
 
-pub fn argb_lrgb_i444_bt709(
+pub fn argb_rgb_i444_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2655,7 +2655,7 @@ pub fn argb_lrgb_i444_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2668,7 +2668,7 @@ pub fn argb_lrgb_i444_bt709(
     )
 }
 
-pub fn bgra_lrgb_i444_bt601(
+pub fn bgra_rgb_i444_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2678,7 +2678,7 @@ pub fn bgra_lrgb_i444_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2691,7 +2691,7 @@ pub fn bgra_lrgb_i444_bt601(
     )
 }
 
-pub fn bgra_lrgb_i444_bt709(
+pub fn bgra_rgb_i444_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2701,7 +2701,7 @@ pub fn bgra_lrgb_i444_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2714,7 +2714,7 @@ pub fn bgra_lrgb_i444_bt709(
     )
 }
 
-pub fn bgr_lrgb_i444_bt601(
+pub fn bgr_rgb_i444_bt601(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2724,7 +2724,7 @@ pub fn bgr_lrgb_i444_bt601(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2737,7 +2737,7 @@ pub fn bgr_lrgb_i444_bt601(
     )
 }
 
-pub fn bgr_lrgb_i444_bt709(
+pub fn bgr_rgb_i444_bt709(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2747,7 +2747,7 @@ pub fn bgr_lrgb_i444_bt709(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -2760,7 +2760,7 @@ pub fn bgr_lrgb_i444_bt709(
     )
 }
 
-pub fn bgra_lrgb_rgb_lrgb(
+pub fn bgra_rgb_rgb_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2811,7 +2811,7 @@ pub fn bgra_lrgb_rgb_lrgb(
     true
 }
 
-pub fn argb_lrgb_nv12_bt601fr(
+pub fn argb_rgb_nv12_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2821,7 +2821,7 @@ pub fn argb_lrgb_nv12_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2835,7 +2835,7 @@ pub fn argb_lrgb_nv12_bt601fr(
     )
 }
 
-pub fn bgra_lrgb_nv12_bt601fr(
+pub fn bgra_rgb_nv12_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2845,7 +2845,7 @@ pub fn bgra_lrgb_nv12_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2859,7 +2859,7 @@ pub fn bgra_lrgb_nv12_bt601fr(
     )
 }
 
-pub fn bgr_lrgb_nv12_bt601fr(
+pub fn bgr_rgb_nv12_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2869,7 +2869,7 @@ pub fn bgr_lrgb_nv12_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -2883,7 +2883,7 @@ pub fn bgr_lrgb_nv12_bt601fr(
     )
 }
 
-pub fn nv12_bt601fr_bgra_lrgb(
+pub fn nv12_bt601fr_bgra_rgb(
     width: u32,
     height: u32,
     last_src_plane: u32,
@@ -2893,7 +2893,7 @@ pub fn nv12_bt601fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    nv12_bgra_lrgb(
+    nv12_bgra_rgb(
         width,
         height,
         last_src_plane as usize,
@@ -2905,7 +2905,7 @@ pub fn nv12_bt601fr_bgra_lrgb(
     )
 }
 
-pub fn i420_bt601fr_bgra_lrgb(
+pub fn i420_bt601fr_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2915,7 +2915,7 @@ pub fn i420_bt601fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i420_bgra_lrgb(
+    i420_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2926,7 +2926,7 @@ pub fn i420_bt601fr_bgra_lrgb(
     )
 }
 
-pub fn i444_bt601fr_bgra_lrgb(
+pub fn i444_bt601fr_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2936,7 +2936,7 @@ pub fn i444_bt601fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i444_bgra_lrgb(
+    i444_bgra_rgb(
         width,
         height,
         src_strides,
@@ -2947,7 +2947,7 @@ pub fn i444_bt601fr_bgra_lrgb(
     )
 }
 
-pub fn argb_lrgb_i420_bt601fr(
+pub fn argb_rgb_i420_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -2957,76 +2957,7 @@ pub fn argb_lrgb_i420_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
-        width,
-        height,
-        src_strides,
-        src_buffers,
-        dst_strides,
-        dst_buffers,
-        PixelFormatChannels::Four,
-        Colorimetry::Bt601FR as usize,
-        Sampler::Argb,
-    )
-}
-
-pub fn bgra_lrgb_i420_bt601fr(
-    width: u32,
-    height: u32,
-    _last_src_plane: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: u32,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    lrgb_i420(
-        width,
-        height,
-        src_strides,
-        src_buffers,
-        dst_strides,
-        dst_buffers,
-        PixelFormatChannels::Four,
-        Colorimetry::Bt601FR as usize,
-        Sampler::Bgra,
-    )
-}
-
-pub fn bgr_lrgb_i420_bt601fr(
-    width: u32,
-    height: u32,
-    _last_src_plane: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: u32,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    lrgb_i420(
-        width,
-        height,
-        src_strides,
-        src_buffers,
-        dst_strides,
-        dst_buffers,
-        PixelFormatChannels::Three,
-        Colorimetry::Bt601FR as usize,
-        Sampler::Bgr,
-    )
-}
-
-pub fn argb_lrgb_i444_bt601fr(
-    width: u32,
-    height: u32,
-    _last_src_plane: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    _last_dst_plane: u32,
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    lrgb_i444(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3039,7 +2970,7 @@ pub fn argb_lrgb_i444_bt601fr(
     )
 }
 
-pub fn bgra_lrgb_i444_bt601fr(
+pub fn bgra_rgb_i420_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3049,7 +2980,7 @@ pub fn bgra_lrgb_i444_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3062,7 +2993,7 @@ pub fn bgra_lrgb_i444_bt601fr(
     )
 }
 
-pub fn bgr_lrgb_i444_bt601fr(
+pub fn bgr_rgb_i420_bt601fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3072,7 +3003,7 @@ pub fn bgr_lrgb_i444_bt601fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3085,7 +3016,76 @@ pub fn bgr_lrgb_i444_bt601fr(
     )
 }
 
-pub fn argb_lrgb_nv12_bt709fr(
+pub fn argb_rgb_i444_bt601fr(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    rgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601FR as usize,
+        Sampler::Argb,
+    )
+}
+
+pub fn bgra_rgb_i444_bt601fr(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    rgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Four,
+        Colorimetry::Bt601FR as usize,
+        Sampler::Bgra,
+    )
+}
+
+pub fn bgr_rgb_i444_bt601fr(
+    width: u32,
+    height: u32,
+    _last_src_plane: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    _last_dst_plane: u32,
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    rgb_i444(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+        PixelFormatChannels::Three,
+        Colorimetry::Bt601FR as usize,
+        Sampler::Bgr,
+    )
+}
+
+pub fn argb_rgb_nv12_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3095,7 +3095,7 @@ pub fn argb_lrgb_nv12_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -3109,7 +3109,7 @@ pub fn argb_lrgb_nv12_bt709fr(
     )
 }
 
-pub fn bgra_lrgb_nv12_bt709fr(
+pub fn bgra_rgb_nv12_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3119,7 +3119,7 @@ pub fn bgra_lrgb_nv12_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -3133,7 +3133,7 @@ pub fn bgra_lrgb_nv12_bt709fr(
     )
 }
 
-pub fn bgr_lrgb_nv12_bt709fr(
+pub fn bgr_rgb_nv12_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3143,7 +3143,7 @@ pub fn bgr_lrgb_nv12_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_nv12(
+    rgb_nv12(
         width,
         height,
         src_strides,
@@ -3157,7 +3157,7 @@ pub fn bgr_lrgb_nv12_bt709fr(
     )
 }
 
-pub fn nv12_bt709fr_bgra_lrgb(
+pub fn nv12_bt709fr_bgra_rgb(
     width: u32,
     height: u32,
     last_src_plane: u32,
@@ -3167,7 +3167,7 @@ pub fn nv12_bt709fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    nv12_bgra_lrgb(
+    nv12_bgra_rgb(
         width,
         height,
         last_src_plane as usize,
@@ -3179,7 +3179,7 @@ pub fn nv12_bt709fr_bgra_lrgb(
     )
 }
 
-pub fn i420_bt709fr_bgra_lrgb(
+pub fn i420_bt709fr_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3189,7 +3189,7 @@ pub fn i420_bt709fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i420_bgra_lrgb(
+    i420_bgra_rgb(
         width,
         height,
         src_strides,
@@ -3200,7 +3200,7 @@ pub fn i420_bt709fr_bgra_lrgb(
     )
 }
 
-pub fn i444_bt709fr_bgra_lrgb(
+pub fn i444_bt709fr_bgra_rgb(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3210,7 +3210,7 @@ pub fn i444_bt709fr_bgra_lrgb(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    i444_bgra_lrgb(
+    i444_bgra_rgb(
         width,
         height,
         src_strides,
@@ -3221,7 +3221,7 @@ pub fn i444_bt709fr_bgra_lrgb(
     )
 }
 
-pub fn argb_lrgb_i420_bt709fr(
+pub fn argb_rgb_i420_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3231,7 +3231,7 @@ pub fn argb_lrgb_i420_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3244,7 +3244,7 @@ pub fn argb_lrgb_i420_bt709fr(
     )
 }
 
-pub fn bgra_lrgb_i420_bt709fr(
+pub fn bgra_rgb_i420_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3254,7 +3254,7 @@ pub fn bgra_lrgb_i420_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3267,7 +3267,7 @@ pub fn bgra_lrgb_i420_bt709fr(
     )
 }
 
-pub fn bgr_lrgb_i420_bt709fr(
+pub fn bgr_rgb_i420_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3277,7 +3277,7 @@ pub fn bgr_lrgb_i420_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i420(
+    rgb_i420(
         width,
         height,
         src_strides,
@@ -3290,7 +3290,7 @@ pub fn bgr_lrgb_i420_bt709fr(
     )
 }
 
-pub fn argb_lrgb_i444_bt709fr(
+pub fn argb_rgb_i444_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3300,7 +3300,7 @@ pub fn argb_lrgb_i444_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -3313,7 +3313,7 @@ pub fn argb_lrgb_i444_bt709fr(
     )
 }
 
-pub fn bgra_lrgb_i444_bt709fr(
+pub fn bgra_rgb_i444_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3323,7 +3323,7 @@ pub fn bgra_lrgb_i444_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
@@ -3336,7 +3336,7 @@ pub fn bgra_lrgb_i444_bt709fr(
     )
 }
 
-pub fn bgr_lrgb_i444_bt709fr(
+pub fn bgr_rgb_i444_bt709fr(
     width: u32,
     height: u32,
     _last_src_plane: u32,
@@ -3346,7 +3346,7 @@ pub fn bgr_lrgb_i444_bt709fr(
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
-    lrgb_i444(
+    rgb_i444(
         width,
         height,
         src_strides,
