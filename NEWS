@@ -1,3 +1,9 @@
+News in 0.5.0
+-------------
+* Renamed ColorSpace::Lrgb in favor of ColorSpace::Rgb
+  https://github.com/aws/dcv-color-primitives/issues/63
+* Refactor internal conversion functions using the paste! macro
+
 News in 0.4.1
 -------------
 * BGR to RGB conversion
