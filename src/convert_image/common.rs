@@ -20,6 +20,20 @@ const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
 }
 
 #[cfg(not(tarpaulin_include))]
+pub const fn sampler_to_depth(sampler: Sampler) -> usize {
+    match sampler {
+        Sampler::Bgr | Sampler::BgrOverflow => 3,
+        _ => 4,
+    }
+}
+
+#[cfg(not(tarpaulin_include))]
+pub const fn is_full_range<const COLORIMETRY: usize>() -> bool {
+    // Forward weights should be defined to mach this order
+    COLORIMETRY >= 2
+}
+
+#[cfg(not(tarpaulin_include))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {

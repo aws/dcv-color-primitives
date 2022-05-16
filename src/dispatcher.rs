@@ -32,7 +32,7 @@ macro_rules! rgb_to_yuv_converter {
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
-                [<rgb _ $dst_pf:lower>](
+                [<rgb _ $dst_pf:lower>]::<{ Sampler::$src_pf as usize }, { sampler_to_depth(Sampler::$src_pf) }, { Colorimetry::$dst_cs as usize }>(
                     width,
                     height,
                     last_src_plane as usize,
@@ -41,8 +41,6 @@ macro_rules! rgb_to_yuv_converter {
                     last_dst_plane as usize,
                     dst_strides,
                     dst_buffers,
-                    Colorimetry::$dst_cs as usize,
-                    Sampler::$src_pf,
                 )
             }
         }
@@ -64,7 +62,7 @@ macro_rules! yuv_to_rgb_converter {
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
-                [<$src_pf:lower _bgra>](
+                [<$src_pf:lower _bgra>]::<{ Colorimetry::$src_cs as usize }, { sampler_to_depth(Sampler::Bgra) }>(
                     width,
                     height,
                     last_src_plane as usize,
@@ -73,7 +71,6 @@ macro_rules! yuv_to_rgb_converter {
                     last_dst_plane as usize,
                     dst_strides,
                     dst_buffers,
-                    Colorimetry::$src_cs as usize,
                 )
             }
         }
