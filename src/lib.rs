@@ -396,8 +396,27 @@ pub struct ImageFormat {
 type ConvertDispatcher =
     fn(u32, u32, u32, &[usize], &[&[u8]], u32, &[usize], &mut [&mut [u8]]) -> bool;
 
-macro_rules! set_dispatcher {
-    ($conv:expr, $set:ident, $src_pf:ident, $src_cs:ident, $dst_pf:ident, $dst_cs:ident) => {
+macro_rules! rgb_to_yuv {
+    ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident, $dst_cs:ident) => {
+        paste! {
+            $conv[dispatcher::get_index(
+                dispatcher::get_image_index(
+                    PixelFormat::$src_pf as u32,
+                    ColorSpace::Rgb as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$src_pf as u32),
+                ),
+                dispatcher::get_image_index(
+                    PixelFormat::$dst_pf as u32,
+                    ColorSpace::$dst_cs as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$dst_pf as u32),
+                ),
+            )] = Some(convert_image::$set::[<$src_pf:lower _ $dst_pf:lower _ $dst_cs:lower>])
+        }
+    };
+}
+
+macro_rules! yuv_to_rgb {
+    ($conv:expr, $set:ident, $src_pf:ident, $src_cs:ident, $dst_pf:ident) => {
         paste! {
             $conv[dispatcher::get_index(
                 dispatcher::get_image_index(
@@ -407,68 +426,86 @@ macro_rules! set_dispatcher {
                 ),
                 dispatcher::get_image_index(
                     PixelFormat::$dst_pf as u32,
-                    ColorSpace::$dst_cs as u32,
+                    ColorSpace::Rgb as u32,
                     dispatcher::get_pixel_format_mode(PixelFormat::$dst_pf as u32),
                 ),
-            )] = Some(convert_image::$set::[<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower _ $dst_cs:lower>])
+            )] = Some(convert_image::$set::[<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>])
+        }
+    };
+}
+
+macro_rules! rgb_to_rgb {
+    ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident) => {
+        paste! {
+            $conv[dispatcher::get_index(
+                dispatcher::get_image_index(
+                    PixelFormat::$src_pf as u32,
+                    ColorSpace::Rgb as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$src_pf as u32),
+                ),
+                dispatcher::get_image_index(
+                    PixelFormat::$dst_pf as u32,
+                    ColorSpace::Rgb as u32,
+                    dispatcher::get_pixel_format_mode(PixelFormat::$dst_pf as u32),
+                ),
+            )] = Some(convert_image::$set::[<$src_pf:lower _ $dst_pf:lower>])
         }
     };
 }
 
 macro_rules! set_dispatch_table {
     ($conv:expr, $set:ident) => {
-        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgr, Rgb, Rgb, Rgb);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt601);
-        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt709);
-        set_dispatcher!($conv, $set, Bgra, Rgb, Rgb, Rgb);
-        set_dispatcher!($conv, $set, I420, Bt601, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I420, Bt709, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I444, Bt601, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I444, Bt709, Bgra, Rgb);
-        set_dispatcher!($conv, $set, Nv12, Bt601, Bgra, Rgb);
-        set_dispatcher!($conv, $set, Nv12, Bt709, Bgra, Rgb);
-        set_dispatcher!($conv, $set, Rgb, Rgb, Bgra, Rgb);
-
-        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Rgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Rgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Argb, Rgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Bgr, Rgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I420, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, I444, Bt709FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt601FR);
-        set_dispatcher!($conv, $set, Bgra, Rgb, Nv12, Bt709FR);
-        set_dispatcher!($conv, $set, I420, Bt601FR, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I420, Bt709FR, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I444, Bt601FR, Bgra, Rgb);
-        set_dispatcher!($conv, $set, I444, Bt709FR, Bgra, Rgb);
-        set_dispatcher!($conv, $set, Nv12, Bt601FR, Bgra, Rgb);
-        set_dispatcher!($conv, $set, Nv12, Bt709FR, Bgra, Rgb);
+        rgb_to_rgb!($conv, $set, Bgr, Rgb);
+        rgb_to_rgb!($conv, $set, Bgra, Rgb);
+        rgb_to_rgb!($conv, $set, Rgb, Bgra);
+        rgb_to_yuv!($conv, $set, Argb, I420, Bt601);
+        rgb_to_yuv!($conv, $set, Argb, I420, Bt601FR);
+        rgb_to_yuv!($conv, $set, Argb, I420, Bt709);
+        rgb_to_yuv!($conv, $set, Argb, I420, Bt709FR);
+        rgb_to_yuv!($conv, $set, Argb, I444, Bt601);
+        rgb_to_yuv!($conv, $set, Argb, I444, Bt601FR);
+        rgb_to_yuv!($conv, $set, Argb, I444, Bt709);
+        rgb_to_yuv!($conv, $set, Argb, I444, Bt709FR);
+        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt601);
+        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt601FR);
+        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt709);
+        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgr, I420, Bt601);
+        rgb_to_yuv!($conv, $set, Bgr, I420, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgr, I420, Bt709);
+        rgb_to_yuv!($conv, $set, Bgr, I420, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgr, I444, Bt601);
+        rgb_to_yuv!($conv, $set, Bgr, I444, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgr, I444, Bt709);
+        rgb_to_yuv!($conv, $set, Bgr, I444, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt601);
+        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt709);
+        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgra, I420, Bt601);
+        rgb_to_yuv!($conv, $set, Bgra, I420, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgra, I420, Bt709);
+        rgb_to_yuv!($conv, $set, Bgra, I420, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgra, I444, Bt601);
+        rgb_to_yuv!($conv, $set, Bgra, I444, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgra, I444, Bt709);
+        rgb_to_yuv!($conv, $set, Bgra, I444, Bt709FR);
+        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt601);
+        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt601FR);
+        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709);
+        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709FR);
+        yuv_to_rgb!($conv, $set, I420, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgra);
     };
 }
 
