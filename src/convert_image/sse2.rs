@@ -66,7 +66,7 @@ macro_rules! xcgh_odd_even_words {
     };
 }
 
-const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
+const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
     [
         i32x2_to_i32(XG_601 - SHORT_HALF, XR_601),
         i32x2_to_i32(SHORT_HALF, XB_601),
@@ -75,7 +75,6 @@ const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
         i32x2_to_i32(0, ZB_601),
         i32x2_to_i32(0, YB_601),
         Y_OFFSET,
-        0,
     ],
     [
         i32x2_to_i32(XG_709 - SHORT_HALF, XR_709),
@@ -85,7 +84,6 @@ const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
         i32x2_to_i32(0, ZB_709),
         i32x2_to_i32(0, YB_709),
         Y_OFFSET,
-        0,
     ],
     [
         i32x2_to_i32(XG_601FR - SHORT_HALF, XR_601FR),
@@ -95,7 +93,6 @@ const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
         i32x2_to_i32(0, ZB_601FR),
         i32x2_to_i32(0, YB_601FR - SHORT_HALF),
         FIX16_HALF,
-        1,
     ],
     [
         i32x2_to_i32(XG_709FR - SHORT_HALF, XR_709FR),
@@ -105,7 +102,6 @@ const FORWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
         i32x2_to_i32(0, ZB_709FR),
         i32x2_to_i32(0, YB_709FR - SHORT_HALF),
         FIX16_HALF,
-        1,
     ],
 ];
 
@@ -233,34 +229,35 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 /// `green_red`:       --g3--r3 --g2--r2 --g1--r1 --g0--r0
 /// `green_blue`:      --g3--b3 --g2--b2 --g1--b1 --g0--b0
 #[inline(always)]
-unsafe fn unpack_ui8x3_i16x2_4x(image: *const u8, sampler: Sampler) -> (__m128i, __m128i) {
-    let line = match sampler {
-        Sampler::BgrOverflow => {
-            let bgr: *const i32 = image.cast();
-            _mm_set_epi32(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
-        }
-        _ => loadu(image.cast()),
+unsafe fn unpack_ui8x3_i16x2_4x<const SAMPLER: usize>(image: *const u8) -> (__m128i, __m128i) {
+    let line = if SAMPLER == Sampler::BgrOverflow as usize {
+        let bgr: *const i32 = image.cast();
+        _mm_set_epi32(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
+    } else {
+        loadu(image.cast())
     };
 
-    let aligned_line = match sampler {
-        Sampler::Bgr | Sampler::BgrOverflow => _mm_unpacklo_epi64(
+    let line = if SAMPLER == Sampler::Bgr as usize || SAMPLER == Sampler::BgrOverflow as usize {
+        _mm_unpacklo_epi64(
             _mm_unpacklo_epi32(line, _mm_srli_si128(line, 3)),
             _mm_unpacklo_epi32(_mm_srli_si128(line, 6), _mm_srli_si128(line, 9)),
-        ),
-        _ => line,
+        )
+    } else {
+        line
     };
 
-    let (red, blue, green) = match sampler {
-        Sampler::Argb => (
-            _mm_srli_epi32(_mm_slli_epi32(aligned_line, 16), 24),
-            _mm_srli_epi32(aligned_line, 24),
-            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(aligned_line, 16), 24), 8),
-        ),
-        _ => (
-            _mm_srli_epi32(_mm_slli_epi32(aligned_line, 8), 24),
-            _mm_srli_epi32(_mm_slli_epi32(aligned_line, 24), 24),
-            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(aligned_line, 8), 24), 8),
-        ),
+    let (red, blue, green) = if SAMPLER == Sampler::Argb as usize {
+        (
+            _mm_srli_epi32(_mm_slli_epi32(line, 16), 24),
+            _mm_srli_epi32(line, 24),
+            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 16), 24), 8),
+        )
+    } else {
+        (
+            _mm_srli_epi32(_mm_slli_epi32(line, 8), 24),
+            _mm_srli_epi32(_mm_slli_epi32(line, 24), 24),
+            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8),
+        )
     };
 
     (_mm_or_si128(red, green), _mm_or_si128(blue, green))
@@ -334,24 +331,22 @@ unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
 
 /// Convert linear rgb to yuv colorspace (4-wide)
 #[inline(always)]
-unsafe fn rgb_to_yuv_4x(
+unsafe fn rgb_to_yuv_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
     y1: *mut u8,
     uv: *mut u8,
-    sampler: Sampler,
     y_weigths: &[__m128i; 3],
     uv_weights: &[__m128i; 3],
-    full_range: bool,
 ) {
-    let (rg0, bg0) = unpack_ui8x3_i16x2_4x(rgb0, sampler);
+    let (rg0, bg0) = unpack_ui8x3_i16x2_4x::<SAMPLER>(rgb0);
     pack_i32_4x(
         y0,
         fix_to_i32_4x!(affine_transform(rg0, bg0, y_weigths), FIX16),
     );
 
-    let (rg1, bg1) = unpack_ui8x3_i16x2_4x(rgb1, sampler);
+    let (rg1, bg1) = unpack_ui8x3_i16x2_4x::<SAMPLER>(rgb1);
     pack_i32_4x(
         y1,
         fix_to_i32_4x!(affine_transform(rg1, bg1, y_weigths), FIX16),
@@ -360,7 +355,7 @@ unsafe fn rgb_to_yuv_4x(
     let srg = sum_i16x2_neighborhood_2x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_2x(bg0, bg1);
     let mut t = affine_transform(srg, sbg, uv_weights);
-    if full_range {
+    if is_full_range::<COLORIMETRY>() {
         t = _mm_add_epi32(
             t,
             _mm_slli_epi32(
@@ -377,25 +372,23 @@ unsafe fn rgb_to_yuv_4x(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i420_4x(
+unsafe fn rgb_to_i420_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
     y1: *mut u8,
     u: *mut u8,
     v: *mut u8,
-    sampler: Sampler,
     y_weigths: &[__m128i; 3],
     uv_weights: &[__m128i; 3],
-    full_range: bool,
 ) {
-    let (rg0, bg0) = unpack_ui8x3_i16x2_4x(rgb0, sampler);
+    let (rg0, bg0) = unpack_ui8x3_i16x2_4x::<SAMPLER>(rgb0);
     pack_i32_4x(
         y0,
         fix_to_i32_4x!(affine_transform(rg0, bg0, y_weigths), FIX16),
     );
 
-    let (rg1, bg1) = unpack_ui8x3_i16x2_4x(rgb1, sampler);
+    let (rg1, bg1) = unpack_ui8x3_i16x2_4x::<SAMPLER>(rgb1);
     pack_i32_4x(
         y1,
         fix_to_i32_4x!(affine_transform(rg1, bg1, y_weigths), FIX16),
@@ -404,7 +397,7 @@ unsafe fn rgb_to_i420_4x(
     let srg = sum_i16x2_neighborhood_2x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_2x(bg0, bg1);
     let mut t = affine_transform(srg, sbg, uv_weights);
-    if full_range {
+    if is_full_range::<COLORIMETRY>() {
         t = _mm_add_epi32(
             t,
             _mm_slli_epi32(
@@ -437,18 +430,16 @@ unsafe fn rgb_to_i420_4x(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i444_4x(
+unsafe fn rgb_to_i444_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
     v: *mut u8,
-    sampler: Sampler,
     y_weights: &[__m128i; 3],
     u_weights: &[__m128i; 3],
     v_weights: &[__m128i; 3],
-    full_range: bool,
 ) {
-    let (rg, bg) = unpack_ui8x3_i16x2_4x(rgb, sampler);
+    let (rg, bg) = unpack_ui8x3_i16x2_4x::<SAMPLER>(rgb);
     pack_i32_4x(
         y,
         fix_to_i32_4x!(affine_transform(rg, bg, y_weights), FIX16),
@@ -456,7 +447,7 @@ unsafe fn rgb_to_i444_4x(
 
     let mut tu = affine_transform(rg, bg, u_weights);
     let mut tv = affine_transform(rg, bg, v_weights);
-    if full_range {
+    if is_full_range::<COLORIMETRY>() {
         tu = _mm_add_epi32(tu, _mm_srli_epi32(_mm_slli_epi32(bg, 16), 2));
         tv = _mm_add_epi32(tv, _mm_srli_epi32(_mm_slli_epi32(rg, 16), 2));
     }
@@ -467,21 +458,19 @@ unsafe fn rgb_to_i444_4x(
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn rgb_to_yuv_sse2(
+unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8]),
-    depth: usize,
-    weights: &[i32; 8],
-    sampler: Sampler,
 ) {
     const DST_DEPTH: usize = RGB_TO_YUV_WAVES;
 
     let (y_stride, uv_stride) = dst_strides;
 
+    let weights = &FORWARD_WEIGHTS[COLORIMETRY];
     let y_weigths = [
         _mm_set1_epi32(weights[0]),
         _mm_set1_epi32(weights[1]),
@@ -491,16 +480,20 @@ unsafe fn rgb_to_yuv_sse2(
     let uv_weights = [
         _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
         _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
-        _mm_set1_epi32(C_OFFSET - FIX18_HALF * weights[7]),
+        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
+            C_OFFSET - FIX18_HALF
+        } else {
+            C_OFFSET
+        }),
     ];
 
     let src_group = src_buffer.as_ptr();
     let y_group = dst_buffers.0.as_mut_ptr();
     let uv_group = dst_buffers.1.as_mut_ptr();
 
-    let src_depth = depth * RGB_TO_YUV_WAVES;
+    let src_depth = DEPTH * RGB_TO_YUV_WAVES;
     let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 2
@@ -511,16 +504,14 @@ unsafe fn rgb_to_yuv_sse2(
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_yuv_4x(
+            rgb_to_yuv_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
                 y_group.add(wg_index(x, 2 * y + 1, DST_DEPTH, y_stride)),
                 uv_group.add(wg_index(x, y, DST_DEPTH, uv_stride)),
-                sampler,
                 &y_weigths,
                 &uv_weights,
-                weights[7] == 1,
             );
         }
     }
@@ -529,49 +520,43 @@ unsafe fn rgb_to_yuv_sse2(
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_yuv_4x(
+            rgb_to_yuv_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
                 y_group.add(wg_index(x, y_start + 1, DST_DEPTH, y_stride)),
                 uv_group.add(wg_index(x, wg_height, DST_DEPTH, uv_stride)),
-                sampler,
                 &y_weigths,
                 &uv_weights,
-                weights[7] == 1,
             );
         }
 
         // Handle leftover pixels
-        rgb_to_yuv_4x(
+        rgb_to_yuv_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
             y_group.add(wg_index(rem, y_start + 1, DST_DEPTH, y_stride)),
             uv_group.add(wg_index(rem, wg_height, DST_DEPTH, uv_stride)),
-            Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
-            weights[7] == 1,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn rgb_to_i420_sse2(
+unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
-    depth: usize,
-    weights: &[i32; 8],
-    sampler: Sampler,
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
 
+    let weights = &FORWARD_WEIGHTS[COLORIMETRY];
     let y_weigths = [
         _mm_set1_epi32(weights[0]),
         _mm_set1_epi32(weights[1]),
@@ -581,7 +566,11 @@ unsafe fn rgb_to_i420_sse2(
     let uv_weights = [
         _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
         _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
-        _mm_set1_epi32(C_OFFSET - FIX18_HALF * weights[7]),
+        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
+            C_OFFSET - FIX18_HALF
+        } else {
+            C_OFFSET
+        }),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -589,9 +578,9 @@ unsafe fn rgb_to_i420_sse2(
     let u_group = dst_buffers.1.as_mut_ptr();
     let v_group = dst_buffers.2.as_mut_ptr();
 
-    let src_depth = depth * RGB_TO_YUV_WAVES;
+    let src_depth = DEPTH * RGB_TO_YUV_WAVES;
     let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 2
@@ -602,17 +591,15 @@ unsafe fn rgb_to_i420_sse2(
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i420_4x(
+            rgb_to_i420_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, 2 * y + 1, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
                 v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
-                sampler,
                 &y_weigths,
                 &uv_weights,
-                weights[7] == 1,
             );
         }
     }
@@ -621,51 +608,45 @@ unsafe fn rgb_to_i420_sse2(
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i420_4x(
+            rgb_to_i420_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
                 v_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-                sampler,
                 &y_weigths,
                 &uv_weights,
-                weights[7] == 1,
             );
         }
 
         // Handle leftover pixels
-        rgb_to_i420_4x(
+        rgb_to_i420_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
             y_group.add(wg_index(rem, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
             v_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-            Sampler::BgrOverflow,
             &y_weigths,
             &uv_weights,
-            weights[7] == 1,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn rgb_to_i444_sse2(
+unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
     dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
-    depth: usize,
-    weights: &[i32; 8],
-    sampler: Sampler,
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
 
+    let weights = &FORWARD_WEIGHTS[COLORIMETRY];
     let y_weights = [
         _mm_set1_epi32(weights[0]),
         _mm_set1_epi32(weights[1]),
@@ -675,13 +656,21 @@ unsafe fn rgb_to_i444_sse2(
     let u_weights = [
         _mm_set1_epi32(weights[3]),
         _mm_set1_epi32(weights[5]),
-        _mm_set1_epi32(C_OFFSET16 - FIX16_HALF * weights[7]),
+        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
+            C_OFFSET16 - FIX16_HALF
+        } else {
+            C_OFFSET16
+        }),
     ];
 
     let v_weights = [
         _mm_set1_epi32(weights[2]),
         _mm_set1_epi32(weights[4]),
-        _mm_set1_epi32(C_OFFSET16 - FIX16_HALF * weights[7]),
+        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
+            C_OFFSET16 - FIX16_HALF
+        } else {
+            C_OFFSET16
+        }),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -689,9 +678,9 @@ unsafe fn rgb_to_i444_sse2(
     let u_group = dst_buffers.1.as_mut_ptr();
     let v_group = dst_buffers.2.as_mut_ptr();
 
-    let rgb_depth = depth * RGB_TO_YUV_WAVES;
+    let rgb_depth = DEPTH * RGB_TO_YUV_WAVES;
     let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
-    let y_start = if (depth == 4) || (read_bytes_per_line <= src_stride) {
+    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
         height
     } else {
         height - 1
@@ -702,16 +691,14 @@ unsafe fn rgb_to_i444_sse2(
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i444_4x(
+            rgb_to_i444_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
                 v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, v_stride)),
-                sampler,
                 &y_weights,
                 &u_weights,
                 &v_weights,
-                weights[7] == 1,
             );
         }
     }
@@ -720,50 +707,46 @@ unsafe fn rgb_to_i444_sse2(
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i444_4x(
+            rgb_to_i444_4x::<SAMPLER, COLORIMETRY>(
                 src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
                 v_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, v_stride)),
-                sampler,
                 &y_weights,
                 &u_weights,
                 &v_weights,
-                weights[7] == 1,
             );
         }
 
         // Handle leftover pixels
-        rgb_to_i444_4x(
+        rgb_to_i444_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
             src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
             v_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, v_stride)),
-            Sampler::BgrOverflow,
             &y_weights,
             &u_weights,
             &v_weights,
-            weights[7] == 1,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn yuv_to_rgb_sse2(
+unsafe fn nv12_to_rgb_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
     src_buffers: (&[u8], &[u8]),
     dst_stride: usize,
     dst_buffer: &mut [u8],
-    weights: &[i16; 8],
 ) {
     const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
     const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, uv_stride) = src_strides;
 
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
     let xxym = _mm_set1_epi16(weights[0]);
     let rcrm = _mm_set1_epi16(weights[1]);
     let gcrm = _mm_set1_epi16(weights[2]);
@@ -841,20 +824,20 @@ unsafe fn yuv_to_rgb_sse2(
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn i420_to_rgb_sse2(
+unsafe fn i420_to_rgb_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
     src_buffers: (&[u8], &[u8], &[u8]),
     dst_stride: usize,
     dst_buffer: &mut [u8],
-    weights: &[i16; 8],
 ) {
     const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
     const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, u_stride, v_stride) = src_strides;
 
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
     let xxym = _mm_set1_epi16(weights[0]);
     let rcrm = _mm_set1_epi16(weights[1]);
     let gcrm = _mm_set1_epi16(weights[2]);
@@ -933,20 +916,20 @@ unsafe fn i420_to_rgb_sse2(
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn i444_to_rgb_sse2(
+unsafe fn i444_to_rgb_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
     src_buffers: (&[u8], &[u8], &[u8]),
     dst_stride: usize,
     dst_buffer: &mut [u8],
-    weights: &[i16; 8],
 ) {
     const SRC_DEPTH: usize = YUV_TO_RGB_WAVES / 2;
     const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
 
     let (y_stride, u_stride, v_stride) = src_strides;
 
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
     let xxym = _mm_set1_epi16(weights[0]);
     let rcrm = _mm_set1_epi16(weights[1]);
     let gcrm = _mm_set1_epi16(weights[2]);
@@ -1073,7 +1056,7 @@ unsafe fn rgb_to_bgra_sse2(
 
 // Internal module functions
 #[inline(never)]
-fn nv12_bgra(
+fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1082,10 +1065,7 @@ fn nv12_bgra(
     _last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
 ) -> bool {
-    const DST_DEPTH: usize = 4;
-
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
         return true;
@@ -1104,7 +1084,7 @@ fn nv12_bgra(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    let rgb_stride = DST_DEPTH * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_strides = (
@@ -1137,21 +1117,20 @@ fn nv12_bgra(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            yuv_to_rgb_sse2(
+            nv12_to_rgb_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
                 src_buffers,
                 dst_stride,
                 dst_buffer,
-                &BACKWARD_WEIGHTS[colorimetry],
             );
         }
     }
 
     if scalar_part > 0 {
         let x = vector_part;
-        let dx = x * DST_DEPTH;
+        let dx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1159,14 +1138,13 @@ fn nv12_bgra(
             return false;
         }
 
-        x86::nv12_to_rgb(
+        x86::nv12_to_rgb::<COLORIMETRY, DEPTH>(
             scalar_part,
             h,
             src_strides,
             (&src_buffers.0[x..], &src_buffers.1[x..]),
             dst_stride,
             &mut dst_buffer[dx..],
-            &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
 
@@ -1174,7 +1152,7 @@ fn nv12_bgra(
 }
 
 #[inline(never)]
-fn i420_bgra(
+fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1183,10 +1161,7 @@ fn i420_bgra(
     _last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
 ) -> bool {
-    const DST_DEPTH: usize = 4;
-
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
         return true;
@@ -1206,7 +1181,7 @@ fn i420_bgra(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    let rgb_stride = DST_DEPTH * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_strides = (
@@ -1233,14 +1208,13 @@ fn i420_bgra(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i420_to_rgb_sse2(
+            i420_to_rgb_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
                 src_buffers,
                 dst_stride,
                 dst_buffer,
-                &BACKWARD_WEIGHTS[colorimetry],
             );
         }
     }
@@ -1248,7 +1222,7 @@ fn i420_bgra(
     if scalar_part > 0 {
         let x = vector_part;
         let cx = x / 2;
-        let dx = x * DST_DEPTH;
+        let dx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1260,7 +1234,7 @@ fn i420_bgra(
             return false;
         }
 
-        x86::i420_to_rgb(
+        x86::i420_to_rgb::<COLORIMETRY, DEPTH>(
             scalar_part,
             h,
             src_strides,
@@ -1271,7 +1245,6 @@ fn i420_bgra(
             ),
             dst_stride,
             &mut dst_buffer[dx..],
-            &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
 
@@ -1279,7 +1252,7 @@ fn i420_bgra(
 }
 
 #[inline(never)]
-fn i444_bgra(
+fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1288,10 +1261,7 @@ fn i444_bgra(
     _last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
 ) -> bool {
-    const DST_DEPTH: usize = 4;
-
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
         return true;
@@ -1308,7 +1278,7 @@ fn i444_bgra(
 
     let w = width as usize;
     let h = height as usize;
-    let rgb_stride = DST_DEPTH * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_strides = (
@@ -1335,21 +1305,20 @@ fn i444_bgra(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i444_to_rgb_sse2(
+            i444_to_rgb_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
                 src_buffers,
                 dst_stride,
                 dst_buffer,
-                &BACKWARD_WEIGHTS[colorimetry],
             );
         }
     }
 
     if scalar_part > 0 {
         let x = vector_part;
-        let dx = x * DST_DEPTH;
+        let dx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1361,7 +1330,7 @@ fn i444_bgra(
             return false;
         }
 
-        x86::i444_to_rgb(
+        x86::i444_to_rgb::<COLORIMETRY, DEPTH>(
             scalar_part,
             h,
             src_strides,
@@ -1372,7 +1341,6 @@ fn i444_bgra(
             ),
             dst_stride,
             &mut dst_buffer[dx..],
-            &x86::BACKWARD_WEIGHTS[colorimetry],
         );
     }
 
@@ -1380,7 +1348,7 @@ fn i444_bgra(
 }
 
 #[inline(never)]
-fn rgb_nv12(
+fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1389,8 +1357,6 @@ fn rgb_nv12(
     last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
-    sampler: Sampler,
 ) -> bool {
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
@@ -1409,11 +1375,7 @@ fn rgb_nv12(
     let w = width as usize;
     let h = height as usize;
     let ch = h / 2;
-    let depth = match sampler {
-        Sampler::Bgr => 3_usize,
-        _ => 4_usize,
-    };
-    let rgb_stride = depth * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_stride = compute_stride(src_strides[0], rgb_stride);
@@ -1449,23 +1411,20 @@ fn rgb_nv12(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            rgb_to_yuv_sse2(
+            rgb_to_nv12_sse2::<SAMPLER, DEPTH, COLORIMETRY>(
                 vector_part,
                 h,
                 src_stride,
                 src_buffer,
                 dst_strides,
                 &mut (y_plane, uv_plane),
-                depth,
-                &FORWARD_WEIGHTS[colorimetry],
-                sampler,
             );
         }
     }
 
     if scalar_part > 0 {
         let x = vector_part;
-        let sx = x * depth;
+        let sx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1473,16 +1432,13 @@ fn rgb_nv12(
             return false;
         }
 
-        x86::rgb_to_nv12(
+        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
             &mut (&mut y_plane[x..], &mut uv_plane[x..]),
-            depth,
-            &x86::FORWARD_WEIGHTS[colorimetry],
-            sampler,
         );
     }
 
@@ -1490,7 +1446,7 @@ fn rgb_nv12(
 }
 
 #[inline(never)]
-fn rgb_i420(
+fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1499,8 +1455,6 @@ fn rgb_i420(
     _last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
-    sampler: Sampler,
 ) -> bool {
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
@@ -1520,11 +1474,7 @@ fn rgb_i420(
     let h = height as usize;
     let cw = w / 2;
     let ch = h / 2;
-    let depth = match sampler {
-        Sampler::Bgr => 3_usize,
-        _ => 4_usize,
-    };
-    let rgb_stride = depth * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_stride = compute_stride(src_strides[0], rgb_stride);
@@ -1553,16 +1503,13 @@ fn rgb_i420(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            rgb_to_i420_sse2(
+            rgb_to_i420_sse2::<SAMPLER, DEPTH, COLORIMETRY>(
                 vector_part,
                 h,
                 src_stride,
                 src_buffer,
                 dst_strides,
                 &mut (y_plane, u_plane, v_plane),
-                depth,
-                &FORWARD_WEIGHTS[colorimetry],
-                sampler,
             );
         }
     }
@@ -1570,7 +1517,7 @@ fn rgb_i420(
     if scalar_part > 0 {
         let x = vector_part;
         let cx = x / 2;
-        let sx = x * depth;
+        let sx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1582,16 +1529,13 @@ fn rgb_i420(
             return false;
         }
 
-        x86::rgb_to_i420(
+        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
             &mut (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
-            depth,
-            &x86::FORWARD_WEIGHTS[colorimetry],
-            sampler,
         );
     }
 
@@ -1599,7 +1543,7 @@ fn rgb_i420(
 }
 
 #[inline(never)]
-fn rgb_i444(
+fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1608,8 +1552,6 @@ fn rgb_i444(
     _last_dst_plane: usize,
     dst_strides: &[usize],
     dst_buffers: &mut [&mut [u8]],
-    colorimetry: usize,
-    sampler: Sampler,
 ) -> bool {
     // Degenerate case, trivially accept
     if width == 0 || height == 0 {
@@ -1627,11 +1569,7 @@ fn rgb_i444(
 
     let w = width as usize;
     let h = height as usize;
-    let depth = match sampler {
-        Sampler::Bgr => 3_usize,
-        _ => 4_usize,
-    };
-    let rgb_stride = depth * w;
+    let rgb_stride = DEPTH * w;
 
     // Compute actual strides
     let src_stride = compute_stride(src_strides[0], rgb_stride);
@@ -1660,23 +1598,20 @@ fn rgb_i444(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            rgb_to_i444_sse2(
+            rgb_to_i444_sse2::<SAMPLER, DEPTH, COLORIMETRY>(
                 vector_part,
                 h,
                 src_stride,
                 src_buffer,
                 dst_strides,
                 &mut (y_plane, u_plane, v_plane),
-                depth,
-                &FORWARD_WEIGHTS[colorimetry],
-                sampler,
             );
         }
     }
 
     if scalar_part > 0 {
         let x = vector_part;
-        let sx = x * depth;
+        let sx = x * DEPTH;
 
         // The compiler is not smart here
         // This condition should never happen
@@ -1685,16 +1620,13 @@ fn rgb_i444(
             return false;
         }
 
-        x86::rgb_to_i444(
+        x86::rgb_to_i444::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
             &mut (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
-            depth,
-            &x86::FORWARD_WEIGHTS[colorimetry],
-            sampler,
         );
     }
 
