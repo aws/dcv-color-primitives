@@ -178,8 +178,3 @@ pub enum Colorimetry {
     Bt709FR,
     Length,
 }
-
-pub enum PixelFormatChannels {
-    Three = 3,
-    Four = 4,
-}
