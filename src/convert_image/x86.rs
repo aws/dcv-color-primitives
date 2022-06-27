@@ -666,37 +666,41 @@ pub fn rgb_to_bgra(
     let src_stride_diff = src_stride - (SRC_DEPTH * width);
     let dst_stride_diff = dst_stride - (DST_DEPTH * width);
 
-    // For single swap iteration, since the swap is done on 32 bits while the input is only
-    // 24 bits (RGB), to avoid reading an extra byte of memory that could be outside the
-    // boundaries of the buffer it is necessary to check if the there is at least one byte
-    // of stride in the input buffer, in that case we can read till the end of the buffer.
-    let single_swap_iterations = if src_stride_diff < 1 {
-        width - 1
-    } else {
-        width
-    };
-
-    // For multiple swap iteration, since each swap reads two extra bytes it is necessary
-    // to check if there is enough space to read them without going out of boundaries.
-    // Since each step retrieves items_per_iteration colors, it is checked if the width of
-    // the image is a multiple of items_per_iteration,
-    // in that case it is checked if there are 2 extra bytes of stride, if there is not
-    // enough space then the number of multiple swap iterarions is reduced by items_per_iteration
-    // since it is not safe to read till the end of the buffer, otherwise it is not.
-    let multi_swap_iterations =
-        if ITEMS_PER_ITERATION * (width / ITEMS_PER_ITERATION) == width && src_stride_diff < 2 {
-            ITEMS_PER_ITERATION * ((width - 1) / ITEMS_PER_ITERATION)
-        } else {
-            ITEMS_PER_ITERATION * (width / ITEMS_PER_ITERATION)
-        };
-
     unsafe {
         let src_group = src_buffer.as_ptr();
         let dst_group = dst_buffer.as_mut_ptr();
         let mut src_offset = 0;
         let mut dst_offset = 0;
 
-        for _ in 0..height {
+        for y in 0..height {
+            let is_last_line = y == height - 1;
+
+            // For single swap iteration, since the swap is done on 32 bits while the input is only
+            // 24 bits (RGB), to avoid reading an extra byte of memory that could be outside the
+            // boundaries of the buffer it is necessary to check if the there is at least one byte
+            // of stride in the input buffer, in that case we can read till the end of the buffer.
+            let single_swap_iterations = if is_last_line || src_stride_diff < 1 {
+                width - 1
+            } else {
+                width
+            };
+
+            // For multiple swap iteration, since each swap reads two extra bytes it is necessary
+            // to check if there is enough space to read them without going out of boundaries.
+            // Since each step retrieves items_per_iteration colors, it is checked if the width of
+            // the image is a multiple of items_per_iteration,
+            // in that case it is checked if there are 2 extra bytes of stride, if there is not
+            // enough space then the number of multiple swap iterarions is reduced by items_per_iteration
+            // since it is not safe to read till the end of the buffer, otherwise it is not.
+            let multi_swap_iterations = if is_last_line
+                || (ITEMS_PER_ITERATION * (width / ITEMS_PER_ITERATION) == width
+                    && src_stride_diff < 2)
+            {
+                ITEMS_PER_ITERATION * ((width - 1) / ITEMS_PER_ITERATION)
+            } else {
+                ITEMS_PER_ITERATION * (width / ITEMS_PER_ITERATION)
+            };
+
             let mut x = 0;
 
             // Retrieves items_per_iteration colors per cycle if possible
