@@ -123,10 +123,39 @@ jobs:
       - name: Test
         run: wasm-pack test --node
 
+  sanitizer:
+    name: Sanitizer
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+
+      - name: Sanitizer
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --target=x86_64-unknown-linux-gnu
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+
+      - name: Sanitizer (instruction sets)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets"
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: build
+    needs: sanitizer
 
     steps:
       - uses: actions/checkout@v2
