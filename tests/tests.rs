@@ -1764,7 +1764,7 @@ fn over_4gb() {
         let dst_layout = Layout::from_size_align_unchecked(EXPECTED_DST_BUFFER_SIZE, 1);
         let dst_ptr = alloc_zeroed(dst_layout);
         if !dst_ptr.is_null() {
-            let src_image = from_raw_parts_mut(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
+            let src_image: &[u8] = from_raw_parts_mut(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
             let dst_image = from_raw_parts_mut(dst_ptr, EXPECTED_DST_BUFFER_SIZE);
 
             // Touch output
@@ -1774,7 +1774,7 @@ fn over_4gb() {
 
             dst_image[dst_image.len() - 1] = 0;
 
-            let src_buffers = &[&src_image[..]];
+            let src_buffers = &[src_image];
             let dst_buffers = &mut [&mut *dst_image];
 
             assert!(convert_image(
