@@ -1,3 +1,7 @@
+News in 0.5.1
+-------------
+* Avoid reading invalid data for rgb to bgra conversion
+
 News in 0.5.0
 -------------
 * Renamed ColorSpace::Lrgb in favor of ColorSpace::Rgb
