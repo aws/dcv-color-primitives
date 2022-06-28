@@ -137,13 +137,11 @@ jobs:
           target: x86_64-unknown-linux-gnu
 
       - name: Sanitizer
-        uses: actions-rs/cargo@v1
         run: cargo +nightly test --verbose --target=x86_64-unknown-linux-gnu
         env:
           RUSTFLAGS: -Zsanitizer=address
 
       - name: Sanitizer (instruction sets)
-        uses: actions-rs/cargo@v1
         run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets"
         env:
           RUSTFLAGS: -Zsanitizer=address
