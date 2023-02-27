@@ -13,6 +13,8 @@
 // HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#![allow(clippy::crate_in_macro_def)]
+
 use crate::color_space::ColorSpace;
 use crate::pixel_format::PixelFormat;
 use crate::static_assert;
@@ -32,7 +34,7 @@ macro_rules! rgb_to_yuv_converter {
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
-                [<rgb _ $dst_pf:lower>]::<{ Sampler::$src_pf as usize }, { sampler_to_depth(Sampler::$src_pf) }, { Colorimetry::$dst_cs as usize }>(
+                [<rgb _ $dst_pf:lower>]::<{ Sampler::$src_pf as usize }, { crate::pixel_format::PixelFormat::depth(crate::pixel_format::PixelFormat::$src_pf) }, { Colorimetry::$dst_cs as usize }>(
                     width,
                     height,
                     last_src_plane as usize,
@@ -50,9 +52,9 @@ macro_rules! rgb_to_yuv_converter {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! yuv_to_rgb_converter {
-    ($src_pf:ident, $src_cs:ident) => {
+    ($src_pf:ident, $src_cs:ident, $dst_pf:ident) => {
         paste::paste! {
-            pub fn [<$src_pf:lower _ $src_cs:lower _bgra>] (
+            pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
                 width: u32,
                 height: u32,
                 last_src_plane: u32,
@@ -62,7 +64,7 @@ macro_rules! yuv_to_rgb_converter {
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
-                [<$src_pf:lower _bgra>]::<{ Colorimetry::$src_cs as usize }, { sampler_to_depth(Sampler::Bgra) }>(
+                [<$src_pf:lower _rgb>]::<{ Colorimetry::$src_cs as usize }, { crate::pixel_format::PixelFormat::depth(crate::pixel_format::PixelFormat::$dst_pf) }>(
                     width,
                     height,
                     last_src_plane as usize,

@@ -30,7 +30,7 @@ The library is currenty able to convert the following pixel formats:
 | BGRA                 | I420, I444, NV12, RGB      |
 | I420                 | BGRA                       |
 | I444                 | BGRA                       |
-| NV12                 | BGRA                       |
+| NV12                 | BGRA, RGB                  |
 | RGB                  | BGRA                       |
 
 ### Color models

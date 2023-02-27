@@ -3,7 +3,7 @@ use std::error;
 use std::fmt;
 use std::fs::{remove_file, OpenOptions};
 use std::io::BufRead;
-use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
@@ -13,6 +13,7 @@ use dcv_color_primitives as dcp;
 
 const NV12_OUTPUT: &str = "./output.nv12";
 const BGRA_OUTPUT: &str = "./output.bgra";
+const RGB_OUTPUT: &str = "./output.rgb";
 const RGB_BGRA_OUTPUT: &str = "./rgb_output.bgra";
 const BGR_RGB_OUTPUT: &str = "./bgr_output.rgb";
 const BGRA_RGB_OUTPUT: &str = "./bgra_rgb_output.rgb";
@@ -63,7 +64,7 @@ fn read_line(file: &mut Cursor<&[u8]>) -> BenchmarkResult<String> {
 }
 
 fn pnm_size(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32)> {
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     skip_line(file)?;
 
     let dimensions: Vec<_> = read_line(file)?
@@ -71,13 +72,13 @@ fn pnm_size(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32)> {
         .map(|s| s.parse::<u32>().unwrap())
         .collect();
 
-    let width = dimensions.get(0).ok_or(BenchmarkError)?;
+    let width = dimensions.first().ok_or(BenchmarkError)?;
     let height = dimensions.get(1).ok_or(BenchmarkError)?;
     Ok((*width, *height))
 }
 
 fn pnm_data(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32, Vec<u8>)> {
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     let (width, height) = pnm_size(file)?;
 
     let size: usize = (width as usize) * (height as usize);
@@ -299,6 +300,57 @@ fn nv12_bgra(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResu
             .create(true)
             .open(output_path)?;
         write!(buffer, "P5\n{} {}\n255\n", 4 * width, height)?;
+        buffer.write_all(&output_buffer)?;
+    }
+
+    Ok(elapsed)
+}
+
+fn nv12_rgb(input_file: &mut Cursor<&[u8]>, output_path: &str) -> BenchmarkResult<Duration> {
+    let (width, mut height, input_buffer) = { pnm_data(input_file)? };
+    height = 2 * height / 3;
+
+    let dst_size: usize = 3 * (width as usize) * (height as usize);
+    let mut output_buffer: Vec<u8> = vec![0; dst_size];
+    for i in (0..dst_size).step_by(PAGE_SIZE) {
+        output_buffer[i] = 0;
+    }
+
+    let input_data: &[&[u8]] = &[&input_buffer];
+    let output_data: &mut [&mut [u8]] = &mut [&mut output_buffer[..]];
+
+    let src_format = ImageFormat {
+        pixel_format: PixelFormat::Nv12,
+        color_space: ColorSpace::Bt601,
+        num_planes: 1,
+    };
+
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::Rgb,
+        color_space: ColorSpace::Rgb,
+        num_planes: 1,
+    };
+
+    let start = Instant::now();
+    convert_image(
+        width,
+        height,
+        &src_format,
+        None,
+        input_data,
+        &dst_format,
+        None,
+        output_data,
+    )?;
+
+    let elapsed = start.elapsed();
+
+    if !Path::new(output_path).exists() {
+        let mut buffer = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(output_path)?;
+        write!(buffer, "P5\n{} {}\n255\n", 3 * width, height)?;
         buffer.write_all(&output_buffer)?;
     }
 
@@ -672,6 +724,29 @@ fn bench(c: &mut Criterion) {
                 for _i in 0..iters {
                     total += nv12_bgra(&mut input_file, output_path)
                         .expect("Benchmark iteration failed");
+                }
+
+                total
+            });
+        });
+    }
+
+    {
+        let output_path = &RGB_OUTPUT;
+        if Path::new(output_path).exists() {
+            remove_file(Path::new(output_path)).expect("Unable to delete benchmark output");
+        }
+
+        let mut input_file: Cursor<&[u8]> = Cursor::new(include_bytes!("input.nv12"));
+        let (width, height) =
+            { pnm_size(&mut input_file).expect("Malformed benchmark input file") };
+        group.throughput(Throughput::Elements((width as u64) * (height as u64)));
+        group.bench_function("nv12>rgb", move |b| {
+            b.iter_custom(|iters| {
+                let mut total = Duration::new(0, 0);
+                for _i in 0..iters {
+                    total +=
+                        nv12_rgb(&mut input_file, output_path).expect("Benchmark iteration failed");
                 }
 
                 total

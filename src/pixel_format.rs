@@ -61,6 +61,17 @@ pub enum PixelFormat {
     Nv12,
 }
 
+impl PixelFormat {
+    #[cfg(not(tarpaulin_include))]
+    pub(crate) const fn depth(pixel_format: PixelFormat) -> usize {
+        match pixel_format {
+            PixelFormat::Argb | PixelFormat::Bgra | PixelFormat::Rgba => 4,
+            PixelFormat::Bgr | PixelFormat::Rgb => 3,
+            _ => 0,
+        }
+    }
+}
+
 /// If a plane stride is assigned to this constant, the plane will be assumed to contain packed data
 pub const STRIDE_AUTO: usize = 0;
 

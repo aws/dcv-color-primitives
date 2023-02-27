@@ -733,7 +733,7 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn nv12_to_rgb_sse2<const COLORIMETRY: usize>(
+unsafe fn nv12_to_bgra_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
@@ -824,7 +824,7 @@ unsafe fn nv12_to_rgb_sse2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn i420_to_rgb_sse2<const COLORIMETRY: usize>(
+unsafe fn i420_to_bgra_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -916,7 +916,7 @@ unsafe fn i420_to_rgb_sse2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "sse2")]
-unsafe fn i444_to_rgb_sse2<const COLORIMETRY: usize>(
+unsafe fn i444_to_bgra_sse2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1056,7 +1056,7 @@ unsafe fn rgb_to_bgra_sse2(
 
 // Internal module functions
 #[inline(never)]
-fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1112,12 +1112,26 @@ fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
         return false;
     }
 
+    if DEPTH == 3 {
+        // Needed _mm_shuffle_epi8 is from SSSE3, fallback to scalar path
+        x86::nv12_to_rgb::<COLORIMETRY>(
+            w,
+            h,
+            src_strides,
+            (src_buffers.0, src_buffers.1),
+            dst_stride,
+            dst_buffer,
+        );
+
+        return true;
+    }
+
     // Process vector part and scalar one
     let vector_part = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES);
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            nv12_to_rgb_sse2::<COLORIMETRY>(
+            nv12_to_bgra_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
@@ -1138,7 +1152,7 @@ fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::nv12_to_rgb::<COLORIMETRY, DEPTH>(
+        x86::nv12_to_bgra::<COLORIMETRY>(
             scalar_part,
             h,
             src_strides,
@@ -1152,7 +1166,7 @@ fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1208,7 +1222,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i420_to_rgb_sse2::<COLORIMETRY>(
+            i420_to_bgra_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
@@ -1234,7 +1248,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i420_to_rgb::<COLORIMETRY, DEPTH>(
+        x86::i420_to_bgra::<COLORIMETRY>(
             scalar_part,
             h,
             src_strides,
@@ -1252,7 +1266,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1305,7 +1319,7 @@ fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i444_to_rgb_sse2::<COLORIMETRY>(
+            i444_to_bgra_sse2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
@@ -1330,7 +1344,7 @@ fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i444_to_rgb::<COLORIMETRY, DEPTH>(
+        x86::i444_to_bgra::<COLORIMETRY>(
             scalar_part,
             h,
             src_strides,
@@ -1669,18 +1683,22 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
-yuv_to_rgb_converter!(I420, Bt601);
-yuv_to_rgb_converter!(I420, Bt601FR);
-yuv_to_rgb_converter!(I420, Bt709);
-yuv_to_rgb_converter!(I420, Bt709FR);
-yuv_to_rgb_converter!(I444, Bt601);
-yuv_to_rgb_converter!(I444, Bt601FR);
-yuv_to_rgb_converter!(I444, Bt709);
-yuv_to_rgb_converter!(I444, Bt709FR);
-yuv_to_rgb_converter!(Nv12, Bt601);
-yuv_to_rgb_converter!(Nv12, Bt601FR);
-yuv_to_rgb_converter!(Nv12, Bt709);
-yuv_to_rgb_converter!(Nv12, Bt709FR);
+yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 
 pub fn bgr_rgb(
     width: u32,

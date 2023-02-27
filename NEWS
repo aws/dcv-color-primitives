@@ -1,3 +1,7 @@
+News in 0.5.2
+-------------
+* Add nv12 to rgb conversion
+
 News in 0.5.1
 -------------
 * Avoid reading invalid data for rgb to bgra conversion
