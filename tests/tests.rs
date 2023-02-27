@@ -71,6 +71,8 @@ const COLOR_SPACE_RGB: u32 = ColorSpace::Rgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
 const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
 const PIXEL_FORMAT_BGR: u32 = PixelFormat::Bgr as u32;
+const PIXEL_FORMAT_NV12: u32 = PixelFormat::Nv12 as u32;
+const PIXEL_FORMAT_RGB: u32 = PixelFormat::Rgb as u32;
 const RGB_SRC: [[[u8; 4]; 8]; 8] = [
     [
         [161, 24, 44, 58],
@@ -900,7 +902,7 @@ fn rgb_to_yuv_ok(pixel_format: PixelFormat, num_planes: u32) {
     }
 }
 
-fn yuv_to_rgb_size_format_mode_stride(
+fn yuv_to_bgra_size_format_mode_stride(
     image_size: (u32, u32),
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
@@ -1111,7 +1113,7 @@ fn yuv_to_rgb_size_format_mode_stride(
     }
 }
 
-fn yuv_to_rgb_size_format_mode(
+fn yuv_to_bgra_size_format_mode(
     image_size: (u32, u32),
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
@@ -1120,7 +1122,7 @@ fn yuv_to_rgb_size_format_mode(
 
     if src_format.num_planes == 1 {
         for (y_pad, dst_pad) in iproduct!(0..MAX_PAD, 0..MAX_PAD) {
-            yuv_to_rgb_size_format_mode_stride(
+            yuv_to_bgra_size_format_mode_stride(
                 image_size,
                 src_format,
                 dst_format,
@@ -1129,7 +1131,7 @@ fn yuv_to_rgb_size_format_mode(
         }
     } else if src_format.num_planes == 2 {
         for (y_pad, uv_pad, dst_pad) in iproduct!(0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD) {
-            yuv_to_rgb_size_format_mode_stride(
+            yuv_to_bgra_size_format_mode_stride(
                 image_size,
                 src_format,
                 dst_format,
@@ -1138,12 +1140,12 @@ fn yuv_to_rgb_size_format_mode(
         }
     } else if src_format.num_planes == 3 {
         for pad in iproduct!(0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD) {
-            yuv_to_rgb_size_format_mode_stride(image_size, src_format, dst_format, pad);
+            yuv_to_bgra_size_format_mode_stride(image_size, src_format, dst_format, pad);
         }
     }
 }
 
-fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
+fn yuv_to_bgra_ok(pixel_format: PixelFormat, num_planes: u32) {
     const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
         ColorSpace::Bt601,
         ColorSpace::Bt709,
@@ -1172,6 +1174,174 @@ fn yuv_to_rgb_ok(pixel_format: PixelFormat, num_planes: u32) {
 
         for width in (0..=MAX_WIDTH).step_by(step) {
             for height in (0..=MAX_HEIGHT).step_by(step) {
+                yuv_to_bgra_size_format_mode((width, height), &src_format, &dst_format);
+            }
+        }
+    }
+}
+
+fn yuv_to_rgb_size_format_mode_stride(
+    image_size: (u32, u32),
+    src_format: &ImageFormat,
+    dst_format: &ImageFormat,
+    pad: (usize, usize, usize),
+) {
+    let (y_pad, u_pad, dst_pad) = pad;
+    let w = image_size.0 as usize;
+    let h = image_size.1 as usize;
+
+    let y_stride = w + y_pad;
+    let u_stride = w + u_pad;
+    let ch = h / 2;
+    let src_size = y_stride * h + u_stride * ch;
+
+    let dst_stride = w * 3 + dst_pad;
+    let dst_size = dst_stride * h;
+    let color_space_index = match src_format.color_space {
+        ColorSpace::Bt601 => 0,
+        ColorSpace::Bt709 => 1,
+        ColorSpace::Bt601FR => 2,
+        _ => 3,
+    };
+
+    let mut src_image = vec![0_u8; src_size].into_boxed_slice();
+    let mut i = 0;
+    while i < y_stride * h {
+        for x in (0..w).step_by(2) {
+            let index = (x >> 1) & 7;
+            let luma = Y_SRC[color_space_index][index];
+
+            src_image[i + x] = luma;
+            src_image[i + x + 1] = luma;
+        }
+
+        i += y_stride;
+    }
+
+    while i < src_size {
+        for x in (0..w).step_by(2) {
+            let index = (x >> 1) & 0x7;
+            src_image[i + x] = U_SRC[color_space_index][index];
+            src_image[i + x + 1] = V_SRC[color_space_index][index];
+        }
+
+        i += u_stride;
+    }
+
+    let mut dst_image = vec![0_u8; dst_size].into_boxed_slice();
+    let dst_stride = if dst_pad == 0 {
+        STRIDE_AUTO
+    } else {
+        dst_stride
+    };
+
+    let mut src_buffers: Vec<&[u8]> = Vec::with_capacity(2);
+    let mut src_strides = Vec::with_capacity(2);
+    src_strides.push(if y_pad == 0 { STRIDE_AUTO } else { y_stride });
+    if src_format.num_planes == 1 {
+        src_buffers.push(&src_image);
+    } else if src_format.num_planes == 2 {
+        src_strides.push(if u_pad == 0 { STRIDE_AUTO } else { u_stride });
+
+        let (first, last) = src_image.split_at(y_stride * h);
+        src_buffers.push(first);
+        src_buffers.push(last);
+    }
+
+    let mut expected_row = vec![0_i32; 3 * w].into_boxed_slice();
+    for (x, pixel) in expected_row.chunks_exact_mut(3).enumerate() {
+        let index = (x >> 1) & 7;
+
+        pixel[0] = if (index & 1) == 0 { 0 } else { 255 };
+        pixel[1] = if ((index >> 1) & 1) == 0 { 0 } else { 255 };
+        pixel[2] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
+    }
+
+    assert!(convert_image(
+        image_size.0,
+        image_size.1,
+        src_format,
+        Some(&src_strides[..]),
+        &src_buffers[..],
+        dst_format,
+        Some(&[dst_stride]),
+        &mut [&mut dst_image[..]],
+    )
+    .is_ok());
+
+    let pack_stride = 3 * w;
+    i = 0;
+    while i < dst_size {
+        for col in 0..w {
+            let off = 3 * col;
+            assert!(
+                (i32::from(dst_image[i + off]) - expected_row[off]).abs() <= 2
+                    && (i32::from(dst_image[i + off + 1]) - expected_row[off + 1]).abs() <= 2
+                    && (i32::from(dst_image[i + off + 2]) - expected_row[off + 2]).abs() <= 2
+            );
+        }
+
+        for col in 0..dst_pad {
+            assert_eq!(dst_image[i + pack_stride + col], 0);
+        }
+
+        i += pack_stride + dst_pad;
+    }
+}
+
+fn yuv_to_rgb_size_format_mode(
+    image_size: (u32, u32),
+    src_format: &ImageFormat,
+    dst_format: &ImageFormat,
+) {
+    const MAX_PAD: usize = 4;
+
+    if src_format.num_planes == 1 {
+        for (y_pad, dst_pad) in iproduct!(0..MAX_PAD, 0..MAX_PAD) {
+            yuv_to_rgb_size_format_mode_stride(
+                image_size,
+                src_format,
+                dst_format,
+                (y_pad, y_pad, dst_pad),
+            );
+        }
+    } else {
+        for (y_pad, uv_pad, dst_pad) in iproduct!(0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD) {
+            yuv_to_rgb_size_format_mode_stride(
+                image_size,
+                src_format,
+                dst_format,
+                (y_pad, uv_pad, dst_pad),
+            );
+        }
+    }
+}
+
+fn yuv_to_rgb_ok(num_planes: u32) {
+    const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
+        ColorSpace::Bt601,
+        ColorSpace::Bt709,
+        ColorSpace::Bt601FR,
+        ColorSpace::Bt709FR,
+    ];
+    const MAX_WIDTH: u32 = 34;
+    const MAX_HEIGHT: u32 = 4;
+
+    let dst_format = ImageFormat {
+        pixel_format: PixelFormat::Rgb,
+        color_space: ColorSpace::Rgb,
+        num_planes: 1,
+    };
+
+    for color_space in SUPPORTED_COLOR_SPACES {
+        let src_format = ImageFormat {
+            pixel_format: PixelFormat::Nv12,
+            color_space: *color_space,
+            num_planes,
+        };
+
+        for width in (0..=MAX_WIDTH).step_by(2) {
+            for height in (0..=MAX_HEIGHT).step_by(2) {
                 yuv_to_rgb_size_format_mode((width, height), &src_format, &dst_format);
             }
         }
@@ -1340,17 +1510,22 @@ fn rgb_to_i444_ok() {
     rgb_to_yuv_ok(PixelFormat::I444, 3);
 }
 
-fn i420_to_rgb_ok() {
-    yuv_to_rgb_ok(PixelFormat::I420, 3);
+fn i420_to_bgra_ok() {
+    yuv_to_bgra_ok(PixelFormat::I420, 3);
+}
+
+fn nv12_to_bgra_ok() {
+    yuv_to_bgra_ok(PixelFormat::Nv12, 1);
+    yuv_to_bgra_ok(PixelFormat::Nv12, 2);
+}
+
+fn i444_to_bgra_ok() {
+    yuv_to_bgra_ok(PixelFormat::I444, 3);
 }
 
 fn nv12_to_rgb_ok() {
-    yuv_to_rgb_ok(PixelFormat::Nv12, 1);
-    yuv_to_rgb_ok(PixelFormat::Nv12, 2);
-}
-
-fn i444_to_rgb_ok() {
-    yuv_to_rgb_ok(PixelFormat::I444, 3);
+    yuv_to_rgb_ok(1);
+    yuv_to_rgb_ok(2);
 }
 
 fn rgb_ok() {
@@ -1548,6 +1723,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         }
 
         let mut expected = Ok(());
+        let src_pf = pixel_format as u32;
         let dst_pf = *dst_pixel_format as u32;
         let dst_cs = *dst_color_space as u32;
         let src_cs = *src_color_space as u32;
@@ -1570,7 +1746,8 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         );
         set_expected!(
             expected,
-            dst_pf != PIXEL_FORMAT_BGRA,
+            !(dst_pf == PIXEL_FORMAT_BGRA
+                || (src_pf == PIXEL_FORMAT_NV12 && dst_pf == PIXEL_FORMAT_RGB)),
             ErrorKind::InvalidOperation
         );
         set_expected!(
@@ -1817,12 +1994,13 @@ fn functional_tests() {
         rgb_to_yuv_errors(PixelFormat::I444);
         rgb_errors();
 
-        i444_to_rgb_ok();
-        i420_to_rgb_ok();
-        nv12_to_rgb_ok();
+        i444_to_bgra_ok();
+        i420_to_bgra_ok();
+        nv12_to_bgra_ok();
         rgb_to_i444_ok();
         rgb_to_i420_ok();
         rgb_to_nv12_ok();
+        nv12_to_rgb_ok();
 
         rgb_ok();
     }

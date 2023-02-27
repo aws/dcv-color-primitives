@@ -47,7 +47,7 @@
 //! | BGRA                 | I420, I444, NV12, RGB      |
 //! | I420                 | BGRA                       |
 //! | I444                 | BGRA                       |
-//! | NV12                 | BGRA                       |
+//! | NV12                 | BGRA, RGB                  |
 //! | RGB                  | BGRA                       |
 //!
 //! The supported color models are:
@@ -506,6 +506,10 @@ macro_rules! set_dispatch_table {
         yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Rgb);
     };
 }
 
@@ -829,7 +833,7 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Bgr`              | `PixelFormat::Rgb`  [`5`]
 ///   `PixelFormat::I420`             | `PixelFormat::Bgra` [`2`]
 ///   `PixelFormat::I444`             | `PixelFormat::Bgra` [`2`]
-///   `PixelFormat::Nv12`             | `PixelFormat::Bgra` [`2`]
+///   `PixelFormat::Nv12`             | `PixelFormat::Bgra`, `PixelFormat::Rgb` [`2`]
 ///   `PixelFormat::Rgb`              | `PixelFormat::Bgra` [`3`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the

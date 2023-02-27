@@ -23,30 +23,31 @@ use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
-    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
-    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
-    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x,
-    _mm256_set_epi16, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
-    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
-    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_blend_epi32,
+    _mm256_cmpeq_epi32, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
+    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
+    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
+    _mm256_set1_epi64x, _mm256_set_epi16, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
+    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
+    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32,
+    _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
+    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
+    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_cmpeq_epi32,
-    _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
-    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
-    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
-    _mm256_set1_epi64x, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32,
-    _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16,
-    _mm256_slli_epi32, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_blend_epi32,
+    _mm256_cmpeq_epi32, _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16,
+    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
+    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
+    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x, _mm256_set_epi32, _mm256_set_epi64x,
+    _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
+    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256,
+    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
+    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
+    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
+    _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -247,6 +248,67 @@ unsafe fn pack_i16x3_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m
         rgba.add(1),
         _mm256_permute2x128_si256(rgbw_lo, rgbw_hi, PACK_HI_DQWORD_2X256),
     );
+}
+
+/// Truncate and deinterleave 3 short samples into 3 uchar samples (16-wide)
+#[inline(always)]
+unsafe fn pack_rgb_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m256i) {
+    let compress_mask = _mm256_setr_epi8(
+        0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, -128, -128, -128, -128, 0, 1, 2, 4, 5, 6, 8, 9, 10,
+        12, 13, 14, -128, -128, -128, -128,
+    );
+
+    // bFbEbDbC bBbAb9b8 rFrErDrC rBrAr9r8 b7b6b5b4 b3b2b1b0 r7r6r5r4 r3r2r1r0
+    let a2 = _mm256_packus_epi16(red, blue);
+    // gFgEgDgC gBgAg9g8 gFgEgDgC gBgAg9g8 g7g6g5g4 g3g2g1g0 g7g6g5g4 g3g2g1g0
+    let a0 = _mm256_packus_epi16(green, green);
+
+    // bFbEbDbC bBbAb9b8 rFrErDrC rBrAr9r8 b7b6b5b4 b3b2b1b0 r7r6r5r4 r3r2r1r0
+    // gFgEgDgC gBgAg9g8 gFgEgDgC gBgAg9g8 g7g6g5g4 g3g2g1g0 g7g6g5g4 g3g2g1g0
+    // gFrFgErE gDrDgCrC gBrBgArA g9r9g8r8 g7r7g6r6 g5r5g4r4 g3r3g2r2 g1r1g0r0
+    let a1 = _mm256_unpacklo_epi8(a2, a0);
+    // bFbEbDbC bBbAb9b8 rFrErDrC rBrAr9r8 b7b6b5b4 b3b2b1b0 r7r6r5r4 r3r2r1r0
+    // gFgEgDgC gBgAg9g8 gFgEgDgC gBgAg9g8 g7g6g5g4 g3g2g1g0 g7g6g5g4 g3g2g1g0
+    // gFbFgEbE gDbDgCbC gBbBgAbA g9b9g8b8 g7b7g6b6 g5b5g4b4 g3b3g2b2 g1b1g0b0
+    let a0 = _mm256_unpackhi_epi8(a2, a0);
+
+    // Merge:
+    // gFrFgErE gDrDgCrC gBrBgArA g9r9g8r8 g7r7g6r6 g5r5g4r4 g3r3g2r2 g1r1g0r0
+    // gFbFgEbE gDbDgCbC gBbBgAbA g9b9g8b8 g7b7g6b6 g5b5g4b4 g3b3g2b2 g1b1g0b0
+    // gBbBgBrB gAbAgArA g9b9g9r9 g8b8g8r8 g3b3g3r3 g2b2g2r2 g1b1g1r1 g0b0g0r0
+    // gFbFgFrF gEbEgErE gBbDgDrD gCbCgCrC g7b7g7r7 g6b6g6r6 g5b5g5r5 g4b4g4r4
+    let a2 = _mm256_unpacklo_epi16(a1, a0);
+    let a0 = _mm256_unpackhi_epi16(a1, a0);
+
+    // Compress:
+    // gBbBgBrB gAbAgArA g9b9g9r9 g8b8g8r8 g3b3g3r3 g2b2g2r2 g1b1g1r1 g0b0g0r0
+    // -------- bBgBrBbA gArAb9g9 r9b8g8r8 -------- b3g3r3b2 g2r2b1g1 r1b0g0r0
+    // gFbFgFrF gEbEgErE gBbDgDrD gCbCgCrC g7b7g7r7 g6b6g6r6 g5b5g5r5 g4b4g4r4
+    // -------- bFgFrFbE gErEbDgD rDbCgCrC -------- b7g7r7b6 g6r6b5g5 r5b4g4r4
+    let a2 = _mm256_shuffle_epi8(a2, compress_mask);
+    let a1 = _mm256_shuffle_epi8(a0, compress_mask);
+
+    // Shift and combine:
+    // rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8 | r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+    // bFgFrFbE gErEbDgD -------- -------- | -------- -------- b7g7r7b6 g6r6b5g5
+    // rDbCgCrC bBgBrBbA rDbCgCrC bBgBrBbA | gArAb9g9 r9b8g8r8 gArAb9g9 r9b8g8r8
+    // bFgFrFbE gErEbDgD rDbCgCrC bBgBrBbA | gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5
+    let a0 = _mm256_slli_si256(a1, 12);
+    let a1 = _mm256_srli_si256(a1, 4);
+    let a2 = _mm256_or_si256(a0, a2);
+    let a0 = _mm256_permute4x64_epi64(a1, shuffle(2, 3, 1, 0));
+    let a1 = _mm256_permute4x64_epi64(a2, shuffle(3, 3, 2, 2));
+    let a0 = _mm256_blend_epi32(a0, a1, 0x3C);
+
+    // Permute:
+    // gArAb9g9 r9b8g8r8 b7g7r7b6 g6r6b5g5 | r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+    let a1 = _mm256_permute2x128_si256(a2, a0, PACK_LO_DQWORD_2X256);
+
+    // Write:
+    // a0 at 16
+    // a1 at 0
+    storeu(image.add(16).cast(), a0);
+    storeu(image.cast(), a1);
 }
 
 /// Convert 3 deinterleaved uchar samples into 2 deinterleaved
@@ -747,7 +809,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize>(
+unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
@@ -866,7 +928,126 @@ unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i420_to_rgb_avx2<const COLORIMETRY: usize>(
+unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize>(
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize),
+    src_buffers: (&[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
+    const DST_DEPTH: usize = 48;
+
+    let (y_stride, uv_stride) = src_strides;
+
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
+    let xxym = _mm256_set1_epi16(weights[0]);
+    let rcrm = _mm256_set1_epi16(weights[1]);
+    let gcrm = _mm256_set1_epi16(weights[2]);
+    let gcbm = _mm256_set1_epi16(weights[3]);
+    let bcbm = _mm256_set1_epi16(weights[4]);
+    let rn = _mm256_set1_epi16(weights[5]);
+    let gp = _mm256_set1_epi16(weights[6]);
+    let bn = _mm256_set1_epi16(weights[7]);
+
+    let y_group = src_buffers.0.as_ptr();
+    let uv_group = src_buffers.1.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
+
+    let wg_width = width / YUV_TO_RGB_WAVES;
+    let wg_height = height / 2;
+
+    for y in 0..wg_height {
+        for x in 0..wg_width {
+            let (cb, cr) =
+                unpack_ui8x2_i16be_16x(uv_group.add(wg_index(x, y, SRC_DEPTH, uv_stride)));
+
+            let sb = _mm256_sub_epi16(_mm256_mulhi_epu16(cb, bcbm), bn);
+            let sr = _mm256_sub_epi16(_mm256_mulhi_epu16(cr, rcrm), rn);
+            let sg = _mm256_sub_epi16(
+                gp,
+                _mm256_add_epi16(_mm256_mulhi_epu16(cb, gcbm), _mm256_mulhi_epu16(cr, gcrm)),
+            );
+
+            let (sb_lo, sb_hi) = i16_to_i16x2_16x(sb);
+            let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
+            let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
+
+            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
+
+            let y00 = _mm256_mulhi_epu16(
+                _mm256_permute2x128_si256(
+                    _mm256_unpacklo_epi8(zero!(), y0),
+                    _mm256_unpackhi_epi8(zero!(), y0),
+                    PACK_LO_DQWORD_2X256,
+                ),
+                xxym,
+            );
+            pack_rgb_16x(
+                dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
+                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y00), FIX6),
+            );
+
+            let y10 = _mm256_mulhi_epu16(
+                _mm256_permute2x128_si256(
+                    _mm256_unpacklo_epi8(zero!(), y0),
+                    _mm256_unpackhi_epi8(zero!(), y0),
+                    PACK_HI_DQWORD_2X256,
+                ),
+                xxym,
+            );
+            pack_rgb_16x(
+                dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
+                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
+            );
+
+            let y1 = loadu(
+                y_group
+                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
+                    .cast(),
+            );
+
+            let y01 = _mm256_mulhi_epu16(
+                _mm256_permute2x128_si256(
+                    _mm256_unpacklo_epi8(zero!(), y1),
+                    _mm256_unpackhi_epi8(zero!(), y1),
+                    PACK_LO_DQWORD_2X256,
+                ),
+                xxym,
+            );
+            pack_rgb_16x(
+                dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
+                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y01), FIX6),
+            );
+
+            let y11 = _mm256_mulhi_epu16(
+                _mm256_permute2x128_si256(
+                    _mm256_unpacklo_epi8(zero!(), y1),
+                    _mm256_unpackhi_epi8(zero!(), y1),
+                    PACK_HI_DQWORD_2X256,
+                ),
+                xxym,
+            );
+            pack_rgb_16x(
+                dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
+                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
+                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y11), FIX6),
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -986,7 +1167,7 @@ unsafe fn i420_to_rgb_avx2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i444_to_rgb_avx2<const COLORIMETRY: usize>(
+unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1414,7 +1595,7 @@ unsafe fn rgb_to_bgra_avx2(
 
 // Internal module functions
 #[inline(never)]
-fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1475,14 +1656,25 @@ fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            nv12_to_rgb_avx2::<COLORIMETRY>(
-                vector_part,
-                h,
-                src_strides,
-                src_buffers,
-                dst_stride,
-                dst_buffer,
-            );
+            if DEPTH == 4 {
+                nv12_to_bgra_avx2::<COLORIMETRY>(
+                    vector_part,
+                    h,
+                    src_strides,
+                    src_buffers,
+                    dst_stride,
+                    dst_buffer,
+                );
+            } else {
+                nv12_to_rgb_avx2::<COLORIMETRY>(
+                    vector_part,
+                    h,
+                    src_strides,
+                    src_buffers,
+                    dst_stride,
+                    dst_buffer,
+                );
+            }
         }
     }
 
@@ -1496,21 +1688,32 @@ fn nv12_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::nv12_to_rgb::<COLORIMETRY, DEPTH>(
-            scalar_part,
-            h,
-            src_strides,
-            (&src_buffers.0[x..], &src_buffers.1[x..]),
-            dst_stride,
-            &mut dst_buffer[dx..],
-        );
+        if DEPTH == 4 {
+            x86::nv12_to_bgra::<COLORIMETRY>(
+                scalar_part,
+                h,
+                src_strides,
+                (&src_buffers.0[x..], &src_buffers.1[x..]),
+                dst_stride,
+                &mut dst_buffer[dx..],
+            );
+        } else {
+            x86::nv12_to_rgb::<COLORIMETRY>(
+                scalar_part,
+                h,
+                src_strides,
+                (&src_buffers.0[x..], &src_buffers.1[x..]),
+                dst_stride,
+                &mut dst_buffer[dx..],
+            );
+        }
     }
 
     true
 }
 
 #[inline(never)]
-fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1566,7 +1769,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i420_to_rgb_avx2::<COLORIMETRY>(
+            i420_to_bgra_avx2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
@@ -1592,7 +1795,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i420_to_rgb::<COLORIMETRY, DEPTH>(
+        x86::i420_to_bgra::<COLORIMETRY>(
             scalar_part,
             h,
             src_strides,
@@ -1610,7 +1813,7 @@ fn i420_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1663,7 +1866,7 @@ fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i444_to_rgb_avx2::<COLORIMETRY>(
+            i444_to_bgra_avx2::<COLORIMETRY>(
                 vector_part,
                 h,
                 src_strides,
@@ -1688,7 +1891,7 @@ fn i444_bgra<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i444_to_rgb::<COLORIMETRY, DEPTH>(
+        x86::i444_to_bgra::<COLORIMETRY>(
             scalar_part,
             h,
             src_strides,
@@ -2027,18 +2230,22 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
-yuv_to_rgb_converter!(I420, Bt601);
-yuv_to_rgb_converter!(I420, Bt601FR);
-yuv_to_rgb_converter!(I420, Bt709);
-yuv_to_rgb_converter!(I420, Bt709FR);
-yuv_to_rgb_converter!(I444, Bt601);
-yuv_to_rgb_converter!(I444, Bt601FR);
-yuv_to_rgb_converter!(I444, Bt709);
-yuv_to_rgb_converter!(I444, Bt709FR);
-yuv_to_rgb_converter!(Nv12, Bt601);
-yuv_to_rgb_converter!(Nv12, Bt601FR);
-yuv_to_rgb_converter!(Nv12, Bt709);
-yuv_to_rgb_converter!(Nv12, Bt709FR);
+yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 
 pub fn rgb_bgra(
     width: u32,
