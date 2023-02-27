@@ -1849,13 +1849,7 @@ fn buffers_size() {
                         assert_eq!(*buffer_size, (area * mul) >> shf);
 
                         let row = match pixel_format {
-                            PixelFormat::I422 | PixelFormat::I420 => {
-                                if i > 0 {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
+                            PixelFormat::I422 | PixelFormat::I420 => i32::from(i > 0),
                             _ => 0,
                         };
 

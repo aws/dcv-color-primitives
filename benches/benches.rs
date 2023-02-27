@@ -3,7 +3,7 @@ use std::error;
 use std::fmt;
 use std::fs::{remove_file, OpenOptions};
 use std::io::BufRead;
-use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use std::path::Path;
 use std::time::Duration;
 use std::time::Instant;
@@ -64,7 +64,7 @@ fn read_line(file: &mut Cursor<&[u8]>) -> BenchmarkResult<String> {
 }
 
 fn pnm_size(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32)> {
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     skip_line(file)?;
 
     let dimensions: Vec<_> = read_line(file)?
@@ -72,13 +72,13 @@ fn pnm_size(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32)> {
         .map(|s| s.parse::<u32>().unwrap())
         .collect();
 
-    let width = dimensions.get(0).ok_or(BenchmarkError)?;
+    let width = dimensions.first().ok_or(BenchmarkError)?;
     let height = dimensions.get(1).ok_or(BenchmarkError)?;
     Ok((*width, *height))
 }
 
 fn pnm_data(file: &mut Cursor<&[u8]>) -> BenchmarkResult<(u32, u32, Vec<u8>)> {
-    file.seek(SeekFrom::Start(0))?;
+    file.rewind()?;
     let (width, height) = pnm_size(file)?;
 
     let size: usize = (width as usize) * (height as usize);
