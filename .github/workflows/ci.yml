@@ -158,11 +158,10 @@ jobs:
         with:
           toolchain: stable
           override: true
-          profile: minimal
 
       - uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.25.0'
+          version: '0.22.0'
           args: '-l --ignore-panics --tests --fail-under 85 --exclude-files benches --features "test_instruction_sets"'
 
       - name: Upload to codecov.io
