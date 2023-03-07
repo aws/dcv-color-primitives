@@ -75,9 +75,8 @@
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_buffers: &[&[u8]] = &[&[0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]];
-//!     let dst_buffers: &mut [&mut [u8]] =
-//!         &mut [&mut [0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]];
+//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
+//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -96,10 +95,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         src_buffers,
+//!         &[&*src_data],
 //!         &dst_format,
 //!         None,
-//!         dst_buffers,
+//!         &mut [&mut *dst_data],
 //!     );
 //! }
 //! ```
@@ -116,9 +115,8 @@
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_buffers: &[&[u8]] = &[&[0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]];
-//!     let dst_buffers: &mut [&mut [u8]] =
-//!         &mut [&mut [0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]];
+//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
+//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -137,10 +135,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         src_buffers,
+//!         &[&*src_data],
 //!         &dst_format,
 //!         None,
-//!         dst_buffers,
+//!         &mut [&mut *dst_data],
 //!     )?;
 //!
 //!     Ok(())
@@ -178,7 +176,7 @@
 //! }
 //! ```
 //!
-//! Provide image planes to hangle data scattered in multiple buffers that are not
+//! Provide image planes to handle data scattered in multiple buffers that are not
 //! necessarily contiguous:
 //! ```
 //! use dcv_color_primitives as dcp;
@@ -204,7 +202,6 @@
 //!
 //!     let src_y: Vec<_> = vec![0u8; src_sizes[0]];
 //!     let src_uv: Vec<_> = vec![0u8; src_sizes[1]];
-//!     let src_buffers: &[&[u8]] = &[&src_y[..], &src_uv[..]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -216,17 +213,16 @@
 //!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
 //!
 //!     let mut dst_rgba: Vec<_> = vec![0u8; dst_sizes[0]];
-//!     let dst_buffers: &mut [&mut [u8]] = &mut [&mut dst_rgba[..]];
 //!
 //!     convert_image(
 //!         WIDTH,
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         src_buffers,
+//!         &[&src_y[..], &src_uv[..]],
 //!         &dst_format,
 //!         None,
-//!         dst_buffers,
+//!         &mut [&mut dst_rgba[..]],
 //!     )?;
 //!
 //!     Ok(())
@@ -260,7 +256,6 @@
 //!     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(src_strides), src_sizes)?;
 //!
 //!     let src_rgba: Vec<_> = vec![0u8; src_sizes[0]];
-//!     let src_buffers: &[&[u8]] = &[&src_rgba[..]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
@@ -273,17 +268,16 @@
 //!
 //!     let mut dst_y: Vec<_> = vec![0u8; dst_sizes[0]];
 //!     let mut dst_uv: Vec<_> = vec![0u8; dst_sizes[1]];
-//!     let dst_buffers: &mut [&mut [u8]] = &mut [&mut dst_y[..], &mut dst_uv[..]];
 //!
 //!     convert_image(
 //!         WIDTH,
 //!         HEIGHT,
 //!         &src_format,
 //!         Some(src_strides),
-//!         src_buffers,
+//!         &[&src_rgba[..]],
 //!         &dst_format,
 //!         None,
-//!         dst_buffers,
+//!         &mut [&mut dst_y[..], &mut dst_uv[..]],
 //!     )?;
 //!
 //!     Ok(())
