@@ -422,7 +422,7 @@ default build.
 
 In order to include DCV Color Primitives inside your application library, you need to:
 * Statically link to dcv_color_primitives
-* Link to ws2_32.lib, userenv.lib and bcrypt.lib, for Windows
+* Link to ws2_32.lib, userenv.lib, bcrypt.lib and ntdll.lib, for Windows
 * Link to libdl and libm, for Linux
 
 The API is slightly different than the rust one. Check dcv_color_primitives.h for examples and further information.
