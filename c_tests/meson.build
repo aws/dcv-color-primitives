@@ -7,6 +7,7 @@ dcp_deps = [
   userenv_dep,
   bcrypt_dep,
   librt_dep,
+  ntdll_dep,
 ]
 
 unit = executable(
