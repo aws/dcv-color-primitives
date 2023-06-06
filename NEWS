@@ -1,3 +1,7 @@
+News in 0.5.4
+-------------
+* Fix C-bindings compilation on Windows
+
 News in 0.5.3
 -------------
 * Fix documentation examples
