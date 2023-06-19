@@ -47,3 +47,16 @@ impl ColorSpace {
     /// Deprecated. Same as `ColorSpace::Rgb`
     pub const Lrgb: ColorSpace = ColorSpace::Rgb;
 }
+
+#[cfg(not(tarpaulin_include))]
+impl std::fmt::Display for ColorSpace {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ColorSpace::Rgb => write!(f, "rgb"),
+            ColorSpace::Bt601 => write!(f, "bt-601"),
+            ColorSpace::Bt709 => write!(f, "bt-709"),
+            ColorSpace::Bt601FR => write!(f, "bt-601-fr"),
+            ColorSpace::Bt709FR => write!(f, "bt-709-fr"),
+        }
+    }
+}

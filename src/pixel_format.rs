@@ -72,6 +72,23 @@ impl PixelFormat {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
+impl std::fmt::Display for PixelFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PixelFormat::Argb => write!(f, "argb"),
+            PixelFormat::Bgra => write!(f, "bgra"),
+            PixelFormat::Bgr => write!(f, "bgr"),
+            PixelFormat::Rgba => write!(f, "rgba"),
+            PixelFormat::Rgb => write!(f, "rgb"),
+            PixelFormat::I444 => write!(f, "i444"),
+            PixelFormat::I422 => write!(f, "i422"),
+            PixelFormat::I420 => write!(f, "i420"),
+            PixelFormat::Nv12 => write!(f, "nv12"),
+        }
+    }
+}
+
 /// If a plane stride is assigned to this constant, the plane will be assumed to contain packed data
 pub const STRIDE_AUTO: usize = 0;
 
