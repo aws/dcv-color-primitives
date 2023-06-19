@@ -70,37 +70,37 @@ const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
     [
         i32x2_to_i32(XG_601 - SHORT_HALF, XR_601),
         i32x2_to_i32(SHORT_HALF, XB_601),
-        i32x2_to_i32(ZG_601, ZR_601),
+        i32x2_to_i32(ZG_601, -(YR_601 + YG_601)),
         i32x2_to_i32(YG_601, YR_601),
-        i32x2_to_i32(0, ZB_601),
-        i32x2_to_i32(0, YB_601),
+        i32x2_to_i32(0, -(-(YR_601 + YG_601) + ZG_601)),
+        i32x2_to_i32(0, -(YR_601 + YG_601)),
         Y_OFFSET,
     ],
     [
         i32x2_to_i32(XG_709 - SHORT_HALF, XR_709),
         i32x2_to_i32(SHORT_HALF, XB_709),
-        i32x2_to_i32(ZG_709, ZR_709),
+        i32x2_to_i32(ZG_709, -(YR_709 + YG_709)),
         i32x2_to_i32(YG_709, YR_709),
-        i32x2_to_i32(0, ZB_709),
-        i32x2_to_i32(0, YB_709),
+        i32x2_to_i32(0, -(-(YR_709 + YG_709) + ZG_709)),
+        i32x2_to_i32(0, -(YR_709 + YG_709)),
         Y_OFFSET,
     ],
     [
         i32x2_to_i32(XG_601FR - SHORT_HALF, XR_601FR),
         i32x2_to_i32(SHORT_HALF, XB_601FR),
-        i32x2_to_i32(ZG_601FR, ZR_601FR - SHORT_HALF),
+        i32x2_to_i32(ZG_601FR, -(YR_601FR + YG_601FR)),
         i32x2_to_i32(YG_601FR, YR_601FR),
-        i32x2_to_i32(0, ZB_601FR),
-        i32x2_to_i32(0, YB_601FR - SHORT_HALF),
+        i32x2_to_i32(0, -(-(YR_601FR + YG_601FR) + ZG_601FR)),
+        i32x2_to_i32(0, -(YR_601FR + YG_601FR)),
         FIX16_HALF,
     ],
     [
         i32x2_to_i32(XG_709FR - SHORT_HALF, XR_709FR),
         i32x2_to_i32(SHORT_HALF, XB_709FR),
-        i32x2_to_i32(ZG_709FR, ZR_709FR - SHORT_HALF),
+        i32x2_to_i32(ZG_709FR, -(YR_709FR + YG_709FR)),
         i32x2_to_i32(YG_709FR, YR_709FR),
-        i32x2_to_i32(0, ZB_709FR),
-        i32x2_to_i32(0, YB_709FR - SHORT_HALF),
+        i32x2_to_i32(0, -(-(YR_709FR + YG_709FR) + ZG_709FR)),
+        i32x2_to_i32(0, -(YR_709FR + YG_709FR)),
         FIX16_HALF,
     ],
 ];
@@ -230,37 +230,49 @@ unsafe fn pack_i16x3_8x(image: *mut u8, red: __m128i, green: __m128i, blue: __m1
 /// `green_blue`:      --g3--b3 --g2--b2 --g1--b1 --g0--b0
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x<const SAMPLER: usize>(image: *const u8) -> (__m128i, __m128i) {
-    let line = if SAMPLER == Sampler::BgrOverflow as usize {
-        let bgr: *const i32 = image.cast();
-        _mm_set_epi32(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
-    } else {
-        loadu(image.cast())
-    };
-
-    let line = if SAMPLER == Sampler::Bgr as usize || SAMPLER == Sampler::BgrOverflow as usize {
-        _mm_unpacklo_epi64(
+    if SAMPLER == Sampler::BgrOverflow as usize {
+        let line: *const i32 = image.cast();
+        let line = _mm_set_epi32(0, loadu(line.add(2)), loadu(line.add(1)), loadu(line));
+        let line = _mm_unpacklo_epi64(
             _mm_unpacklo_epi32(line, _mm_srli_si128(line, 3)),
             _mm_unpacklo_epi32(_mm_srli_si128(line, 6), _mm_srli_si128(line, 9)),
-        )
-    } else {
-        line
-    };
+        );
 
-    let (red, blue, green) = if SAMPLER == Sampler::Argb as usize {
-        (
-            _mm_srli_epi32(_mm_slli_epi32(line, 16), 24),
-            _mm_srli_epi32(line, 24),
-            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 16), 24), 8),
-        )
-    } else {
-        (
-            _mm_srli_epi32(_mm_slli_epi32(line, 8), 24),
-            _mm_srli_epi32(_mm_slli_epi32(line, 24), 24),
-            _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8),
-        )
-    };
+        let red = _mm_srli_epi32(_mm_slli_epi32(line, 8), 24);
+        let blue = _mm_srli_epi32(_mm_slli_epi32(line, 24), 24);
+        let green = _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8);
 
-    (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+        (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+    } else if SAMPLER == Sampler::Bgr as usize {
+        let line = loadu(image.cast());
+
+        let line = _mm_unpacklo_epi64(
+            _mm_unpacklo_epi32(line, _mm_srli_si128(line, 3)),
+            _mm_unpacklo_epi32(_mm_srli_si128(line, 6), _mm_srli_si128(line, 9)),
+        );
+
+        let red = _mm_srli_epi32(_mm_slli_epi32(line, 8), 24);
+        let blue = _mm_srli_epi32(_mm_slli_epi32(line, 24), 24);
+        let green = _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8);
+
+        (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+    } else if SAMPLER == Sampler::Argb as usize {
+        let line = loadu(image.cast());
+
+        let red = _mm_srli_epi32(_mm_slli_epi32(line, 16), 24);
+        let blue = _mm_srli_epi32(line, 24);
+        let green = _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 16), 24), 8);
+
+        (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+    } else {
+        let line = loadu(image.cast());
+
+        let red = _mm_srli_epi32(_mm_slli_epi32(line, 8), 24);
+        let blue = _mm_srli_epi32(_mm_slli_epi32(line, 24), 24);
+        let green = _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8);
+
+        (_mm_or_si128(red, green), _mm_or_si128(blue, green))
+    }
 }
 
 #[inline(always)]
@@ -331,7 +343,7 @@ unsafe fn sum_i16x2_neighborhood_2x(xy0: __m128i, xy1: __m128i) -> __m128i {
 
 /// Convert linear rgb to yuv colorspace (4-wide)
 #[inline(always)]
-unsafe fn rgb_to_yuv_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_yuv_4x<const SAMPLER: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -354,25 +366,13 @@ unsafe fn rgb_to_yuv_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
 
     let srg = sum_i16x2_neighborhood_2x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_2x(bg0, bg1);
-    let mut t = affine_transform(srg, sbg, uv_weights);
-    if is_full_range::<COLORIMETRY>() {
-        t = _mm_add_epi32(
-            t,
-            _mm_slli_epi32(
-                _mm_or_si128(
-                    _mm_and_si128(sbg, _mm_set1_epi64x(0xFFFF_i64)),
-                    _mm_and_si128(srg, _mm_set1_epi64x(0xFFFF_0000_0000_i64)),
-                ),
-                14,
-            ),
-        );
-    }
+    let t = affine_transform(srg, sbg, uv_weights);
 
     pack_i32_4x(uv, fix_to_i32_4x!(t, FIX18));
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i420_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_i420_4x<const SAMPLER: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -396,19 +396,7 @@ unsafe fn rgb_to_i420_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
 
     let srg = sum_i16x2_neighborhood_2x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_2x(bg0, bg1);
-    let mut t = affine_transform(srg, sbg, uv_weights);
-    if is_full_range::<COLORIMETRY>() {
-        t = _mm_add_epi32(
-            t,
-            _mm_slli_epi32(
-                _mm_or_si128(
-                    _mm_and_si128(sbg, _mm_set1_epi64x(0xFFFF_i64)),
-                    _mm_and_si128(srg, _mm_set1_epi64x(0xFFFF_0000_0000_i64)),
-                ),
-                14,
-            ),
-        );
-    }
+    let t = affine_transform(srg, sbg, uv_weights);
 
     // shuff: ******v1 ******v0 ******u1 ******u0
     let shuff = _mm_shuffle_epi32(fix_to_i32_4x!(t, FIX18), mm_shuffle(3, 1, 2, 0));
@@ -430,7 +418,7 @@ unsafe fn rgb_to_i420_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i444_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_i444_4x<const SAMPLER: usize>(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
@@ -445,12 +433,8 @@ unsafe fn rgb_to_i444_4x<const SAMPLER: usize, const COLORIMETRY: usize>(
         fix_to_i32_4x!(affine_transform(rg, bg, y_weights), FIX16),
     );
 
-    let mut tu = affine_transform(rg, bg, u_weights);
-    let mut tv = affine_transform(rg, bg, v_weights);
-    if is_full_range::<COLORIMETRY>() {
-        tu = _mm_add_epi32(tu, _mm_srli_epi32(_mm_slli_epi32(bg, 16), 2));
-        tv = _mm_add_epi32(tv, _mm_srli_epi32(_mm_slli_epi32(rg, 16), 2));
-    }
+    let tu = affine_transform(rg, bg, u_weights);
+    let tv = affine_transform(rg, bg, v_weights);
 
     pack_i32_4x(u, fix_to_i32_4x!(tu, FIX16));
     pack_i32_4x(v, fix_to_i32_4x!(tv, FIX16));
@@ -480,11 +464,7 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let uv_weights = [
         _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
         _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
-        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET - FIX18_HALF
-        } else {
-            C_OFFSET
-        }),
+        _mm_set1_epi32(FIX18_C_HALF + (FIX18_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -504,7 +484,7 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_yuv_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_yuv_4x::<SAMPLER>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
@@ -520,7 +500,7 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_yuv_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_yuv_4x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
@@ -532,7 +512,7 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_yuv_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_yuv_4x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
@@ -566,11 +546,7 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let uv_weights = [
         _mm_set_epi32(weights[2], weights[3], weights[2], weights[3]),
         _mm_set_epi32(weights[4], weights[5], weights[4], weights[5]),
-        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET - FIX18_HALF
-        } else {
-            C_OFFSET
-        }),
+        _mm_set1_epi32(FIX18_C_HALF + (FIX18_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -591,7 +567,7 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i420_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i420_4x::<SAMPLER>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
@@ -608,7 +584,7 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i420_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i420_4x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
@@ -621,7 +597,7 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_i420_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_i420_4x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
@@ -656,21 +632,13 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let u_weights = [
         _mm_set1_epi32(weights[3]),
         _mm_set1_epi32(weights[5]),
-        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET16 - FIX16_HALF
-        } else {
-            C_OFFSET16
-        }),
+        _mm_set1_epi32(FIX16_C_HALF + (FIX16_HALF - 1)),
     ];
 
     let v_weights = [
         _mm_set1_epi32(weights[2]),
         _mm_set1_epi32(weights[4]),
-        _mm_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET16 - FIX16_HALF
-        } else {
-            C_OFFSET16
-        }),
+        _mm_set1_epi32(FIX16_C_HALF + (FIX16_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -691,7 +659,7 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i444_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i444_4x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
@@ -707,7 +675,7 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i444_4x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i444_4x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
@@ -719,7 +687,7 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_i444_4x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_i444_4x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
