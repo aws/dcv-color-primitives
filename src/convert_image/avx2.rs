@@ -23,31 +23,30 @@ use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_blend_epi32,
-    _mm256_cmpeq_epi32, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
-    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
-    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
-    _mm256_set1_epi64x, _mm256_set_epi16, _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i,
-    _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
-    _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32,
-    _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256, _mm256_sub_epi16,
-    _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16, _mm256_unpacklo_epi32,
-    _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_blend_epi32, _mm256_cmpeq_epi32,
+    _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
+    _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
+    _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi16,
+    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
+    _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
+    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
+    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
+    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
-    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_and_si256, _mm256_blend_epi32,
-    _mm256_cmpeq_epi32, _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16,
-    _mm256_mulhi_epu16, _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16,
-    _mm256_permute2x128_si256, _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32,
-    _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set1_epi64x, _mm256_set_epi32, _mm256_set_epi64x,
-    _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
-    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256,
-    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
-    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
-    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
-    _mm_setzero_si128, _MM_HINT_NTA,
+    __m256i, _mm256_add_epi16, _mm256_add_epi32, _mm256_blend_epi32, _mm256_cmpeq_epi32,
+    _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
+    _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
+    _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
+    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
+    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
+    _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
+    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
+    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
+    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -87,37 +86,37 @@ const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
     [
         i32x2_to_i32(XG_601 - SHORT_HALF, XR_601),
         i32x2_to_i32(SHORT_HALF, XB_601),
-        i32x2_to_i32(ZG_601, ZR_601),
+        i32x2_to_i32(ZG_601, -(YR_601 + YG_601)),
         i32x2_to_i32(YG_601, YR_601),
-        i32x2_to_i32(0, ZB_601),
-        i32x2_to_i32(0, YB_601),
+        i32x2_to_i32(0, -(-(YR_601 + YG_601) + ZG_601)),
+        i32x2_to_i32(0, -(YR_601 + YG_601)),
         Y_OFFSET,
     ],
     [
         i32x2_to_i32(XG_709 - SHORT_HALF, XR_709),
         i32x2_to_i32(SHORT_HALF, XB_709),
-        i32x2_to_i32(ZG_709, ZR_709),
+        i32x2_to_i32(ZG_709, -(YR_709 + YG_709)),
         i32x2_to_i32(YG_709, YR_709),
-        i32x2_to_i32(0, ZB_709),
-        i32x2_to_i32(0, YB_709),
+        i32x2_to_i32(0, -(-(YR_709 + YG_709) + ZG_709)),
+        i32x2_to_i32(0, -(YR_709 + YG_709)),
         Y_OFFSET,
     ],
     [
         i32x2_to_i32(XG_601FR - SHORT_HALF, XR_601FR),
         i32x2_to_i32(SHORT_HALF, XB_601FR),
-        i32x2_to_i32(ZG_601FR, ZR_601FR - SHORT_HALF),
+        i32x2_to_i32(ZG_601FR, -(YR_601FR + YG_601FR)),
         i32x2_to_i32(YG_601FR, YR_601FR),
-        i32x2_to_i32(0, ZB_601FR),
-        i32x2_to_i32(0, YB_601FR - SHORT_HALF),
+        i32x2_to_i32(0, -(-(YR_601FR + YG_601FR) + ZG_601FR)),
+        i32x2_to_i32(0, -(YR_601FR + YG_601FR)),
         FIX16_HALF,
     ],
     [
         i32x2_to_i32(XG_709FR - SHORT_HALF, XR_709FR),
         i32x2_to_i32(SHORT_HALF, XB_709FR),
-        i32x2_to_i32(ZG_709FR, ZR_709FR - SHORT_HALF),
+        i32x2_to_i32(ZG_709FR, -(YR_709FR + YG_709FR)),
         i32x2_to_i32(YG_709FR, YR_709FR),
-        i32x2_to_i32(0, ZB_709FR),
-        i32x2_to_i32(0, YB_709FR - SHORT_HALF),
+        i32x2_to_i32(0, -(-(YR_709FR + YG_709FR) + ZG_709FR)),
+        i32x2_to_i32(0, -(YR_709FR + YG_709FR)),
         FIX16_HALF,
     ],
 ];
@@ -315,38 +314,52 @@ unsafe fn pack_rgb_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m25
 /// short samples (8-wide)
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_8x<const SAMPLER: usize>(image: *const u8) -> (__m256i, __m256i) {
-    let line = if SAMPLER == Sampler::BgrOverflow as usize {
-        let bgr: *const i64 = image.cast();
-        _mm256_set_epi64x(0, loadu(bgr.add(2)), loadu(bgr.add(1)), loadu(bgr))
-    } else {
-        loadu(image.cast())
-    };
+    if SAMPLER == Sampler::BgrOverflow as usize {
+        let line: *const i64 = image.cast();
+        let line = _mm256_set_epi64x(0, loadu(line.add(2)), loadu(line.add(1)), loadu(line));
 
-    let line = if SAMPLER == Sampler::Bgr as usize || SAMPLER == Sampler::BgrOverflow as usize {
-        let l = _mm256_permutevar8x32_epi32(line, align_dqword_2x96!());
-        _mm256_unpacklo_epi64(
-            _mm256_unpacklo_epi32(l, _mm256_srli_si256(l, 3)),
-            _mm256_unpacklo_epi32(_mm256_srli_si256(l, 6), _mm256_srli_si256(l, 9)),
-        )
-    } else {
-        line
-    };
+        let line = _mm256_permutevar8x32_epi32(line, align_dqword_2x96!());
+        let line = _mm256_unpacklo_epi64(
+            _mm256_unpacklo_epi32(line, _mm256_srli_si256(line, 3)),
+            _mm256_unpacklo_epi32(_mm256_srli_si256(line, 6), _mm256_srli_si256(line, 9)),
+        );
 
-    let (red, blue, green) = if SAMPLER == Sampler::Argb as usize {
-        (
-            _mm256_srli_epi32(_mm256_slli_epi32(line, 16), 24),
-            _mm256_srli_epi32(line, 24),
-            _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 16), 24), 8),
-        )
-    } else {
-        (
-            _mm256_srli_epi32(_mm256_slli_epi32(line, 8), 24),
-            _mm256_srli_epi32(_mm256_slli_epi32(line, 24), 24),
-            _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 8), 24), 8),
-        )
-    };
+        let red = _mm256_srli_epi32(_mm256_slli_epi32(line, 8), 24);
+        let blue = _mm256_srli_epi32(_mm256_slli_epi32(line, 24), 24);
+        let green = _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 8), 24), 8);
 
-    (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
+        (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
+    } else if SAMPLER == Sampler::Bgr as usize {
+        let line = loadu(image.cast());
+
+        let line = _mm256_permutevar8x32_epi32(line, align_dqword_2x96!());
+        let line = _mm256_unpacklo_epi64(
+            _mm256_unpacklo_epi32(line, _mm256_srli_si256(line, 3)),
+            _mm256_unpacklo_epi32(_mm256_srli_si256(line, 6), _mm256_srli_si256(line, 9)),
+        );
+
+        let red = _mm256_srli_epi32(_mm256_slli_epi32(line, 8), 24);
+        let blue = _mm256_srli_epi32(_mm256_slli_epi32(line, 24), 24);
+        let green = _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 8), 24), 8);
+
+        (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
+    } else if SAMPLER == Sampler::Argb as usize {
+        let line = loadu(image.cast());
+
+        let red = _mm256_srli_epi32(_mm256_slli_epi32(line, 16), 24);
+        let blue = _mm256_srli_epi32(line, 24);
+        let green = _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 16), 24), 8);
+
+        (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
+    } else {
+        let line = loadu(image.cast());
+
+        let red = _mm256_srli_epi32(_mm256_slli_epi32(line, 8), 24);
+        let blue = _mm256_srli_epi32(_mm256_slli_epi32(line, 24), 24);
+        let green = _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 8), 24), 8);
+
+        (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
+    }
 }
 
 /// Truncate int to uchar (8-wide)
@@ -386,7 +399,7 @@ unsafe fn sum_i16x2_neighborhood_4x(xy0: __m256i, xy1: __m256i) -> __m256i {
 
 /// Convert linear rgb to yuv colorspace (8-wide)
 #[inline(always)]
-unsafe fn rgb_to_yuv_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_yuv_8x<const SAMPLER: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -409,25 +422,13 @@ unsafe fn rgb_to_yuv_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
 
     let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
-    let mut t = affine_transform(srg, sbg, uv_weights);
-    if is_full_range::<COLORIMETRY>() {
-        t = _mm256_add_epi32(
-            t,
-            _mm256_slli_epi32(
-                _mm256_or_si256(
-                    _mm256_and_si256(sbg, _mm256_set1_epi64x(0xFFFF_i64)),
-                    _mm256_and_si256(srg, _mm256_set1_epi64x(0xFFFF_0000_0000_i64)),
-                ),
-                14,
-            ),
-        );
-    }
+    let t = affine_transform(srg, sbg, uv_weights);
 
     pack_i32_8x(uv, fix_to_i32_8x!(t, FIX18));
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i420_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_i420_8x<const SAMPLER: usize>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -451,19 +452,7 @@ unsafe fn rgb_to_i420_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
 
     let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
-    let mut t = affine_transform(srg, sbg, uv_weights);
-    if is_full_range::<COLORIMETRY>() {
-        t = _mm256_add_epi32(
-            t,
-            _mm256_slli_epi32(
-                _mm256_or_si256(
-                    _mm256_and_si256(sbg, _mm256_set1_epi64x(0xFFFF_i64)),
-                    _mm256_and_si256(srg, _mm256_set1_epi64x(0xFFFF_0000_0000_i64)),
-                ),
-                14,
-            ),
-        );
-    }
+    let t = affine_transform(srg, sbg, uv_weights);
 
     let shuff = _mm256_permutevar8x32_epi32(
         fix_to_i32_8x!(t, FIX18),
@@ -487,7 +476,7 @@ unsafe fn rgb_to_i420_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i444_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_i444_8x<const SAMPLER: usize>(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
@@ -502,12 +491,8 @@ unsafe fn rgb_to_i444_8x<const SAMPLER: usize, const COLORIMETRY: usize>(
         fix_to_i32_8x!(affine_transform(rg, bg, y_weights), FIX16),
     );
 
-    let mut tu = affine_transform(rg, bg, u_weights);
-    let mut tv = affine_transform(rg, bg, v_weights);
-    if is_full_range::<COLORIMETRY>() {
-        tu = _mm256_add_epi32(tu, _mm256_srli_epi32(_mm256_slli_epi32(bg, 16), 2));
-        tv = _mm256_add_epi32(tv, _mm256_srli_epi32(_mm256_slli_epi32(rg, 16), 2));
-    }
+    let tu = affine_transform(rg, bg, u_weights);
+    let tv = affine_transform(rg, bg, v_weights);
 
     pack_i32_8x(u, fix_to_i32_8x!(tu, FIX16));
     pack_i32_8x(v, fix_to_i32_8x!(tv, FIX16));
@@ -550,11 +535,7 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
             weights[4], weights[5], weights[4], weights[5], weights[4], weights[5], weights[4],
             weights[5],
         ),
-        _mm256_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET - FIX18_HALF
-        } else {
-            C_OFFSET
-        }),
+        _mm256_set1_epi32(FIX18_C_HALF + (FIX18_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -574,7 +555,7 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_yuv_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_yuv_8x::<SAMPLER>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
@@ -590,7 +571,7 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_yuv_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_yuv_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
@@ -602,7 +583,7 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_yuv_8x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_yuv_8x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
@@ -642,11 +623,7 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
             weights[4], weights[5], weights[4], weights[5], weights[4], weights[5], weights[4],
             weights[5],
         ),
-        _mm256_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET - FIX18_HALF
-        } else {
-            C_OFFSET
-        }),
+        _mm256_set1_epi32(FIX18_C_HALF + (FIX18_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -667,7 +644,7 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i420_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i420_8x::<SAMPLER>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
@@ -684,7 +661,7 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i420_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i420_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, src_depth, src_stride)),
                 src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
@@ -697,7 +674,7 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_i420_8x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_i420_8x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
             src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
@@ -732,21 +709,13 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let u_weights = [
         _mm256_set1_epi32(weights[3]),
         _mm256_set1_epi32(weights[5]),
-        _mm256_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET16 - FIX16_HALF
-        } else {
-            C_OFFSET16
-        }),
+        _mm256_set1_epi32(FIX16_C_HALF + (FIX16_HALF - 1)),
     ];
 
     let v_weights = [
         _mm256_set1_epi32(weights[2]),
         _mm256_set1_epi32(weights[4]),
-        _mm256_set1_epi32(if is_full_range::<COLORIMETRY>() {
-            C_OFFSET16 - FIX16_HALF
-        } else {
-            C_OFFSET16
-        }),
+        _mm256_set1_epi32(FIX16_C_HALF + (FIX16_HALF - 1)),
     ];
 
     let src_group = src_buffer.as_ptr();
@@ -767,7 +736,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i444_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i444_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
@@ -783,7 +752,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     if y_start != height {
         let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
         for x in 0..rem {
-            rgb_to_i444_8x::<SAMPLER, COLORIMETRY>(
+            rgb_to_i444_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
@@ -795,7 +764,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
         }
 
         // Handle leftover pixels
-        rgb_to_i444_8x::<{ Sampler::BgrOverflow as usize }, COLORIMETRY>(
+        rgb_to_i444_8x::<{ Sampler::BgrOverflow as usize }>(
             src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
             y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
             u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
@@ -1515,7 +1484,6 @@ unsafe fn rgb_to_bgra_avx2(
     dst_stride: usize,
     dst_buffer: &mut [u8],
 ) {
-    const GROUP_SIZE: usize = 4;
     const SRC_DEPTH: usize = 3;
     const DST_DEPTH: usize = 4;
 
@@ -1549,40 +1517,48 @@ unsafe fn rgb_to_bgra_avx2(
             //                   ^---------------72----------------^
             // ^---------------80----------------^
             let src_ptr = src_group.add(src_offset);
+            let dst_ptr = dst_group.add(dst_offset).cast();
 
-            let input = _mm256_set_m128i(
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH).cast()),
-                loadu(src_ptr.cast()),
-            );
+            let reg0 = loadu(src_ptr.cast());
+            let reg1 = loadu(src_ptr.add(32).cast());
 
-            let input1 = _mm256_set_m128i(
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 3).cast()),
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 2).cast()),
-            );
+            {
+                // r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+                let input =
+                    _mm256_permutevar8x32_epi32(reg0, _mm256_set_epi32(6, 5, 4, 3, 3, 2, 1, 0));
 
-            let input2 = _mm256_set_m128i(
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 5).cast()),
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 4).cast()),
-            );
+                // r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+                let res = _mm256_or_si256(_mm256_shuffle_epi8(input, shf_mask), alpha_mask);
+                storeu(dst_ptr, res);
 
-            let input3 = _mm256_set_m128i(
-                loadu(src_ptr.add((GROUP_SIZE * SRC_DEPTH * 7) - 4).cast()),
-                loadu(src_ptr.add(GROUP_SIZE * SRC_DEPTH * 6).cast()),
-            );
+                // r1b0g0r0 bFgFrFbE gErEbDgD rDbCgCrC rDbCgCrC bBgBrBbA gArAb9g9 r9b8g8r8
+                let input1 = _mm256_blend_epi32(
+                    _mm256_permute4x64_epi64(reg0, shuffle(0, 0, 0, 3)),
+                    _mm256_permutevar8x32_epi32(reg1, _mm256_set_epi32(4, 3, 2, 1, 1, 0, 0, 0)),
+                    0b1111_1100,
+                );
+                let res1 = _mm256_or_si256(_mm256_shuffle_epi8(input1, shf_mask), alpha_mask);
+                storeu(dst_ptr.add(1), res1);
+            }
 
-            let input3 =
-                _mm256_permutevar8x32_epi32(input3, _mm256_set_epi32(4, 7, 6, 5, 3, 2, 1, 0));
+            {
+                let reg2 = loadu(src_ptr.add(64).cast());
 
-            let res = _mm256_or_si256(_mm256_shuffle_epi8(input, shf_mask), alpha_mask);
-            let res1 = _mm256_or_si256(_mm256_shuffle_epi8(input1, shf_mask), alpha_mask);
-            let res2 = _mm256_or_si256(_mm256_shuffle_epi8(input2, shf_mask), alpha_mask);
-            let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, shf_mask), alpha_mask);
+                // r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+                let input2 = _mm256_blend_epi32(
+                    _mm256_permutevar8x32_epi32(reg1, _mm256_set_epi32(0, 0, 0, 7, 7, 6, 5, 4)),
+                    _mm256_permutevar8x32_epi32(reg2, _mm256_set_epi32(2, 1, 0, 0, 0, 0, 0, 0)),
+                    0b1110_0000,
+                );
+                let res2 = _mm256_or_si256(_mm256_shuffle_epi8(input2, shf_mask), alpha_mask);
+                storeu(dst_ptr.add(2), res2);
 
-            let dst_ptr: *mut __m256i = dst_group.add(dst_offset).cast();
-            storeu(dst_ptr, res);
-            storeu(dst_ptr.add(1), res1);
-            storeu(dst_ptr.add(2), res2);
-            storeu(dst_ptr.add(3), res3);
+                // r9b8g8r8 b7g7r7b6 g6r6b5g5 r5b4g4r4 r5b4g4r4 b3g3r3b2 g2r2b1g1 r1b0g0r0
+                let input3 =
+                    _mm256_permutevar8x32_epi32(reg2, _mm256_set_epi32(4, 7, 6, 5, 5, 4, 3, 2));
+                let res3 = _mm256_or_si256(_mm256_shuffle_epi8(input3, shf_mask), alpha_mask);
+                storeu(dst_ptr.add(3), res3);
+            }
 
             src_offset += LANE_COUNT * SRC_DEPTH;
             dst_offset += LANE_COUNT * DST_DEPTH;
@@ -1685,6 +1661,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
         // The compiler is not smart here
         // This condition should never happen
         if x >= src_buffers.0.len() || x >= src_buffers.1.len() || dx >= dst_buffer.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1792,6 +1769,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             || cx >= src_buffers.2.len()
             || dx >= dst_buffer.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1888,6 +1866,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             || x >= src_buffers.2.len()
             || dx >= dst_buffer.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1990,6 +1969,7 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         // The compiler is not smart here
         // This condition should never happen
         if sx >= src_buffer.len() || x >= y_plane.len() || x >= uv_plane.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -2087,6 +2067,7 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
             || cx >= u_plane.len()
             || cx >= v_plane.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -2178,6 +2159,7 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         // This condition should never happen
         if sx >= src_buffer.len() || x >= y_plane.len() || x >= u_plane.len() || x >= v_plane.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -2315,6 +2297,7 @@ pub fn rgb_bgra(
         // The compiler is not smart here
         // This condition should never happen
         if sx >= src_buffer.len() || dx >= dst_buffer.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -2448,6 +2431,7 @@ pub fn bgr_rgb(
         // The compiler is not smart here
         // This condition should never happen
         if sx >= src_buffer.len() || dx >= dst_buffer.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 

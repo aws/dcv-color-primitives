@@ -52,24 +52,18 @@ unsafe fn _bswap64(x: i64) -> i64 {
     (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
 }
 
-pub const FORWARD_WEIGHTS: [[i32; 10]; Colorimetry::Length as usize] = [
+const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
+    [XR_601, XG_601, XB_601, YR_601, YG_601, ZG_601, Y_OFFSET],
+    [XR_709, XG_709, XB_709, YR_709, YG_709, ZG_709, Y_OFFSET],
     [
-        XR_601, XG_601, XB_601, YR_601, YG_601, YB_601, ZR_601, ZG_601, ZB_601, Y_OFFSET,
+        XR_601FR, XG_601FR, XB_601FR, YR_601FR, YG_601FR, ZG_601FR, FIX16_HALF,
     ],
     [
-        XR_709, XG_709, XB_709, YR_709, YG_709, YB_709, ZR_709, ZG_709, ZB_709, Y_OFFSET,
-    ],
-    [
-        XR_601FR, XG_601FR, XB_601FR, YR_601FR, YG_601FR, YB_601FR, ZR_601FR, ZG_601FR, ZB_601FR,
-        FIX16_HALF,
-    ],
-    [
-        XR_709FR, XG_709FR, XB_709FR, YR_709FR, YG_709FR, YB_709FR, ZR_709FR, ZG_709FR, ZB_709FR,
-        FIX16_HALF,
+        XR_709FR, XG_709FR, XB_709FR, YR_709FR, YG_709FR, ZG_709FR, FIX16_HALF,
     ],
 ];
 
-pub const BACKWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
+const BACKWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
     [
         XXYM_601, RCRM_601, GCRM_601, GCBM_601, BCBM_601, RN_601, GP_601, BN_601,
     ],
@@ -203,16 +197,11 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let xb = weights[2];
     let yr = weights[3];
     let yg = weights[4];
-    let yb = weights[5];
-    let zr = weights[6];
-    let zg = weights[7];
-    let zb = weights[8];
-    let yo = weights[9];
-    let co = if is_full_range::<COLORIMETRY>() {
-        C_OFFSET - FIX18_HALF
-    } else {
-        C_OFFSET
-    };
+    let zg = weights[5];
+    let yo = weights[6];
+    let yb = -(yr + yg);
+    let zb = -(yb + zg);
+    let co = FIX18_C_HALF + (FIX18_HALF - 1);
 
     let wg_width = width / 2;
     let wg_height = height / 2;
@@ -270,7 +259,7 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 pack_i32x2(
                     uv_group.add(wg_index(x, y, 2, uv_stride)),
                     fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, co), FIX18),
-                    fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, co), FIX18),
+                    fix_to_i32(affine_transform(sr, sg, sb, yb, zg, zb, co), FIX18),
                 );
             }
         }
@@ -294,17 +283,11 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let xb = weights[2];
     let yr = weights[3];
     let yg = weights[4];
-    let yb = weights[5];
-    let zr = weights[6];
-    let zg = weights[7];
-    let zb = weights[8];
-    let yo = weights[9];
-    let co = if is_full_range::<COLORIMETRY>() {
-        C_OFFSET - FIX18_HALF
-    } else {
-        C_OFFSET
-    };
-
+    let zg = weights[5];
+    let yo = weights[6];
+    let yb = -(yr + yg);
+    let zb = -(yb + zg);
+    let co = FIX18_C_HALF + (FIX18_HALF - 1);
     let wg_width = width / 2;
     let wg_height = height / 2;
 
@@ -367,7 +350,7 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 {
                     *u = fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, co), FIX18) as u8;
-                    *v = fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, co), FIX18) as u8;
+                    *v = fix_to_i32(affine_transform(sr, sg, sb, yb, zg, zb, co), FIX18) as u8;
                 }
             }
         }
@@ -391,16 +374,11 @@ pub fn rgb_to_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let xb = weights[2];
     let yr = weights[3];
     let yg = weights[4];
-    let yb = weights[5];
-    let zr = weights[6];
-    let zg = weights[7];
-    let zb = weights[8];
-    let yo = weights[9];
-    let co = if is_full_range::<COLORIMETRY>() {
-        C_OFFSET16 - FIX16_HALF
-    } else {
-        C_OFFSET16
-    };
+    let zg = weights[5];
+    let yo = weights[6];
+    let yb = -(yr + yg);
+    let zb = -(yb + zg);
+    let co = FIX16_C_HALF + (FIX16_HALF - 1);
 
     unsafe {
         let src_group = src_buffer.as_ptr();
@@ -422,7 +400,7 @@ pub fn rgb_to_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 {
                     *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, yo), FIX16) as u8;
                     *u_data = fix_to_i32(affine_transform(r, g, b, yr, yg, yb, co), FIX16) as u8;
-                    *v_data = fix_to_i32(affine_transform(r, g, b, zr, zg, zb, co), FIX16) as u8;
+                    *v_data = fix_to_i32(affine_transform(r, g, b, yb, zg, zb, co), FIX16) as u8;
                 }
             }
         }

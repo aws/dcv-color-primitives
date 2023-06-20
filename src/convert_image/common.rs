@@ -20,12 +20,6 @@ const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
 }
 
 #[cfg(not(tarpaulin_include))]
-pub const fn is_full_range<const COLORIMETRY: usize>() -> bool {
-    // Forward weights should be defined to mach this order
-    COLORIMETRY >= 2
-}
-
-#[cfg(not(tarpaulin_include))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
@@ -81,12 +75,9 @@ pub const SHORT_HALF: i32 = 16384;
 pub const XR_601: i32 = 16829;
 pub const XG_601: i32 = 33039;
 pub const XB_601: i32 = 6416;
-pub const YR_601: i32 = -9713;
-pub const YG_601: i32 = -19070;
-pub const YB_601: i32 = 28784;
-pub const ZR_601: i32 = 28784;
-pub const ZG_601: i32 = -24102;
-pub const ZB_601: i32 = -4680;
+pub const YR_601: i32 = -9714;
+pub const YG_601: i32 = -19071;
+pub const ZG_601: i32 = -24103;
 
 pub const XXYM_601: i32 = 19077;
 pub const RCRM_601: i32 = 26149;
@@ -101,12 +92,9 @@ pub const BN_601: i32 = 17685;
 pub const XR_709: i32 = 11966;
 pub const XG_709: i32 = 40254;
 pub const XB_709: i32 = 4064;
-pub const YR_709: i32 = -6595;
-pub const YG_709: i32 = -22188;
-pub const YB_709: i32 = 28784;
-pub const ZR_709: i32 = 28784;
-pub const ZG_709: i32 = -26144;
-pub const ZB_709: i32 = -2638;
+pub const YR_709: i32 = -6596;
+pub const YG_709: i32 = -22189;
+pub const ZG_709: i32 = -26145;
 
 pub const XXYM_709: i32 = 19077;
 pub const RCRM_709: i32 = 29372;
@@ -121,12 +109,9 @@ pub const BN_709: i32 = 18465;
 pub const XR_601FR: i32 = 19595;
 pub const XG_601FR: i32 = 38470;
 pub const XB_601FR: i32 = 7471;
-pub const YR_601FR: i32 = -11057;
+pub const YR_601FR: i32 = -11058;
 pub const YG_601FR: i32 = -21709;
-pub const YB_601FR: i32 = 32768;
-pub const ZR_601FR: i32 = 32768;
-pub const ZG_601FR: i32 = -27438;
-pub const ZB_601FR: i32 = -5328;
+pub const ZG_601FR: i32 = -27439;
 
 pub const XXYM_601FR: i32 = 16384;
 pub const RCRM_601FR: i32 = 22970;
@@ -142,11 +127,8 @@ pub const XR_709FR: i32 = 13933;
 pub const XG_709FR: i32 = 46871;
 pub const XB_709FR: i32 = 4732;
 pub const YR_709FR: i32 = -7508;
-pub const YG_709FR: i32 = -25258;
-pub const YB_709FR: i32 = 32768;
-pub const ZR_709FR: i32 = 32768;
-pub const ZG_709FR: i32 = -29762;
-pub const ZB_709FR: i32 = -3004;
+pub const YG_709FR: i32 = -25259;
+pub const ZG_709FR: i32 = -29763;
 
 pub const XXYM_709FR: i32 = 16384;
 pub const RCRM_709FR: i32 = 25802;
@@ -161,11 +143,9 @@ pub const BN_709FR: i32 = 15050;
 const Y_MIN: i32 = 16;
 const C_HALF: i32 = 128;
 const FIX16_Y_MIN: i32 = u8_to_fix(Y_MIN, FIX16);
-const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
+pub const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
 pub const FIX18_C_HALF: i32 = u8_to_fix(C_HALF, FIX18);
 pub const Y_OFFSET: i32 = FIX16_Y_MIN + FIX16_HALF;
-pub const C_OFFSET: i32 = FIX18_C_HALF + FIX18_HALF;
-pub const C_OFFSET16: i32 = FIX16_C_HALF + FIX16_HALF;
 pub const DEFAULT_ALPHA: u8 = 255;
 
 #[derive(Copy, Clone)]

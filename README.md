@@ -45,14 +45,10 @@ Both standard range (0-235) and full range (0-255) are supported.
 ## Requirements
 
 * Rust 1.55 and newer (until DCP 0.2: At least Rust 1.39)
-* Python3 and Fractions module (needed only if you want to execute the benchmark)
 
 ### Windows
 
 * Install rustup: https://www.rust-lang.org/tools/install
-* If you want to execute the benchmark:
-    * Install Python 3: https://www.python.org/downloads/
-    * Install fraction module: `pip install Fraction`
 
 ### Linux
 
@@ -60,9 +56,6 @@ Both standard range (0-235) and full range (0-255) are supported.
     ```
     curl https://sh.rustup.rs -sSf | sh
     ```
-* If you want to execute the benchmark:
-    * Install Python 3 (example for Ubuntu): `apt install python3`
-    * Install fraction module: `pip install Fraction`
 
 You may require administrative privileges.
 
@@ -87,8 +80,26 @@ cargo test
 
 Run benchmark:
 ```
-python benches/geninput.py
 cargo bench
+```
+
+Advanced benchamark mode.
+There are two benchmark scripts:
+* `run-bench.ps1` for Windows
+* `run-bench.sh` for Linux and MacOS
+
+They allow to obtain more stable results than `cargo bench`, by reducing variance due to:
+* CPU migration
+* File system caching
+* Process priority
+
+Moreover, the Linux script support hardware performance counters, e.g. it is possible to output
+consumed CPU cycles instead of elapsed time.
+
+Linux examples:
+```
+./run-bench -c 1 # runs cargo bench and outputs CPU cycles
+./run.bench -c 1 -p "/i420" # runs cargo bench, output CPU cycles, filtering tests that contains '/i420'
 ```
 
 ## WebAssembly
