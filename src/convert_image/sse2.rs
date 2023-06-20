@@ -1117,6 +1117,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
         // The compiler is not smart here
         // This condition should never happen
         if x >= src_buffers.0.len() || x >= src_buffers.1.len() || dx >= dst_buffer.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1213,6 +1214,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             || cx >= src_buffers.2.len()
             || dx >= dst_buffer.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1309,6 +1311,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             || x >= src_buffers.2.len()
             || dx >= dst_buffer.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1411,6 +1414,7 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         // The compiler is not smart here
         // This condition should never happen
         if sx >= src_buffer.len() || x >= y_plane.len() || x >= uv_plane.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1508,6 +1512,7 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
             || cx >= u_plane.len()
             || cx >= v_plane.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1599,6 +1604,7 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         // This condition should never happen
         if sx >= src_buffer.len() || x >= y_plane.len() || x >= u_plane.len() || x >= v_plane.len()
         {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 
@@ -1780,6 +1786,7 @@ pub fn rgb_bgra(
         // The compiler is not smart here
         // This condition should never happen
         if sx >= src_buffer.len() || dx >= dst_buffer.len() {
+            #[cfg(not(tarpaulin_include))]
             return false;
         }
 

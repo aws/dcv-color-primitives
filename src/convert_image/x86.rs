@@ -200,8 +200,7 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let zg = weights[5];
     let yo = weights[6];
     let yb = -(yr + yg);
-    let zr = yb;
-    let zb = -(zr + zg);
+    let zb = -(yb + zg);
     let co = FIX18_C_HALF + (FIX18_HALF - 1);
 
     let wg_width = width / 2;
@@ -260,7 +259,7 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 pack_i32x2(
                     uv_group.add(wg_index(x, y, 2, uv_stride)),
                     fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, co), FIX18),
-                    fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, co), FIX18),
+                    fix_to_i32(affine_transform(sr, sg, sb, yb, zg, zb, co), FIX18),
                 );
             }
         }
@@ -287,8 +286,7 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let zg = weights[5];
     let yo = weights[6];
     let yb = -(yr + yg);
-    let zr = yb;
-    let zb = -(zr + zg);
+    let zb = -(yb + zg);
     let co = FIX18_C_HALF + (FIX18_HALF - 1);
     let wg_width = width / 2;
     let wg_height = height / 2;
@@ -352,7 +350,7 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 {
                     *u = fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, co), FIX18) as u8;
-                    *v = fix_to_i32(affine_transform(sr, sg, sb, zr, zg, zb, co), FIX18) as u8;
+                    *v = fix_to_i32(affine_transform(sr, sg, sb, yb, zg, zb, co), FIX18) as u8;
                 }
             }
         }
@@ -379,8 +377,7 @@ pub fn rgb_to_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let zg = weights[5];
     let yo = weights[6];
     let yb = -(yr + yg);
-    let zr = yb;
-    let zb = -(zr + zg);
+    let zb = -(yb + zg);
     let co = FIX16_C_HALF + (FIX16_HALF - 1);
 
     unsafe {
@@ -403,7 +400,7 @@ pub fn rgb_to_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                 {
                     *y_data = fix_to_i32(affine_transform(r, g, b, xr, xg, xb, yo), FIX16) as u8;
                     *u_data = fix_to_i32(affine_transform(r, g, b, yr, yg, yb, co), FIX16) as u8;
-                    *v_data = fix_to_i32(affine_transform(r, g, b, zr, zg, zb, co), FIX16) as u8;
+                    *v_data = fix_to_i32(affine_transform(r, g, b, yb, zg, zb, co), FIX16) as u8;
                 }
             }
         }

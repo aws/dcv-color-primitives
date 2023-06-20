@@ -315,6 +315,7 @@ pub enum ErrorKind {
     NotEnoughData,
 }
 
+#[cfg(not(tarpaulin_include))]
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -334,6 +335,7 @@ impl fmt::Display for ErrorKind {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 impl error::Error for ErrorKind {
     fn cause(&self) -> Option<&dyn error::Error> {
         None
@@ -521,6 +523,7 @@ static mut GLOBAL_STATE: GlobalState = GlobalState {
     converters: [None; dispatcher::TABLE_SIZE],
 };
 
+#[cfg(not(tarpaulin_include))]
 fn initialize_global_state(manufacturer: CpuManufacturer, set: InstructionSet) {
     unsafe {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -998,6 +1001,7 @@ pub fn convert_image(
 }
 
 #[doc(hidden)]
+#[cfg(not(tarpaulin_include))]
 #[cfg(not(feature = "test_instruction_sets"))]
 pub mod c_api {
     #![allow(clippy::wildcard_imports)]
