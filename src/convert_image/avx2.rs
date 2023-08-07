@@ -223,8 +223,17 @@ unsafe fn unpack_ui8x2_i16be_16x(image: *const u8) -> (__m256i, __m256i) {
 /// Truncate and deinterleave 3 short samples into 4 uchar samples (16-wide)
 /// Alpha set to `DEFAULT_ALPHA`
 #[inline(always)]
-unsafe fn pack_i16x3_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m256i) {
-    let blue_red = _mm256_packus_epi16(blue, red);
+unsafe fn pack_i16x3_16x<const REVERSED: bool>(
+    image: *mut u8,
+    red: __m256i,
+    green: __m256i,
+    blue: __m256i,
+) {
+    let blue_red = if REVERSED {
+        _mm256_packus_epi16(red, blue)
+    } else {
+        _mm256_packus_epi16(blue, red)
+    };
     let green_white = _mm256_packus_epi16(
         green,
         _mm256_srli_epi16(_mm256_cmpeq_epi32(zero!(), zero!()), 8),
@@ -778,7 +787,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
+unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
@@ -834,7 +843,7 @@ unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
@@ -849,7 +858,7 @@ unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
@@ -870,7 +879,7 @@ unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
@@ -885,7 +894,7 @@ unsafe fn nv12_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
@@ -1016,7 +1025,7 @@ unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
+unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1073,7 +1082,7 @@ unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
@@ -1088,7 +1097,7 @@ unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
@@ -1109,7 +1118,7 @@ unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
@@ -1124,7 +1133,7 @@ unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
@@ -1136,7 +1145,7 @@ unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize>(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize>(
+unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1212,7 +1221,7 @@ unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x(
+            pack_i16x3_16x::<REVERSED>(
                 dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
                 fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
                 fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
@@ -1571,7 +1580,7 @@ unsafe fn rgb_to_bgra_avx2(
 
 // Internal module functions
 #[inline(never)]
-fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1633,7 +1642,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     if vector_part > 0 {
         unsafe {
             if DEPTH == 4 {
-                nv12_to_bgra_avx2::<COLORIMETRY>(
+                nv12_to_bgra_avx2::<COLORIMETRY, REVERSED>(
                     vector_part,
                     h,
                     src_strides,
@@ -1666,7 +1675,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
         }
 
         if DEPTH == 4 {
-            x86::nv12_to_bgra::<COLORIMETRY>(
+            x86::nv12_to_bgra::<COLORIMETRY, REVERSED>(
                 scalar_part,
                 h,
                 src_strides,
@@ -1690,7 +1699,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1746,7 +1755,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i420_to_bgra_avx2::<COLORIMETRY>(
+            i420_to_bgra_avx2::<COLORIMETRY, REVERSED>(
                 vector_part,
                 h,
                 src_strides,
@@ -1773,7 +1782,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i420_to_bgra::<COLORIMETRY>(
+        x86::i420_to_bgra::<COLORIMETRY, REVERSED>(
             scalar_part,
             h,
             src_strides,
@@ -1791,7 +1800,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1844,7 +1853,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            i444_to_bgra_avx2::<COLORIMETRY>(
+            i444_to_bgra_avx2::<COLORIMETRY, REVERSED>(
                 vector_part,
                 h,
                 src_strides,
@@ -1870,7 +1879,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
             return false;
         }
 
-        x86::i444_to_bgra::<COLORIMETRY>(
+        x86::i444_to_bgra::<COLORIMETRY, REVERSED>(
             scalar_part,
             h,
             src_strides,
@@ -2213,21 +2222,33 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601, Rgba);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Rgba);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Rgba);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Rgba);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);
 
 pub fn rgb_bgra(
     width: u32,

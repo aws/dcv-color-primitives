@@ -70,6 +70,11 @@ impl PixelFormat {
             _ => 0,
         }
     }
+
+    #[cfg(not(tarpaulin_include))]
+    pub(crate) const fn reversed(pixel_format: PixelFormat) -> bool {
+        matches!(pixel_format, PixelFormat::Rgba)
+    }
 }
 
 #[cfg(not(tarpaulin_include))]

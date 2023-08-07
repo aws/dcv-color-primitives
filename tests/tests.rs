@@ -73,6 +73,7 @@ const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
 const PIXEL_FORMAT_BGR: u32 = PixelFormat::Bgr as u32;
 const PIXEL_FORMAT_NV12: u32 = PixelFormat::Nv12 as u32;
 const PIXEL_FORMAT_RGB: u32 = PixelFormat::Rgb as u32;
+const PIXEL_FORMAT_RGBA: u32 = PixelFormat::Rgba as u32;
 const RGB_SRC: [[[u8; 4]; 8]; 8] = [
     [
         [161, 24, 44, 58],
@@ -1091,6 +1092,12 @@ fn yuv_to_bgra_size_format_mode_stride(
     .is_ok());
 
     i = 0;
+
+    let (r_offset, b_offset) = match dst_format.pixel_format {
+        PixelFormat::Bgra => (0, 2),
+        _ => (2, 0),
+    };
+
     while i < dst_size {
         let pack_stride = 4 * w;
 
@@ -1098,9 +1105,10 @@ fn yuv_to_bgra_size_format_mode_stride(
             let src = 4 * col;
             let dst = 3 * col;
             assert!(
-                (i32::from(dst_image[i + src]) - expected_row[dst]).abs() <= 2
+                (i32::from(dst_image[i + src + r_offset]) - expected_row[dst]).abs() <= 2
                     && (i32::from(dst_image[i + src + 1]) - expected_row[dst + 1]).abs() <= 2
-                    && (i32::from(dst_image[i + src + 2]) - expected_row[dst + 2]).abs() <= 2
+                    && (i32::from(dst_image[i + src + b_offset]) - expected_row[dst + 2]).abs()
+                        <= 2
                     && dst_image[i + src + 3] == 255
             );
         }
@@ -1152,6 +1160,7 @@ fn yuv_to_bgra_ok(pixel_format: PixelFormat, num_planes: u32) {
         ColorSpace::Bt601FR,
         ColorSpace::Bt709FR,
     ];
+    const SUPPORTED_DST_FORMATS: &[PixelFormat] = &[PixelFormat::Bgra, PixelFormat::Rgba];
     const MAX_WIDTH: u32 = 34;
     const MAX_HEIGHT: u32 = 4;
 
@@ -1159,17 +1168,17 @@ fn yuv_to_bgra_ok(pixel_format: PixelFormat, num_planes: u32) {
         PixelFormat::I444 => 1,
         _ => 2,
     };
-    let dst_format = ImageFormat {
-        pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Rgb,
-        num_planes: 1,
-    };
 
-    for color_space in SUPPORTED_COLOR_SPACES {
+    for (color_space, dst_format) in iproduct!(SUPPORTED_COLOR_SPACES, SUPPORTED_DST_FORMATS) {
         let src_format = ImageFormat {
             pixel_format,
             color_space: *color_space,
             num_planes,
+        };
+        let dst_format = ImageFormat {
+            pixel_format: *dst_format,
+            color_space: ColorSpace::Rgb,
+            num_planes: 1,
         };
 
         for width in (0..=MAX_WIDTH).step_by(step) {
@@ -1747,6 +1756,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         set_expected!(
             expected,
             !(dst_pf == PIXEL_FORMAT_BGRA
+                || dst_pf == PIXEL_FORMAT_RGBA
                 || (src_pf == PIXEL_FORMAT_NV12 && dst_pf == PIXEL_FORMAT_RGB)),
             ErrorKind::InvalidOperation
         );

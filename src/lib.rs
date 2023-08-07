@@ -45,9 +45,9 @@
 //! | ARGB                 | I420, I444, NV12           |
 //! | BGR                  | I420, I444, NV12, RGB      |
 //! | BGRA                 | I420, I444, NV12, RGB      |
-//! | I420                 | BGRA                       |
-//! | I444                 | BGRA                       |
-//! | NV12                 | BGRA, RGB                  |
+//! | I420                 | BGRA, RGBA                 |
+//! | I444                 | BGRA, RGBA                 |
+//! | NV12                 | BGRA, RGB, RGBA            |
 //! | RGB                  | BGRA                       |
 //!
 //! The supported color models are:
@@ -491,21 +491,33 @@ macro_rules! set_dispatch_table {
         rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709);
         rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709FR);
         yuv_to_rgb!($conv, $set, I420, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt601, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt601FR, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709FR, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601FR, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709FR, Rgba);
         yuv_to_rgb!($conv, $set, Nv12, Bt601, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgba);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Rgba);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt709, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709, Rgba);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Rgb);
+        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Rgba);
     };
 }
 
@@ -828,9 +840,9 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Bgr`              | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::Nv12` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::Rgb`  [`5`]
-///   `PixelFormat::I420`             | `PixelFormat::Bgra` [`2`]
-///   `PixelFormat::I444`             | `PixelFormat::Bgra` [`2`]
-///   `PixelFormat::Nv12`             | `PixelFormat::Bgra`, `PixelFormat::Rgb` [`2`]
+///   `PixelFormat::I420`             | `PixelFormat::Bgra`, `PixelFormat::Rgba` [`2`]
+///   `PixelFormat::I444`             | `PixelFormat::Bgra`, `PixelFormat::Rgba` [`2`]
+///   `PixelFormat::Nv12`             | `PixelFormat::Bgra`, `PixelFormat::Rgb`, `PixelFormat::Rgba` [`2`]
 ///   `PixelFormat::Rgb`              | `PixelFormat::Bgra` [`3`]
 ///
 /// * [`NotEnoughData`] if the source stride array is not `None` and its length is less than the
