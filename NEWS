@@ -1,3 +1,13 @@
+News in 0.6.0
+-------------
+* Added {i420,i444,nv12} > rgba conversions.
+* Perform thread-safe, automatic library initialization:
+  https://github.com/aws/dcv-color-primitives/issues/66
+* Removed function initialize().
+* describe_acceleration() is always successful, so it does
+  not wrap the value in a Result anymore.
+* Removed deprecated ColorSpace::Lrgb.
+
 News in 0.5.4
 -------------
 * Fix C-bindings compilation on Windows

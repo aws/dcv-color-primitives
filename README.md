@@ -44,7 +44,7 @@ Both standard range (0-235) and full range (0-255) are supported.
 
 ## Requirements
 
-* Rust 1.55 and newer (until DCP 0.2: At least Rust 1.39)
+* Rust 1.70 and newer
 
 ### Windows
 
@@ -83,7 +83,7 @@ Run benchmark:
 cargo bench
 ```
 
-Advanced benchamark mode.
+Advanced benchmark mode.
 There are two benchmark scripts:
 * `run-bench.ps1` for Windows
 * `run-bench.sh` for Linux and MacOS
@@ -121,18 +121,6 @@ wasm-pack test --node
 
 ## Usage
 
-### Initialize the library
-
-This function has to be called before any other library function call:
-
-```rust
-use dcv_color_primitives as dcp;
-
-fn main() {
-    dcp::initialize();
-}
-```
-
 ### Image conversion
 
 Convert an image from bgra to nv12 (single plane) format containing yuv in BT601:
@@ -142,8 +130,6 @@ use dcv_color_primitives as dcp;
 use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 
 fn main() {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
@@ -182,7 +168,6 @@ The library functions return a `Result` describing the operation outcome:
 | Result                             | Description                                                           |
 | ---------------------------------- | --------------------------------------------------------------------- |
 | `Ok(())`                           | The operation succeeded                                               |
-| `Err(ErrorKind::NotInitialized)`   | The library is not initialized                                        |
 | `Err(ErrorKind::InvalidValue)`     | One or more parameters have invalid values for the called function    |
 | `Err(ErrorKind::InvalidOperation)` | The combination of parameters is unsupported for the called function  |
 | `Err(ErrorKind::NotEnoughData)`    | One or more buffers are not correctly sized                           |
@@ -195,8 +180,6 @@ use dcv_color_primitives as dcp;
 use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
 fn main() {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
@@ -240,8 +223,6 @@ use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
@@ -287,8 +268,6 @@ use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
 use std::error;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_PLANES: u32 = 1;
@@ -321,8 +300,6 @@ use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat}
 use std::error;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_SRC_PLANES: u32 = 2;
@@ -376,8 +353,6 @@ use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat}
 use std::error;
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    dcp::initialize();
-
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_SRC_PLANES: u32 = 1;

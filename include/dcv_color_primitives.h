@@ -40,12 +40,6 @@
  *
  * # Examples
  *
- * Initialize the library:
- *
- * |[<!-- language="C" -->
- * dcp_initialize();
- * ]|
- *
  * Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
  *
  * |[<!-- language="C" -->
@@ -70,7 +64,6 @@
  *     1,
  * };
  *
- * dcp_initialize();
  * dcp_convert_image(WIDTH, HEIGHT,
  *                   &src_format, NULL, src_buffers,
  *                   &dst_format, NULL, dst_buffers,
@@ -104,7 +97,6 @@
  * DcpResult result;
  * DcpErrorKind error;
  *
- * dcp_initialize();
  * result = dcp_convert_image(WIDTH, HEIGHT,
  *                            &src_format, NULL, src_buffers,
  *                            &dst_format, NULL, dst_buffers,
@@ -136,7 +128,6 @@
  * DcpErrorKind error;
  * uint8_t *buffer = NULL;
  *
- * dcp_initialize();
  * result = dcp_get_buffers_size(WIDTH, HEIGHT, &format, NULL, sizes, &error);
  * if (result == DCP_RESULT_OK) {
  *     buffer = (uint8_t *)malloc(sizes[0]);
@@ -173,8 +164,6 @@
  * static uint8_t * dst_buffers[NUM_DST_PLANES] = { 0 };
  *
  * DcpErrorKind error;
- *
- * dcp_initialize();
  *
  * if (dcp_get_buffers_size(WIDTH, HEIGHT, &src_format, NULL, src_sizes, &error) != DCP_RESULT_OK) {
  *     printf("Cannot compute source buffer size, error 0x%X\n", error);
@@ -229,8 +218,6 @@
  *
  * DcpErrorKind error;
  *
- * dcp_initialize();
- *
  * if (dcp_get_buffers_size(WIDTH, HEIGHT, &src_format, src_strides, src_sizes, &error) != DCP_RESULT_OK) {
  *     printf("Cannot compute source buffer size, error 0x%X\n", error);
  *     return 0;
@@ -275,7 +262,6 @@ typedef enum {
 
 /**
  * DcpErrorKind:
- * @DCP_ERROR_KIND_NOT_INITIALIZED: function(dcp_initialize) was never called
  * @DCP_ERROR_KIND_INVALID_VALUE: One or more parameters have invalid values for the called function
  * @DCP_ERROR_KIND_INVALID_OPERATION: The combination of parameters is unsupported for the called function
  * @DCP_ERROR_KIND_NOT_ENOUGH_DATA: Not enough data was provided to the called function.
@@ -284,7 +270,6 @@ typedef enum {
  * An enumeration of errors.
  */
 typedef enum {
-    DCP_ERROR_KIND_NOT_INITIALIZED,
     DCP_ERROR_KIND_INVALID_VALUE,
     DCP_ERROR_KIND_INVALID_OPERATION,
     DCP_ERROR_KIND_NOT_ENOUGH_DATA,
@@ -414,58 +399,21 @@ typedef struct {
 static const size_t DCP_STRIDE_AUTO = 0;
 
 /**
- * dcp_initialize:
- * Automatically initializes the library functions that are most appropriate for
- * the current processor type.
- *
- * You should call this function before calling any other library function
- *
- * # Safety
- *
- * You can not use any other library function (also in other threads) while the initialization
- * is in progress. Failure to do so result in undefined behaviour
- *
- * # Examples
- *
- * |[<!-- language="C" -->
- * dcp_initialize();
- * ]|
- */
-void                dcp_initialize              (void);
-
-/**
  * dcp_describe_acceleration:
  * Returns a description of the algorithms that are best for the running cpu and
  * available instruction sets
  *
- * Returns: a null-terminated string that contains the description, or %NULL if the library was not
- *          initialized before. String has to freed using function(dcp_unref_string)
+ * Returns: a null-terminated string that contains the description.
+ *          String has to freed using function(dcp_unref_string)
  *
  * # Examples
  *
  * |[<!-- language="C" -->
  * char *description = NULL;
  *
- * dcp_initialize();
  * description = dcp_describe_acceleration();
- * if (description != NULL) {
- *     printf("%s\n", description);
- * } else {
- *     printf("Unable to describe the acceleration\n");
- * }
+ * printf("%s\n", description);
  * // => {cpu-manufacturer:Intel,instruction-set:Avx2}
- * ]|
- *
- * When function(dcp_initialize) is not called:
- *
- * |[<!-- language="C" -->
- * char *description = dcp_describe_acceleration();
- * if (description != NULL) {
- *     printf("%s\n", description);
- * } else {
- *     printf("Unable to describe the acceleration\n");
- * }
- * // => Unable to describe the acceleration
  * ]|
  */
 char *              dcp_describe_acceleration   (void);
@@ -482,7 +430,6 @@ char *              dcp_describe_acceleration   (void);
  * |[<!-- language="C" -->
  * char *description = NULL;
  *
- * dcp_initialize();
  * description = dcp_describe_acceleration();
  * dcp_unref_string(description);
  * ]|
@@ -540,7 +487,6 @@ void                dcp_unref_string            (char *string);
  * DcpResult result;
  * DcpErrorKind error;
  *
- * dcp_initialize();
  * result = dcp_get_buffers_size(WIDTH, HEIGHT, &format, NULL, sizes, &error);
  * ]|
  *
@@ -566,7 +512,6 @@ void                dcp_unref_string            (char *string);
  * DcpResult result;
  * DcpErrorKind error;
  *
- * dcp_initialize();
  * result = dcp_get_buffers_size(WIDTH, HEIGHT, &format, STRIDES, sizes, &error);
  * ]|
  *
@@ -592,7 +537,6 @@ void                dcp_unref_string            (char *string);
  * DcpResult result;
  * DcpErrorKind error;
  *
- * dcp_initialize();
  * result = dcp_get_buffers_size(WIDTH, HEIGHT, &format, STRIDES, sizes, &error);
  * ]|
  *
@@ -633,7 +577,6 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * - %DCP_ERROR_KIND_INVALID_VALUE if @src_buffers or @dst_buffers is %NULL
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image pixel format is not a #DcpPixelFormat
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image color space is not a #DcpColorSpace
- * - %DCP_ERROR_KIND_NOT_INITIALIZED if the library was not initialized before
  * - %DCP_ERROR_KIND_INVALID_VALUE if @width or @height violate the [size constraints][size-constraint]
  *   that might by imposed by the source and destination image pixel formats
  * - %DCP_ERROR_KIND_INVALID_VALUE if source or destination image formats have a number of planes

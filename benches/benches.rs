@@ -515,8 +515,6 @@ fn convert_to(
 }
 
 fn bench(c: &mut Criterion<Perf>) {
-    initialize();
-
     let mut perf = PerfEvent::new();
 
     for src_format in SRC_FORMATS {

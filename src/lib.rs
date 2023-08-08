@@ -34,6 +34,8 @@
     // by vzeroupper().
     // This is detrimental to performance
     clippy::inline_always,
+    // Yield false positives
+    clippy::must_use_candidate,
 )]
 
 //! DCV color primitives is a library to perform image color model conversion.
@@ -58,20 +60,12 @@
 //!
 //! # Examples
 //!
-//! Initialize the library:
-//! ```
-//! use dcv_color_primitives as dcp;
-//! dcp::initialize();
-//! ```
-//!
 //! Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
 //! ```
 //! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
 //!
 //! fn convert() {
-//!     dcp::initialize();
-//!
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
@@ -110,8 +104,6 @@
 //! use std::error;
 //!
 //! fn convert() -> Result<(), Box<dyn error::Error>> {
-//!     dcp::initialize();
-//!
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
@@ -152,8 +144,6 @@
 //! use std::error;
 //!
 //! fn compute_size() -> Result<(), Box<dyn error::Error>> {
-//!     dcp::initialize();
-//!
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_PLANES: u32 = 1;
@@ -184,8 +174,6 @@
 //! use std::error;
 //!
 //! fn convert() -> Result<(), Box<dyn error::Error>> {
-//!     dcp::initialize();
-//!
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 2;
@@ -236,8 +224,6 @@
 //! use std::error;
 //!
 //! fn convert() -> Result<(), Box<dyn error::Error>> {
-//!     dcp::initialize();
-//!
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 1;
@@ -294,6 +280,9 @@ use cpu_info::{CpuManufacturer, InstructionSet};
 use paste::paste;
 use std::error;
 use std::fmt;
+#[cfg(feature = "test_instruction_sets")]
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::OnceLock;
 
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
@@ -302,10 +291,6 @@ pub use pixel_format::{PixelFormat, STRIDE_AUTO};
 #[derive(Debug)]
 #[repr(C)]
 pub enum ErrorKind {
-    /// [`initialize`] was never called
-    ///
-    /// [`initialize`]: ./fn.initialize.html
-    NotInitialized,
     /// One or more parameters have invalid values for the called function
     InvalidValue,
     /// The combination of parameters is unsupported for the called function
@@ -319,9 +304,6 @@ pub enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ErrorKind::NotInitialized => {
-                write!(f, "Library was not initialized by calling initialize()")
-            }
             ErrorKind::InvalidValue => write!(
                 f,
                 "One or more parameters have not legal values for the command"
@@ -521,132 +503,90 @@ macro_rules! set_dispatch_table {
     };
 }
 
-struct GlobalState {
-    init: bool,
+#[cfg(feature = "test_instruction_sets")]
+static TEST_SET: AtomicI32 = AtomicI32::new(-1);
+
+type DispatchTable = [Option<ConvertDispatcher>; dispatcher::TABLE_SIZE];
+
+struct Context {
     manufacturer: CpuManufacturer,
     set: InstructionSet,
-    converters: [Option<ConvertDispatcher>; dispatcher::TABLE_SIZE],
+    converters: DispatchTable,
+    #[cfg(feature = "test_instruction_sets")]
+    test_converters: [Option<DispatchTable>; 3],
 }
 
-static mut GLOBAL_STATE: GlobalState = GlobalState {
-    init: false,
-    manufacturer: CpuManufacturer::Unknown,
-    set: InstructionSet::X86,
-    converters: [None; dispatcher::TABLE_SIZE],
-};
+impl Context {
+    pub fn global() -> &'static Context {
+        static INSTANCE: OnceLock<Context> = OnceLock::new();
+        INSTANCE.get_or_init(Context::new)
+    }
 
-#[cfg(not(tarpaulin_include))]
-fn initialize_global_state(manufacturer: CpuManufacturer, set: InstructionSet) {
-    unsafe {
+    pub fn new() -> Self {
+        let (manufacturer, set) = cpu_info::get();
+        let mut context = Context {
+            manufacturer,
+            set,
+            converters: [None; dispatcher::TABLE_SIZE],
+            #[cfg(feature = "test_instruction_sets")]
+            test_converters: [None; 3],
+        };
+
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        match set {
+        match context.set {
             InstructionSet::X86 => {
-                set_dispatch_table!(GLOBAL_STATE.converters, x86);
+                set_dispatch_table!(context.converters, x86);
             }
             InstructionSet::Sse2 => {
-                set_dispatch_table!(GLOBAL_STATE.converters, sse2);
+                set_dispatch_table!(context.converters, sse2);
+                #[cfg(feature = "test_instruction_sets")]
+                {
+                    let mut table: DispatchTable = [None; dispatcher::TABLE_SIZE];
+                    set_dispatch_table!(table, x86);
+                    context.test_converters[0] = Some(table);
+                }
             }
             InstructionSet::Avx2 => {
-                set_dispatch_table!(GLOBAL_STATE.converters, avx2);
+                set_dispatch_table!(context.converters, avx2);
+
+                #[cfg(feature = "test_instruction_sets")]
+                {
+                    let mut table: DispatchTable = [None; dispatcher::TABLE_SIZE];
+                    set_dispatch_table!(table, sse2);
+                    context.test_converters[1] = Some(table);
+
+                    let mut table: DispatchTable = [None; dispatcher::TABLE_SIZE];
+                    set_dispatch_table!(table, x86);
+                    context.test_converters[0] = Some(table);
+                }
             }
         }
 
         // This is the default for arm and wasm32 targets
         #[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
         {
-            set_dispatch_table!(GLOBAL_STATE.converters, x86);
+            set_dispatch_table!(context.converters, x86);
         }
 
-        GLOBAL_STATE.manufacturer = manufacturer;
-        GLOBAL_STATE.set = set;
-        GLOBAL_STATE.init = true;
+        context
     }
-}
-
-/// Automatically initializes the library functions that are most appropriate for
-/// the current processor type.
-///
-/// You should call this function before calling any other library function
-///
-/// # Safety
-/// You can not use any other library function (also in other threads) while the initialization
-/// is in progress. Failure to do so result in undefined behaviour
-///
-/// # Examples
-/// ```
-/// use dcv_color_primitives as dcp;
-/// dcp::initialize();
-/// ```
-#[cfg(not(tarpaulin_include))]
-pub fn initialize() {
-    unsafe {
-        if GLOBAL_STATE.init {
-            return;
-        }
-    }
-
-    let (manufacturer, set) = cpu_info::get();
-    initialize_global_state(manufacturer, set);
-}
-
-/// This is for internal use only
-#[cfg(feature = "test_instruction_sets")]
-pub fn initialize_with_instruction_set(instruction_set: &str) {
-    let (manufacturer, set) = cpu_info::get();
-
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    let set = match instruction_set {
-        "x86" => InstructionSet::X86,
-        "sse2" => match set {
-            InstructionSet::Avx2 => InstructionSet::Sse2,
-            _ => set,
-        },
-        _ => set,
-    };
-
-    initialize_global_state(manufacturer, set);
 }
 
 /// Returns a description of the algorithms that are best for the running cpu and
 /// available instruction sets
 ///
-/// # Errors
-/// * [`NotInitialized`] if the library was not initialized before
-///
 /// # Examples
 /// ```
 /// use dcv_color_primitives as dcp;
-/// dcp::initialize();
-/// match dcp::describe_acceleration() {
-///     Ok(description) => println!("{}", description),
-///     Err(error) => println!("Unable to describe the acceleration: {}", error),
-/// }
+/// println!("{}", dcp::describe_acceleration());
 /// // => {cpu-manufacturer:Intel,instruction-set:Avx2}
-/// ```
-///
-/// When [`initialize`] is not called:
-/// ```
-/// use dcv_color_primitives as dcp;
-/// match dcp::describe_acceleration() {
-///     Ok(description) => println!("{}", description),
-///     Err(error) => println!("Unable to describe the acceleration: {}", error),
-/// }
-/// // => Unable to describe the acceleration: NotInitialized
-/// ```
-///
-/// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
-/// [`initialize`]: ./fn.initialize.html
-pub fn describe_acceleration() -> Result<String, ErrorKind> {
-    unsafe {
-        if GLOBAL_STATE.init {
-            Ok(format!(
-                "{{cpu-manufacturer:{:?},instruction-set:{:?}}}",
-                GLOBAL_STATE.manufacturer, GLOBAL_STATE.set
-            ))
-        } else {
-            Err(ErrorKind::NotInitialized)
-        }
-    }
+pub fn describe_acceleration() -> String {
+    let state = Context::global();
+
+    format!(
+        "{{cpu-manufacturer:{:?},instruction-set:{:?}}}",
+        state.manufacturer, state.set
+    )
 }
 
 /// Compute number of bytes required to store an image given its format, dimensions
@@ -670,8 +610,6 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// use std::error;
 ///
 /// fn compute_size_packed() -> Result<(), Box<dyn error::Error>> {
-///     dcp::initialize();
-///
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -697,8 +635,6 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// use std::error;
 ///
 /// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
-///     dcp::initialize();
-///
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -728,8 +664,6 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// use std::error;
 ///
 /// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
-///     dcp::initialize();
-///
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -766,7 +700,7 @@ pub fn describe_acceleration() -> Result<String, ErrorKind> {
 /// * [`NotEnoughData`] if the buffers size array is not `None` and its length is less than the
 ///   image format number of planes
 ///
-/// [`InvalidValue`]: ./enum.ErrorKind.html#variant.NotInitialized
+/// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
 /// [`size constraints`]: ./struct.ImageFormat.html#note
 /// [`STRIDE_AUTO`]: ./constant.STRIDE_AUTO.html
@@ -813,8 +747,6 @@ pub fn get_buffers_size(
 /// * `dst_buffers` - An array of image buffers in each destination color plane
 ///
 /// # Errors
-///
-/// * [`NotInitialized`] if the library was not initialized before
 ///
 /// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`]
 ///   that might by imposed by the source and destination image pixel formats
@@ -927,7 +859,6 @@ pub fn get_buffers_size(
 /// # Algorithm 5
 /// Conversion from BGR to RGB
 ///
-/// [`NotInitialized`]: ./enum.ErrorKind.html#variant.NotInitialized
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
@@ -946,12 +877,6 @@ pub fn convert_image(
     dst_strides: Option<&[usize]>,
     dst_buffers: &mut [&mut [u8]],
 ) -> Result<(), ErrorKind> {
-    unsafe {
-        if !GLOBAL_STATE.init {
-            return Err(ErrorKind::NotInitialized);
-        }
-    }
-
     let src_pixel_format = src_format.pixel_format as u32;
     let dst_pixel_format = dst_format.pixel_format as u32;
     let src_color_space = src_format.color_space as u32;
@@ -985,7 +910,20 @@ pub fn convert_image(
     let src_index = dispatcher::get_image_index(src_pixel_format, src_color_space, src_pf_mode);
     let dst_index = dispatcher::get_image_index(dst_pixel_format, dst_color_space, dst_pf_mode);
     let index = dispatcher::get_index(src_index, dst_index);
-    let converters = { unsafe { &GLOBAL_STATE.converters } };
+    let converters = Context::global().converters;
+
+    #[cfg(feature = "test_instruction_sets")]
+    let converters = {
+        let test_converters = Context::global().test_converters;
+        #[allow(clippy::cast_sign_loss)]
+        // Checked: we want the invalid value '-1' to be mapped outside the valid range
+        test_converters
+            .get(TEST_SET.load(Ordering::SeqCst) as usize)
+            .map(|&x| x)
+            .flatten()
+            .unwrap_or(converters)
+    };
+
     if index >= converters.len() {
         return Err(ErrorKind::InvalidOperation);
     }
@@ -1010,6 +948,16 @@ pub fn convert_image(
             }
         }
     }
+}
+
+/// This is for internal use only
+#[cfg(feature = "test_instruction_sets")]
+pub fn initialize_with_instruction_set(instruction_set: &str) {
+    match instruction_set {
+        "x86" => TEST_SET.store(0, Ordering::SeqCst),
+        "sse2" => TEST_SET.store(1, Ordering::SeqCst),
+        _ => TEST_SET.store(2, Ordering::SeqCst),
+    };
 }
 
 #[doc(hidden)]
@@ -1043,19 +991,10 @@ pub mod c_api {
     }
 
     #[no_mangle]
-    pub extern "C" fn dcp_initialize() {
-        initialize();
-    }
-
-    #[no_mangle]
     pub extern "C" fn dcp_describe_acceleration() -> *mut c_char {
-        if let Ok(acc) = describe_acceleration() {
-            if let Ok(s) = CString::new(acc) {
-                s.into_raw()
-            } else {
-                let p: *const c_char = ptr::null();
-                p as *mut c_char
-            }
+        let acc = describe_acceleration();
+        if let Ok(s) = CString::new(acc) {
+            s.into_raw()
         } else {
             let p: *const c_char = ptr::null();
             p as *mut c_char
