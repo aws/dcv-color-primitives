@@ -64,7 +64,10 @@ macro_rules! yuv_to_rgb_converter {
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
-                [<$src_pf:lower _rgb>]::<{ Colorimetry::$src_cs as usize }, { crate::pixel_format::PixelFormat::depth(crate::pixel_format::PixelFormat::$dst_pf) }>(
+                [<$src_pf:lower _rgb>]::<
+                    { Colorimetry::$src_cs as usize },
+                    { crate::pixel_format::PixelFormat::depth(crate::pixel_format::PixelFormat::$dst_pf) },
+                    { crate::pixel_format::PixelFormat::reversed(crate::pixel_format::PixelFormat::$dst_pf) }>(
                     width,
                     height,
                     last_src_plane as usize,

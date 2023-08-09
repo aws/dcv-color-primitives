@@ -165,10 +165,16 @@ unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32) {
 
 /// Truncate and interleave 3 int into a dword
 /// Last component is set to `DEFAULT_ALPHA`
-unsafe fn pack_ui8x3(image: *mut u8, x: u8, y: u8, z: u8) {
-    *image = x;
+unsafe fn pack_ui8x3<const REVERSED: bool>(image: *mut u8, x: u8, y: u8, z: u8) {
+    if REVERSED {
+        *image = z;
+        *image.add(2) = x;
+    } else {
+        *image = x;
+        *image.add(2) = z;
+    }
+
     *image.add(1) = y;
-    *image.add(2) = z;
     *image.add(3) = DEFAULT_ALPHA;
 }
 
@@ -408,7 +414,7 @@ pub fn rgb_to_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
 }
 
 #[inline(never)]
-pub fn nv12_to_bgra<const COLORIMETRY: usize>(
+pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize),
@@ -462,7 +468,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize>(
                 // [ 1192, 17512]   Y(16)               Y(235)
                 let sy00 = mulhi_i32(y00, xxym);
 
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y, DEPTH, dst_stride)),
                     // [-14428,30811]   Y(16)Cb(16)         Y(235)Cb(240)
                     fix_to_u8_sat(sy00 + sb, FIX6),
@@ -473,7 +479,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize>(
                 );
 
                 let sy10 = mulhi_i32(y10, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy10 + sb, FIX6),
                     fix_to_u8_sat(sy10 + sg, FIX6),
@@ -484,7 +490,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize>(
                     unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
 
                 let sy01 = mulhi_i32(y01, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy01 + sb, FIX6),
                     fix_to_u8_sat(sy01 + sg, FIX6),
@@ -492,7 +498,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize>(
                 );
 
                 let sy11 = mulhi_i32(y11, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy11 + sb, FIX6),
                     fix_to_u8_sat(sy11 + sg, FIX6),
@@ -584,7 +590,7 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
 }
 
 #[inline(never)]
-pub fn i420_to_bgra<const COLORIMETRY: usize>(
+pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -627,7 +633,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize>(
 
                 let sy00 = mulhi_i32(y00, xxym);
 
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy00 + sb, FIX6),
                     fix_to_u8_sat(sy00 + sg, FIX6),
@@ -635,7 +641,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize>(
                 );
 
                 let sy10 = mulhi_i32(y10, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy10 + sb, FIX6),
                     fix_to_u8_sat(sy10 + sg, FIX6),
@@ -646,7 +652,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize>(
                     unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
 
                 let sy01 = mulhi_i32(y01, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy01 + sb, FIX6),
                     fix_to_u8_sat(sy01 + sg, FIX6),
@@ -654,7 +660,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize>(
                 );
 
                 let sy11 = mulhi_i32(y11, xxym);
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy11 + sb, FIX6),
                     fix_to_u8_sat(sy11 + sg, FIX6),
@@ -666,7 +672,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize>(
 }
 
 #[inline(never)]
-pub fn i444_to_bgra<const COLORIMETRY: usize>(
+pub fn i444_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -704,7 +710,7 @@ pub fn i444_to_bgra<const COLORIMETRY: usize>(
                 let sb = mulhi_i32(cb, bcbm) - bn;
                 let sl = mulhi_i32(l, xxym);
 
-                pack_ui8x3(
+                pack_ui8x3::<REVERSED>(
                     dst_group.add(wg_index(x, y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sl + sb, FIX6),
                     fix_to_u8_sat(sl + sg, FIX6),
@@ -1012,7 +1018,7 @@ fn bgra_to_rgb(
 }
 
 #[inline(never)]
-fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     last_src_plane: usize,
@@ -1069,7 +1075,14 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
     }
 
     if DEPTH == 4 {
-        nv12_to_bgra::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+        nv12_to_bgra::<COLORIMETRY, REVERSED>(
+            w,
+            h,
+            src_strides,
+            src_buffers,
+            dst_stride,
+            dst_buffer,
+        );
     } else {
         nv12_to_rgb::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
     }
@@ -1078,7 +1091,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
 }
 
 #[inline(never)]
-fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1129,13 +1142,13 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
         return false;
     }
 
-    i420_to_bgra::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    i420_to_bgra::<COLORIMETRY, REVERSED>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
 
     true
 }
 
 #[inline(never)]
-fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
+fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
     _last_src_plane: usize,
@@ -1183,7 +1196,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize>(
         return false;
     }
 
-    i444_to_bgra::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    i444_to_bgra::<COLORIMETRY, REVERSED>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
 
     true
 }
@@ -1424,21 +1437,33 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601, Rgba);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Rgba);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Rgba);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Rgba);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
-yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);
 
 pub fn rgb_bgra(
     width: u32,

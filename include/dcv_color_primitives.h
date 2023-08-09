@@ -27,9 +27,9 @@
  * | ARGB                 | I420, I444, NV12           |
  * | BGR                  | I420, I444, NV12, RGB      |
  * | BGRA                 | I420, I444, NV12, RGB      |
- * | I420                 | BGRA                       |
- * | I444                 | BGRA                       |
- * | NV12                 | BGRA, RGB                  |
+ * | I420                 | BGRA, RGBA                 |
+ * | I444                 | BGRA, RGBA                 |
+ * | NV12                 | BGRA, RGB, RGBA            |
  * | RGB                  | BGRA                       |
  *
  * The supported color models are:
@@ -657,9 +657,9 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_I444 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_NV12 [1][algo-1]
  *   DCP_PIXEL_FORMAT_BGR              | DCP_PIXEL_FORMAT_RGB  [5][algo-5]
- *   DCP_PIXEL_FORMAT_I420             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
- *   DCP_PIXEL_FORMAT_I444             | DCP_PIXEL_FORMAT_BGRA [2][algo-2]
- *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA, DCP_PIXEL_FORMAT_RGB [2][algo-2]
+ *   DCP_PIXEL_FORMAT_I420             | DCP_PIXEL_FORMAT_BGRA, DCP_PIXEL_FORMAT_RGBA [2][algo-2]
+ *   DCP_PIXEL_FORMAT_I444             | DCP_PIXEL_FORMAT_BGRA, DCP_PIXEL_FORMAT_RGBA [2][algo-2]
+ *   DCP_PIXEL_FORMAT_NV12             | DCP_PIXEL_FORMAT_BGRA, DCP_PIXEL_FORMAT_RGB, DCP_PIXEL_FORMAT_RGBA [2][algo-2]
  *   DCP_PIXEL_FORMAT_RGB              | DCP_PIXEL_FORMAT_BGRA [3][algo-3]
  *
  * # Undefined behaviour
