@@ -435,6 +435,8 @@ help for further instructions:
      pip install meson ninja
      ```
 
+  Note: Minimum required meson version is 1.0.0.
+
   All build commands have to be issued from Native Tools Command Prompt for VS (x86 or x64 depending on what platform you want to build)
 
 * **Linux**
@@ -461,7 +463,7 @@ help for further instructions:
 
   Then:
   ```
-  meson --buildtype release builddir
+  meson setup --buildtype release builddir
   ninja -C builddir
   ```
 
