@@ -41,13 +41,6 @@ pub enum ColorSpace {
     Bt709FR,
 }
 
-impl ColorSpace {
-    #[deprecated(since = "0.5.0", note = "Lrgb is the same as Rgb. Use ColorSpace::Rgb")]
-    #[allow(non_upper_case_globals)]
-    /// Deprecated. Same as `ColorSpace::Rgb`
-    pub const Lrgb: ColorSpace = ColorSpace::Rgb;
-}
-
 #[cfg(not(tarpaulin_include))]
 impl std::fmt::Display for ColorSpace {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -337,7 +337,6 @@ typedef enum {
  * @DCP_COLOR_SPACE_BT709: YCbCr, ITU-R Recommendation BT.709 (CSC systems)
  * @DCP_COLOR_SPACE_BT601FR: YCbCr, BT.601 (full range)
  * @DCP_COLOR_SPACE_BT709FR: YCbCr, BT.709 (full range)
- * @DCP_COLOR_SPACE_LRGB: Deprecated: 0.5.0: Use @DCP_COLOR_SPACE_RGB instead
  *
  * An enumeration of supported color models.
  *
