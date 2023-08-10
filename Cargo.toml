@@ -2,6 +2,7 @@
 name = "dcv-color-primitives"
 version = "0.6.0"
 edition = "2018"
+rust-version = "1.70"
 description = "a library to perform image color model conversion"
 license = "MIT-0"
 repository = "https://github.com/aws/dcv-color-primitives"
