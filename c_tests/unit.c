@@ -534,12 +534,6 @@ is_valid_format(const DcpImageFormat *format,
 }
 
 static void
-init(void)
-{
-    dcp_initialize();
-}
-
-static void
 unit_init(void)
 {
     char *desc;
@@ -548,11 +542,6 @@ unit_init(void)
     TEST_BEGIN_GROUP(__FUNCTION__);
 
     TEST_BEGIN("init");
-
-    desc = dcp_describe_acceleration();
-    TEST_ASSERT_EQ((desc == NULL), 1);
-
-    init();
 
     desc = dcp_describe_acceleration();
     TEST_ASSERT_EQ((desc != NULL), 1);
@@ -917,7 +906,6 @@ unit_convert_image_rgb_to_yuv(DcpPixelFormat dst_pixel_format,
     uint32_t width;
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     for (width = 0; width <= max_width; width += step) {
         uint32_t height;
@@ -1291,7 +1279,6 @@ unit_convert_image_yuv_to_rgb(DcpPixelFormat format)
     uint32_t width;
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     for (width = 0; width <= max_width; width += step) {
         uint32_t height;
@@ -1318,7 +1305,6 @@ unit_convert_image_rgb_to_yuv_errors(void)
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     /* Allocate and initialize input */
     test_input = alloc_new(&alloc, in_size);
@@ -1450,7 +1436,6 @@ unit_convert_image_yuv_to_rgb_errors(void)
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     /* Allocate and initialize input */
     test_input = alloc_new(&alloc, in_size);
@@ -1645,7 +1630,6 @@ unit_get_buffers_size(void)
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     TEST_BEGIN("no_format");
     status.result = dcp_get_buffers_size(1, 1, NULL, NULL, NULL, &status.error);
@@ -1709,7 +1693,6 @@ unit_convert_image_over_4gb_limit(void)
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
 
     if (sizeof(void *) <= 4) {
         exit(EXIT_SKIP_CODE);
@@ -1807,7 +1790,6 @@ unit_image_convert_rgb_ok(DcpPixelFormat src_pixel_format,
 
     DcpStatus status = dcp_status();
     TEST_BEGIN_GROUP(__FUNCTION__);
-    init();
     for (width = 0; width <= MAX_WIDTH; width++) {
         for (height = 0; height <= MAX_HEIGHT; height++) {
             for (src_stride_diff = 0; src_stride_diff <= MAX_FILL_BYTES; src_stride_diff++) {

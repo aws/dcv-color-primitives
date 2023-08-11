@@ -1,7 +1,7 @@
 project(
   'dcv-color-primitives', 'c',
   license : 'MIT-0',
-  version : run_command('build-aux' / 'getversion.py').stdout().strip(),
+  version : run_command('build-aux' / 'getversion.py', check: false).stdout().strip(),
   meson_version: '>= 0.52.0'
 )
 
@@ -92,7 +92,7 @@ else
   cargo_target = ['build', ]
 endif
 
-cargo_result = run_command('cargo', cargo_target)
+cargo_result = run_command('cargo', cargo_target, check: false)
 
 message(cargo_result.stdout())
 message(cargo_result.stderr())
