@@ -16,7 +16,7 @@
 pub const MAX_NUMBER_OF_PLANES: usize = 4;
 
 /// An enumeration of supported pixel formats.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub enum PixelFormat {
     /// RGB with alpha channel first.

@@ -361,6 +361,7 @@ impl error::Error for ErrorKind {
 ///
 /// The values reported in columns `w` and `h`, when specified, indicate that the described
 /// image should have width and height that are multiples of the specified values
+#[derive(Debug)]
 #[repr(C)]
 pub struct ImageFormat {
     /// Pixel format
