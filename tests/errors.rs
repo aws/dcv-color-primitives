@@ -233,7 +233,7 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
 
         assert_eq!(expected.is_ok(), status.is_ok());
         match status {
-            Ok(_) => check_bounds(
+            Ok(()) => check_bounds(
                 WIDTH,
                 HEIGHT,
                 &src_format,
@@ -355,7 +355,7 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
 
             assert_eq!(expected.is_ok(), status.is_ok());
             match status {
-                Ok(_) => check_bounds(
+                Ok(()) => check_bounds(
                     w,
                     h,
                     &src_format,
@@ -476,7 +476,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
 
         assert_eq!(expected.is_ok(), status.is_ok());
         match status {
-            Ok(_) => check_bounds(w, h, &src_format, &src_buffers, &dst_format, dst_buffers),
+            Ok(()) => check_bounds(w, h, &src_format, &src_buffers, &dst_format, dst_buffers),
             Err(err) => check_err(err, expected.unwrap_err()),
         }
     }

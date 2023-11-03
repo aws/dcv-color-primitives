@@ -131,7 +131,7 @@ fn buffers_size() {
 
         let status = get_buffers_size(1, HEIGHT, &format, None, buffers_size);
         match status {
-            Ok(_) => assert!(expected.is_ok()),
+            Ok(()) => assert!(expected.is_ok()),
             Err(err) => check_err(err, expected.err().unwrap()),
         }
 
@@ -146,7 +146,7 @@ fn buffers_size() {
 
         let status = get_buffers_size(WIDTH, 1, &format, None, buffers_size);
         match status {
-            Ok(_) => assert!(expected.is_ok()),
+            Ok(()) => assert!(expected.is_ok()),
             Err(err) => check_err(err, expected.err().unwrap()),
         }
 
@@ -162,7 +162,7 @@ fn buffers_size() {
         assert_eq!(expected.is_ok(), status.is_ok());
 
         match status {
-            Ok(_) => {
+            Ok(()) => {
                 let pf = pf as usize;
                 let num_planes = num_planes as usize;
                 let area = (WIDTH as usize) * (HEIGHT as usize);
