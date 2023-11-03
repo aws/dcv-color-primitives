@@ -1,3 +1,7 @@
+News in 0.6.1
+-------------
+* Added debug traits for public structs.
+
 News in 0.6.0
 -------------
 * Added {i420,i444,nv12} > rgba conversions.
