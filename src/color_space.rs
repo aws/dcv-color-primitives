@@ -21,7 +21,7 @@
 /// * Gamma
 /// * Range (headroom / footroom)
 /// * Primaries
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub enum ColorSpace {
     /// Gamma-corrected R'G'B'.

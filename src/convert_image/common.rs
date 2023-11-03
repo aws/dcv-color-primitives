@@ -148,7 +148,7 @@ pub const FIX18_C_HALF: i32 = u8_to_fix(C_HALF, FIX18);
 pub const Y_OFFSET: i32 = FIX16_Y_MIN + FIX16_HALF;
 pub const DEFAULT_ALPHA: u8 = 255;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Sampler {
     Argb,
     Bgra,
@@ -157,6 +157,7 @@ pub enum Sampler {
     Length,
 }
 
+#[derive(Debug)]
 pub enum Colorimetry {
     Bt601,
     Bt709,
