@@ -997,7 +997,7 @@ pub mod c_api {
             s.into_raw()
         } else {
             let p: *const c_char = ptr::null();
-            p as *mut c_char
+            p.cast_mut()
         }
     }
 
@@ -1045,7 +1045,7 @@ pub mod c_api {
 
         let buffers_size = slice::from_raw_parts_mut(buffers_size, num_planes);
         match get_buffers_size(width, height, format, strides, buffers_size) {
-            Ok(_) => self::Result::Ok,
+            Ok(()) => self::Result::Ok,
             Err(error_kind) => set_error(error, error_kind),
         }
     }
@@ -1151,7 +1151,7 @@ pub mod c_api {
             dst_strides,
             &mut dst_buffers[..],
         ) {
-            Ok(_) => self::Result::Ok,
+            Ok(()) => self::Result::Ok,
             Err(error_kind) => set_error(error, error_kind),
         }
     }
