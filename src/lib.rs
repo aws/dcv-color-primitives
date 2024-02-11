@@ -806,12 +806,14 @@ pub fn get_buffers_size(
 /// y  =  0.213 * r + 0.715 * g + 0.072 * b + 16
 /// cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
 /// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
+/// ```
 ///
 /// If the destination image color space is Bt601FR, the following formula is applied:
 /// ```text
 /// y  =  0.299 * r + 0.587 * g + 0.114 * b
 /// cb = -0.169 * r - 0.331 * g + 0.500 * b + 128
 /// cr =  0.500 * r - 0.419 * g - 0.081 * b + 128
+/// ```
 ///
 /// If the destination image color space is Bt709FR, the following formula is applied:
 /// ```text
@@ -837,12 +839,14 @@ pub fn get_buffers_size(
 /// r = 1.164 * (y - 16) + 1.793 * (cr - 128)
 /// g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
+/// ```
 ///
 /// If the source image color space is Bt601FR, the following formula is applied:
 /// ```text
 /// r = y + 1.402 * (cr - 128)
 /// g = y - 0.714 * (cr - 128) - 0.344 * (cb - 128)
 /// b = y + 1.772 * (cb - 128)
+/// ```
 ///
 /// If the source image color space is Bt709FR, the following formula is applied:
 /// ```text
