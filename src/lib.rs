@@ -808,14 +808,14 @@ pub fn get_buffers_size(
 /// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
 /// ```
 ///
-/// If the destination image color space is Bt601FR, the following formula is applied:
+/// If the destination image color space is `Bt601FR`, the following formula is applied:
 /// ```text
 /// y  =  0.299 * r + 0.587 * g + 0.114 * b
 /// cb = -0.169 * r - 0.331 * g + 0.500 * b + 128
 /// cr =  0.500 * r - 0.419 * g - 0.081 * b + 128
 /// ```
 ///
-/// If the destination image color space is Bt709FR, the following formula is applied:
+/// If the destination image color space is `Bt709FR`, the following formula is applied:
 /// ```text
 /// y  =  0.213 * r + 0.715 * g + 0.072 * b
 /// cb = -0.115 * r - 0.385 * g + 0.500 * b + 128
@@ -827,28 +827,28 @@ pub fn get_buffers_size(
 ///
 /// If the destination image contains an alpha channel, each component will be set to 255
 ///
-/// If the source image color space is Bt601, the following formula is applied:
+/// If the source image color space is `Bt601`, the following formula is applied:
 /// ```text
 /// r = 1.164 * (y - 16) + 1.596 * (cr - 128)
 /// g = 1.164 * (y - 16) - 0.813 * (cr - 128) - 0.392 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.017 * (cb - 128)
 /// ```
 ///
-/// If the source image color space is Bt709, the following formula is applied:
+/// If the source image color space is `Bt709`, the following formula is applied:
 /// ```text
 /// r = 1.164 * (y - 16) + 1.793 * (cr - 128)
 /// g = 1.164 * (y - 16) - 0.534 * (cr - 128) - 0.213 * (cb - 128)
 /// b = 1.164 * (y - 16) + 2.115 * (cb - 128)
 /// ```
 ///
-/// If the source image color space is Bt601FR, the following formula is applied:
+/// If the source image color space is `Bt601FR`, the following formula is applied:
 /// ```text
 /// r = y + 1.402 * (cr - 128)
 /// g = y - 0.714 * (cr - 128) - 0.344 * (cb - 128)
 /// b = y + 1.772 * (cb - 128)
 /// ```
 ///
-/// If the source image color space is Bt709FR, the following formula is applied:
+/// If the source image color space is `Bt709FR`, the following formula is applied:
 /// ```text
 /// r = y + 1.575 * (cr - 128)
 /// g = y - 0.468 * (cr - 128) - 0.187 * (cb - 128)
