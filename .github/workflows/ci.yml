@@ -136,3 +136,29 @@ jobs:
         run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets"
         env:
           RUSTFLAGS: -Zsanitizer=address
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: sanitizer
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: llvm-tools
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov
+
+      - name: Coverage
+        run: ./run-coverage.sh --lcov --output-path final.info
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v4
+        with:
+          file: final.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

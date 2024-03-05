@@ -4,6 +4,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![crates.io](https://img.shields.io/crates/v/dcv-color-primitives.svg)](https://crates.io/crates/dcv-color-primitives)
 [![documentation](https://docs.rs/dcv-color-primitives/badge.svg)](https://docs.rs/dcv-color-primitives)
+[![Coverage Status](https://codecov.io/gh/aws/dcv-color-primitives/branch/master/graph/badge.svg)](https://codecov.io/gh/aws/dcv-color-primitives)
 
 DCV Color Primitives is a library to perform image color model conversion.
 
