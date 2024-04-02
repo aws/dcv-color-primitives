@@ -1,3 +1,6 @@
+News in 0.6.2
+* Use llvm-cov instead of tarpaulin for coverage
+
 News in 0.6.1
 -------------
 * Added debug traits for public structs.
