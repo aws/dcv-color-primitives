@@ -41,8 +41,8 @@ pub enum ColorSpace {
     Bt709FR,
 }
 
-#[cfg(not(tarpaulin_include))]
 impl std::fmt::Display for ColorSpace {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ColorSpace::Rgb => write!(f, "rgb"),

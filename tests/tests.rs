@@ -16,11 +16,7 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
-#[cfg(all(
-    target_arch = "x86_64",
-    not(tarpaulin),
-    not(feature = "test_instruction_sets")
-))]
+#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
 use std::{
     alloc::{alloc, alloc_zeroed, dealloc, Layout},
     ptr::write_bytes,
@@ -216,11 +212,7 @@ fn buffers_size() {
     }
 }
 
-#[cfg(all(
-    target_arch = "x86_64",
-    not(tarpaulin),
-    not(feature = "test_instruction_sets")
-))]
+#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
 #[test]
 fn over_4gb() {
     // In this test the output image will larger than 4GB:
