@@ -13,10 +13,10 @@
 // HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(missing_docs)]
 #![deny(trivial_casts)]
 #![deny(trivial_numeric_casts)]
-#![deny(unstable_features)]
 #![deny(unused_import_braces)]
 #![deny(
     clippy::complexity,
@@ -300,8 +300,8 @@ pub enum ErrorKind {
     NotEnoughData,
 }
 
-#[cfg(not(tarpaulin_include))]
 impl fmt::Display for ErrorKind {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ErrorKind::InvalidValue => write!(
@@ -317,8 +317,8 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-#[cfg(not(tarpaulin_include))]
 impl error::Error for ErrorKind {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn cause(&self) -> Option<&dyn error::Error> {
         None
     }
@@ -966,7 +966,6 @@ pub fn initialize_with_instruction_set(instruction_set: &str) {
 }
 
 #[doc(hidden)]
-#[cfg(not(tarpaulin_include))]
 #[cfg(not(feature = "test_instruction_sets"))]
 pub mod c_api {
     #![allow(clippy::wildcard_imports)]

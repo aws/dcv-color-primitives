@@ -62,7 +62,7 @@ pub enum PixelFormat {
 }
 
 impl PixelFormat {
-    #[cfg(not(tarpaulin_include))]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) const fn depth(pixel_format: PixelFormat) -> usize {
         match pixel_format {
             PixelFormat::Argb | PixelFormat::Bgra | PixelFormat::Rgba => 4,
@@ -71,14 +71,14 @@ impl PixelFormat {
         }
     }
 
-    #[cfg(not(tarpaulin_include))]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) const fn reversed(pixel_format: PixelFormat) -> bool {
         matches!(pixel_format, PixelFormat::Rgba)
     }
 }
 
-#[cfg(not(tarpaulin_include))]
 impl std::fmt::Display for PixelFormat {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PixelFormat::Argb => write!(f, "argb"),
@@ -99,12 +99,12 @@ pub const STRIDE_AUTO: usize = 0;
 
 pub const DEFAULT_STRIDES: [usize; MAX_NUMBER_OF_PLANES] = [STRIDE_AUTO; MAX_NUMBER_OF_PLANES];
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 const fn make_pf_spec(planes: u32, width: u32, height: u32) -> u32 {
     (height << 3) | (width << 2) | planes
 }
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 const fn make_plane_spec(plane0: u32, plane1: u32, plane2: u32, plane3: u32) -> u32 {
     (plane3 << 18) | (plane2 << 12) | (plane1 << 6) | plane0
 }

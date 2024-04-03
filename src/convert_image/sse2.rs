@@ -49,7 +49,7 @@ const YUV_TO_RGB_WG_SIZE: usize = 1;
 const RGB_TO_YUV_WAVES: usize = LANE_COUNT / RGB_TO_YUV_WG_SIZE;
 const YUV_TO_RGB_WAVES: usize = LANE_COUNT / YUV_TO_RGB_WG_SIZE;
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 const fn mm_shuffle(z: i32, y: i32, x: i32, w: i32) -> i32 {
     (z << 6) | (y << 4) | (x << 2) | w
 }
@@ -1124,13 +1124,6 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         let x = vector_part;
         let dx = x * DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
-        if x >= src_buffers.0.len() || x >= src_buffers.1.len() || dx >= dst_buffer.len() {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
-
         x86::nv12_to_bgra::<COLORIMETRY, REVERSED>(
             scalar_part,
             h,
@@ -1217,17 +1210,6 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         let cx = x / 2;
         let dx = x * DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
-        if x >= src_buffers.0.len()
-            || cx >= src_buffers.1.len()
-            || cx >= src_buffers.2.len()
-            || dx >= dst_buffer.len()
-        {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
-
         x86::i420_to_bgra::<COLORIMETRY, REVERSED>(
             scalar_part,
             h,
@@ -1313,17 +1295,6 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     if scalar_part > 0 {
         let x = vector_part;
         let dx = x * DEPTH;
-
-        // The compiler is not smart here
-        // This condition should never happen
-        if x >= src_buffers.0.len()
-            || x >= src_buffers.1.len()
-            || x >= src_buffers.2.len()
-            || dx >= dst_buffer.len()
-        {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
 
         x86::i444_to_bgra::<COLORIMETRY, REVERSED>(
             scalar_part,
@@ -1421,13 +1392,6 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let x = vector_part;
         let sx = x * DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
-        if sx >= src_buffer.len() || x >= y_plane.len() || x >= uv_plane.len() {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
-
         x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
@@ -1515,17 +1479,6 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let cx = x / 2;
         let sx = x * DEPTH;
 
-        // The compiler is not smart here
-        // This condition should never happen
-        if sx >= src_buffer.len()
-            || x >= y_plane.len()
-            || cx >= u_plane.len()
-            || cx >= v_plane.len()
-        {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
-
         x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
@@ -1609,14 +1562,6 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     if scalar_part > 0 {
         let x = vector_part;
         let sx = x * DEPTH;
-
-        // The compiler is not smart here
-        // This condition should never happen
-        if sx >= src_buffer.len() || x >= y_plane.len() || x >= u_plane.len() || x >= v_plane.len()
-        {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
 
         x86::rgb_to_i444::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
@@ -1804,13 +1749,6 @@ pub fn rgb_bgra(
         let x = vector_part;
         let sx = x * SRC_DEPTH;
         let dx = x * DST_DEPTH;
-
-        // The compiler is not smart here
-        // This condition should never happen
-        if sx >= src_buffer.len() || dx >= dst_buffer.len() {
-            #[cfg(not(tarpaulin_include))]
-            return false;
-        }
 
         x86::rgb_to_bgra(
             scalar_part,

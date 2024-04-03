@@ -14,12 +14,12 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 const fn u8_to_fix(x: i32, frac_bits: i32) -> i32 {
     x << frac_bits
 }
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
 pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
@@ -29,7 +29,7 @@ pub const fn i32x2_to_i32(x: i32, y: i32) -> i32 {
     val as i32
 }
 
-#[cfg(not(tarpaulin_include))]
+#[cfg_attr(coverage_nightly, coverage(off))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub const fn i32_to_i16(x: i32) -> i16 {

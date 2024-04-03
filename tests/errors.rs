@@ -482,7 +482,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "test_instruction_sets")))]
 mod errors {
     use super::{rgb_conversion_errors, rgb_to_yuv_errors, yuv_to_rgb_errors, PixelFormat};
     #[cfg(target_arch = "wasm32")]
@@ -531,5 +531,30 @@ mod errors {
     #[test]
     fn bgr_to_rgb() {
         rgb_conversion_errors(PixelFormat::Bgr, PixelFormat::Rgb);
+    }
+}
+
+#[cfg(all(test, feature = "test_instruction_sets"))]
+mod errors {
+    use super::*;
+    use dcp::initialize_with_instruction_set;
+
+    #[test]
+    fn coverage() {
+        const SETS: [&str; 3] = ["x86", "sse2", "avx2"];
+
+        for set in &SETS {
+            initialize_with_instruction_set(set);
+
+            yuv_to_rgb_errors(PixelFormat::Nv12);
+            yuv_to_rgb_errors(PixelFormat::I420);
+            yuv_to_rgb_errors(PixelFormat::I444);
+            rgb_to_yuv_errors(PixelFormat::Nv12);
+            rgb_to_yuv_errors(PixelFormat::I420);
+            rgb_to_yuv_errors(PixelFormat::I444);
+            rgb_conversion_errors(PixelFormat::Rgb, PixelFormat::Bgra);
+            rgb_conversion_errors(PixelFormat::Bgra, PixelFormat::Rgb);
+            rgb_conversion_errors(PixelFormat::Bgr, PixelFormat::Rgb);
+        }
     }
 }
