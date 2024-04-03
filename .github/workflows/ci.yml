@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -48,7 +48,7 @@ jobs:
           - nightly
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -96,7 +96,7 @@ jobs:
     needs: lint
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -120,7 +120,7 @@ jobs:
     needs: lint
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -143,7 +143,7 @@ jobs:
     needs: sanitizer
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@master
         with:
