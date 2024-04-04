@@ -19,7 +19,7 @@ crate-type = ["staticlib", "rlib"]
 paste = "1.0"
 
 [dev-dependencies]
-criterion = {version = "0.3", features = ["html_reports"]}
+criterion = {version = "0.5", features = ["html_reports"]}
 itertools = "0.12"
 rand = "0.8"
 
