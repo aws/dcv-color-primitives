@@ -157,8 +157,6 @@ jobs:
         run: cargo +nightly llvm-cov test --features "test_instruction_sets" --lcov --output-path lcov.info
 
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@v1
         with:
           file: lcov.info
