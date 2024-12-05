@@ -40,6 +40,40 @@ pub const fn i32_to_i16(x: i32) -> i16 {
     val as i16
 }
 
+#[cfg(target_arch = "aarch64")]
+struct AssertI16<const N: i32>;
+
+#[cfg(target_arch = "aarch64")]
+struct AssertU16<const N: i32>;
+
+#[cfg(target_arch = "aarch64")]
+impl<const N: i32> AssertI16<N> {
+    const OK: () = assert!(
+        N >= i16::MIN as i32 && N <= i16::MAX as i32,
+        "must be in i16 range"
+    );
+}
+
+#[cfg(target_arch = "aarch64")]
+impl<const N: i32> AssertU16<N> {
+    const OK: () = assert!(N >= 0 && N <= u16::MAX as i32, "must be in u16 range");
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub const fn as_i16<const X: i32>() -> i16 {
+    let () = AssertI16::<X>::OK;
+    let val = (X & 0xFFFF) as u32;
+    val as i16
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub const fn as_u16<const X: i32>() -> u16 {
+    let () = AssertU16::<X>::OK;
+    (X & 0xFFFF) as u16
+}
+
 pub fn wg_index(x: usize, y: usize, w: usize, h: usize) -> usize {
     (h * y) + (x * w)
 }
@@ -140,8 +174,8 @@ pub const GP_709FR: i32 = 5359;
 pub const BN_709FR: i32 = 15050;
 
 // Other defines
-const Y_MIN: i32 = 16;
-const C_HALF: i32 = 128;
+pub const Y_MIN: i32 = 16;
+pub const C_HALF: i32 = 128;
 const FIX16_Y_MIN: i32 = u8_to_fix(Y_MIN, FIX16);
 pub const FIX16_C_HALF: i32 = u8_to_fix(C_HALF, FIX16);
 pub const FIX18_C_HALF: i32 = u8_to_fix(C_HALF, FIX18);

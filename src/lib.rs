@@ -563,8 +563,24 @@ impl Context {
             }
         }
 
-        // This is the default for arm and wasm32 targets
-        #[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
+        #[cfg(target_arch = "aarch64")]
+        match context.set {
+            InstructionSet::X86 => {
+                set_dispatch_table!(context.converters, x86);
+            }
+            InstructionSet::Neon => {
+                set_dispatch_table!(context.converters, neon);
+                #[cfg(feature = "test_instruction_sets")]
+                {
+                    let mut table: DispatchTable = [None; dispatcher::TABLE_SIZE];
+                    set_dispatch_table!(table, x86);
+                    context.test_converters[0] = Some(table);
+                }
+            }
+        }
+
+        // This is the default for wasm32 targets
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
         {
             set_dispatch_table!(context.converters, x86);
         }
@@ -960,7 +976,7 @@ pub fn convert_image(
 pub fn initialize_with_instruction_set(instruction_set: &str) {
     match instruction_set {
         "x86" => TEST_SET.store(0, Ordering::SeqCst),
-        "sse2" => TEST_SET.store(1, Ordering::SeqCst),
+        "sse2" | "neon" => TEST_SET.store(1, Ordering::SeqCst),
         _ => TEST_SET.store(2, Ordering::SeqCst),
     };
 }

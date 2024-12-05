@@ -82,6 +82,36 @@ macro_rules! yuv_to_rgb_converter {
     };
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! yuv_to_rgb_fallback_converter {
+    ($src_pf:ident, $src_cs:ident, $dst_pf:ident) => {
+        paste::paste! {
+            pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
+                width: u32,
+                height: u32,
+                last_src_plane: u32,
+                src_strides: &[usize],
+                src_buffers: &[&[u8]],
+                last_dst_plane: u32,
+                dst_strides: &[usize],
+                dst_buffers: &mut [&mut [u8]],
+            ) -> bool {
+                x86::[<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>](
+                    width,
+                    height,
+                    last_src_plane,
+                    src_strides,
+                    src_buffers,
+                    last_dst_plane,
+                    dst_strides,
+                    dst_buffers,
+                )
+            }
+        }
+    };
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 const fn enum_count(lo: u32, hi: u32) -> u32 {
     hi - lo + 1
