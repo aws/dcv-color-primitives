@@ -17,6 +17,8 @@
 use core::arch::x86::__cpuid;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::__cpuid;
+#[cfg(target_arch = "aarch64")]
+use std::arch::is_aarch64_feature_detected;
 
 #[derive(Debug)]
 pub enum CpuManufacturer {
@@ -34,6 +36,8 @@ pub enum InstructionSet {
     Sse2,
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     Avx2,
+    #[cfg(target_arch = "aarch64")]
+    Neon,
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -98,7 +102,19 @@ pub fn get() -> (CpuManufacturer, InstructionSet) {
     (manufacturer, set)
 }
 
-#[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
+#[cfg(target_arch = "aarch64")]
+pub fn get() -> (CpuManufacturer, InstructionSet) {
+    (
+        CpuManufacturer::Unknown,
+        if is_aarch64_feature_detected!("neon") {
+            InstructionSet::Neon
+        } else {
+            InstructionSet::X86
+        },
+    )
+}
+
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
 pub fn get() -> (CpuManufacturer, InstructionSet) {
     (CpuManufacturer::Unknown, InstructionSet::X86)
 }

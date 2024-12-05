@@ -1253,7 +1253,12 @@ mod conversions {
 
     #[test]
     fn coverage() {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         const SETS: [&str; 3] = ["x86", "sse2", "avx2"];
+        #[cfg(target_arch = "aarch64")]
+        const SETS: [&str; 2] = ["x86", "neon"];
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+        const SETS: [&str; 1] = ["x86"];
 
         for set in &SETS {
             initialize_with_instruction_set(set);

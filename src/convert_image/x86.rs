@@ -941,9 +941,8 @@ pub fn bgr_to_rgb(
     }
 }
 
-// Internal module functions
 #[inline(never)]
-fn bgra_to_rgb(
+pub fn bgra_to_rgb(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -1017,6 +1016,7 @@ fn bgra_to_rgb(
     }
 }
 
+// Internal module functions
 #[inline(never)]
 fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
