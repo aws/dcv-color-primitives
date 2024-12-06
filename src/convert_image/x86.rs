@@ -44,12 +44,12 @@ fn _bswap(x: i32) -> i32 {
         y = std::mem::transmute::<[i8; 4], i32>(y2);
     }
 
-    return y;
+    y
 }
 
 #[cfg(not(target_arch = "x86_64"))]
 unsafe fn _bswap64(x: i64) -> i64 {
-    (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFFFFFFF)) as i64
+    (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFF_FFFFF)) as i64
 }
 
 const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
