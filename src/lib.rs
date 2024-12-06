@@ -994,7 +994,9 @@ pub mod c_api {
     use std::ptr;
     use std::slice;
 
-    const UNBOUNDED_C_ARRAY: usize = std::isize::MAX as usize;
+    const UNBOUNDED_C_ARRAY: usize = isize::MAX as usize;
+
+    type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
 
     #[repr(C)]
     pub enum Result {
@@ -1115,7 +1117,7 @@ pub mod c_api {
         let src_buffers = {
             let src_num_planes = src_format.num_planes as usize;
             let num_planes = cmp::min(src_num_planes, MAX_NUMBER_OF_PLANES);
-            let mut src_buf: [MaybeUninit<&[u8]>; MAX_NUMBER_OF_PLANES] =
+            let mut src_buf: PlaneArray =
                 [MaybeUninit::uninit().assume_init(); MAX_NUMBER_OF_PLANES];
 
             for (plane_index, item) in src_buf.iter_mut().enumerate().take(num_planes) {
@@ -1127,13 +1129,13 @@ pub mod c_api {
                 *item = MaybeUninit::new(slice::from_raw_parts(ptr, UNBOUNDED_C_ARRAY));
             }
 
-            transmute::<_, [&[u8]; MAX_NUMBER_OF_PLANES]>(src_buf)
+            transmute::<PlaneArray, [&[u8]; MAX_NUMBER_OF_PLANES]>(src_buf)
         };
 
         let mut dst_buffers = {
             let dst_num_planes = dst_format.num_planes as usize;
             let num_planes = cmp::min(dst_num_planes, MAX_NUMBER_OF_PLANES);
-            let mut dst_buf: [MaybeUninit<&[u8]>; MAX_NUMBER_OF_PLANES] =
+            let mut dst_buf: PlaneArray =
                 [MaybeUninit::uninit().assume_init(); MAX_NUMBER_OF_PLANES];
 
             for (plane_index, item) in dst_buf.iter_mut().enumerate().take(num_planes) {
@@ -1145,7 +1147,7 @@ pub mod c_api {
                 *item = MaybeUninit::new(slice::from_raw_parts_mut(ptr, UNBOUNDED_C_ARRAY));
             }
 
-            transmute::<_, [&mut [u8]; MAX_NUMBER_OF_PLANES]>(dst_buf)
+            transmute::<PlaneArray, [&mut [u8]; MAX_NUMBER_OF_PLANES]>(dst_buf)
         };
 
         // Convert nullable type to Option

@@ -292,7 +292,7 @@ fn over_4gb() {
             #[allow(clippy::cast_ptr_alignment)]
             let dst_image_as_u64: &[u64] =
                 from_raw_parts(dst_ptr as *const u64, EXPECTED_DST_BUFFER_SIZE / 8);
-            assert!(dst_image_as_u64.iter().all(|&x| x == std::u64::MAX));
+            assert!(dst_image_as_u64.iter().all(|&x| x == u64::MAX));
 
             dealloc(dst_ptr, dst_layout);
         }
