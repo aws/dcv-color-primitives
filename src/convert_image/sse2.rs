@@ -234,26 +234,12 @@ unsafe fn pack_i16x3_8x<const REVERSED: bool>(
 /// image (sampler=0): a3r3g3b3 a2r2g2b2 a1r1g1b1 a0r0g0b0
 /// image (sampler=1): b3g3r3a3 b2g2r2a2 b1g1r1a1 b0g0r0a0
 /// image (sampler=2): ******** r3g3b3r2 g2b2r1g1 b1r0g0b0
-/// image (sampler=3): -------- r3g3b3r2 g2b2r1g1 b1r0g0b0
 ///
 /// `green_red`:       --g3--r3 --g2--r2 --g1--r1 --g0--r0
 /// `green_blue`:      --g3--b3 --g2--b2 --g1--b1 --g0--b0
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_4x<const SAMPLER: usize>(image: *const u8) -> (__m128i, __m128i) {
-    if SAMPLER == Sampler::BgrOverflow as usize {
-        let line: *const i32 = image.cast();
-        let line = _mm_set_epi32(0, loadu(line.add(2)), loadu(line.add(1)), loadu(line));
-        let line = _mm_unpacklo_epi64(
-            _mm_unpacklo_epi32(line, _mm_srli_si128(line, 3)),
-            _mm_unpacklo_epi32(_mm_srli_si128(line, 6), _mm_srli_si128(line, 9)),
-        );
-
-        let red = _mm_srli_epi32(_mm_slli_epi32(line, 8), 24);
-        let blue = _mm_srli_epi32(_mm_slli_epi32(line, 24), 24);
-        let green = _mm_srli_epi32(_mm_slli_epi32(_mm_srli_epi32(line, 8), 24), 8);
-
-        (_mm_or_si128(red, green), _mm_or_si128(blue, green))
-    } else if SAMPLER == Sampler::Bgr as usize {
+    if SAMPLER == Sampler::Bgr as usize {
         let line = loadu(image.cast());
 
         let line = _mm_unpacklo_epi64(
@@ -482,16 +468,8 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let uv_group = dst_buffers.1.as_mut_ptr();
 
     let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 2
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start / 2;
-
+    let wg_height = height / 2;
     for y in 0..wg_height {
         for x in 0..wg_width {
             rgb_to_yuv_4x::<SAMPLER>(
@@ -504,33 +482,6 @@ unsafe fn rgb_to_nv12_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &uv_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_yuv_4x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
-                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, DST_DEPTH, y_stride)),
-                uv_group.add(wg_index(x, wg_height, DST_DEPTH, uv_stride)),
-                &y_weigths,
-                &uv_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_yuv_4x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
-            y_group.add(wg_index(rem, y_start + 1, DST_DEPTH, y_stride)),
-            uv_group.add(wg_index(rem, wg_height, DST_DEPTH, uv_stride)),
-            &y_weigths,
-            &uv_weights,
-        );
     }
 }
 
@@ -565,16 +516,8 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let v_group = dst_buffers.2.as_mut_ptr();
 
     let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 2
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start / 2;
-
+    let wg_height = height / 2;
     for y in 0..wg_height {
         for x in 0..wg_width {
             rgb_to_i420_4x::<SAMPLER>(
@@ -588,35 +531,6 @@ unsafe fn rgb_to_i420_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &uv_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_i420_4x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
-                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-                &y_weigths,
-                &uv_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_i420_4x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
-            y_group.add(wg_index(rem, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
-            v_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-            &y_weigths,
-            &uv_weights,
-        );
     }
 }
 
@@ -657,17 +571,8 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let v_group = dst_buffers.2.as_mut_ptr();
 
     let rgb_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 1
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start;
-
-    for y in 0..wg_height {
+    for y in 0..height {
         for x in 0..wg_width {
             rgb_to_i444_4x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
@@ -679,33 +584,6 @@ unsafe fn rgb_to_i444_sse2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &v_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_i444_4x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
-                v_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, v_stride)),
-                &y_weights,
-                &u_weights,
-                &v_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_i444_4x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
-            v_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, v_stride)),
-            &y_weights,
-            &u_weights,
-            &v_weights,
-        );
     }
 }
 
@@ -1373,7 +1251,11 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
@@ -1459,7 +1341,11 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
@@ -1544,7 +1430,11 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
