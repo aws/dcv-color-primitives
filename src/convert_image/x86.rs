@@ -78,8 +78,7 @@ const BACKWARD_WEIGHTS: [[i32; 8]; Colorimetry::Length as usize] = [
     ],
 ];
 
-const SAMPLER_OFFSETS: [[usize; 3]; Sampler::Length as usize] =
-    [[1, 2, 3], [2, 1, 0], [2, 1, 0], [2, 1, 0]];
+const SAMPLER_OFFSETS: [[usize; 3]; Sampler::Length as usize] = [[1, 2, 3], [2, 1, 0], [2, 1, 0]];
 
 /// Convert fixed point number approximation to uchar, using saturation
 ///

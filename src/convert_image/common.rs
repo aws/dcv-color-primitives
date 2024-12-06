@@ -187,7 +187,6 @@ pub enum Sampler {
     Argb,
     Bgra,
     Bgr,
-    BgrOverflow,
     Length,
 }
 

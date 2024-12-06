@@ -27,12 +27,12 @@ use core::arch::x86::{
     _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16, _mm256_or_si256,
     _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256, _mm256_permute4x64_epi64,
     _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32, _mm256_set_epi16,
-    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
-    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
-    _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    _mm256_set_epi32, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
+    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256,
+    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
+    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
+    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
+    _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -41,12 +41,12 @@ use core::arch::x86_64::{
     _mm256_extract_epi64, _mm256_extracti128_si256, _mm256_madd_epi16, _mm256_mulhi_epu16,
     _mm256_or_si256, _mm256_packs_epi32, _mm256_packus_epi16, _mm256_permute2x128_si256,
     _mm256_permute4x64_epi64, _mm256_permutevar8x32_epi32, _mm256_set1_epi16, _mm256_set1_epi32,
-    _mm256_set_epi32, _mm256_set_epi64x, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8,
-    _mm256_setzero_si256, _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32,
-    _mm256_slli_si256, _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32,
-    _mm256_srli_si256, _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8,
-    _mm256_unpacklo_epi16, _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8,
-    _mm_prefetch, _mm_setzero_si128, _MM_HINT_NTA,
+    _mm256_set_epi32, _mm256_set_m128i, _mm256_setr_epi32, _mm256_setr_epi8, _mm256_setzero_si256,
+    _mm256_shuffle_epi8, _mm256_slli_epi16, _mm256_slli_epi32, _mm256_slli_si256,
+    _mm256_srai_epi16, _mm256_srai_epi32, _mm256_srli_epi16, _mm256_srli_epi32, _mm256_srli_si256,
+    _mm256_sub_epi16, _mm256_unpackhi_epi16, _mm256_unpackhi_epi8, _mm256_unpacklo_epi16,
+    _mm256_unpacklo_epi32, _mm256_unpacklo_epi64, _mm256_unpacklo_epi8, _mm_prefetch,
+    _mm_setzero_si128, _MM_HINT_NTA,
 };
 
 const LANE_COUNT: usize = 32;
@@ -323,22 +323,7 @@ unsafe fn pack_rgb_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m25
 /// short samples (8-wide)
 #[inline(always)]
 unsafe fn unpack_ui8x3_i16x2_8x<const SAMPLER: usize>(image: *const u8) -> (__m256i, __m256i) {
-    if SAMPLER == Sampler::BgrOverflow as usize {
-        let line: *const i64 = image.cast();
-        let line = _mm256_set_epi64x(0, loadu(line.add(2)), loadu(line.add(1)), loadu(line));
-
-        let line = _mm256_permutevar8x32_epi32(line, align_dqword_2x96!());
-        let line = _mm256_unpacklo_epi64(
-            _mm256_unpacklo_epi32(line, _mm256_srli_si256(line, 3)),
-            _mm256_unpacklo_epi32(_mm256_srli_si256(line, 6), _mm256_srli_si256(line, 9)),
-        );
-
-        let red = _mm256_srli_epi32(_mm256_slli_epi32(line, 8), 24);
-        let blue = _mm256_srli_epi32(_mm256_slli_epi32(line, 24), 24);
-        let green = _mm256_srli_epi32(_mm256_slli_epi32(_mm256_srli_epi32(line, 8), 24), 8);
-
-        (_mm256_or_si256(red, green), _mm256_or_si256(blue, green))
-    } else if SAMPLER == Sampler::Bgr as usize {
+    if SAMPLER == Sampler::Bgr as usize {
         let line = loadu(image.cast());
 
         let line = _mm256_permutevar8x32_epi32(line, align_dqword_2x96!());
@@ -552,16 +537,8 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let uv_group = dst_buffers.1.as_mut_ptr();
 
     let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 2
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start / 2;
-
+    let wg_height = height / 2;
     for y in 0..wg_height {
         for x in 0..wg_width {
             rgb_to_yuv_8x::<SAMPLER>(
@@ -574,33 +551,6 @@ unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &uv_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_yuv_8x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
-                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, DST_DEPTH, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, DST_DEPTH, y_stride)),
-                uv_group.add(wg_index(x, wg_height, DST_DEPTH, uv_stride)),
-                &y_weigths,
-                &uv_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_yuv_8x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, DST_DEPTH, y_stride)),
-            y_group.add(wg_index(rem, y_start + 1, DST_DEPTH, y_stride)),
-            uv_group.add(wg_index(rem, wg_height, DST_DEPTH, uv_stride)),
-            &y_weigths,
-            &uv_weights,
-        );
     }
 }
 
@@ -641,16 +591,8 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let v_group = dst_buffers.2.as_mut_ptr();
 
     let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * src_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 2
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start / 2;
-
+    let wg_height = height / 2;
     for y in 0..wg_height {
         for x in 0..wg_width {
             rgb_to_i420_8x::<SAMPLER>(
@@ -664,35 +606,6 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &uv_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_i420_8x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, src_depth, src_stride)),
-                src_group.add(wg_index(x, y_start + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
-                y_group.add(wg_index(x, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-                &y_weigths,
-                &uv_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_i420_8x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, src_depth, src_stride)),
-            src_group.add(wg_index(rem, y_start + 1, src_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
-            y_group.add(wg_index(rem, y_start + 1, RGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, u_stride)),
-            v_group.add(wg_index(rem, wg_height, RGB_TO_YUV_WAVES / 2, v_stride)),
-            &y_weigths,
-            &uv_weights,
-        );
     }
 }
 
@@ -733,17 +646,8 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let v_group = dst_buffers.2.as_mut_ptr();
 
     let rgb_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let read_bytes_per_line = ((width - 1) / RGB_TO_YUV_WAVES) * rgb_depth + LANE_COUNT;
-    let y_start = if (DEPTH == 4) || (read_bytes_per_line <= src_stride) {
-        height
-    } else {
-        height - 1
-    };
-
     let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = y_start;
-
-    for y in 0..wg_height {
+    for y in 0..height {
         for x in 0..wg_width {
             rgb_to_i444_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
@@ -755,33 +659,6 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
                 &v_weights,
             );
         }
-    }
-
-    // Handle leftover line
-    if y_start != height {
-        let rem = (width - RGB_TO_YUV_WAVES) / RGB_TO_YUV_WAVES;
-        for x in 0..rem {
-            rgb_to_i444_8x::<SAMPLER>(
-                src_group.add(wg_index(x, y_start, rgb_depth, src_stride)),
-                y_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, u_stride)),
-                v_group.add(wg_index(x, y_start, RGB_TO_YUV_WAVES, v_stride)),
-                &y_weights,
-                &u_weights,
-                &v_weights,
-            );
-        }
-
-        // Handle leftover pixels
-        rgb_to_i444_8x::<{ Sampler::BgrOverflow as usize }>(
-            src_group.add(wg_index(rem, y_start, rgb_depth, src_stride)),
-            y_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, y_stride)),
-            u_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, u_stride)),
-            v_group.add(wg_index(rem, y_start, RGB_TO_YUV_WAVES, v_stride)),
-            &y_weights,
-            &u_weights,
-            &v_weights,
-        );
     }
 }
 
@@ -1927,7 +1804,11 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
@@ -2013,7 +1894,11 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
@@ -2098,7 +1983,11 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let vector_part = if DEPTH == 3 {
+        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
+    } else {
+        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
+    };
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
