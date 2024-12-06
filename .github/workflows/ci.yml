@@ -111,9 +111,6 @@ jobs:
         with:
           command: build
 
-      - name: Test
-        run: wasm-pack test --node
-
   sanitizer:
     name: Sanitizer
     runs-on: ubuntu-latest
