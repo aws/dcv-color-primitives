@@ -20,38 +20,6 @@ use crate::{rgb_to_yuv_converter, yuv_to_rgb_converter};
 
 use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 
-#[cfg(target_arch = "x86")]
-use core::arch::x86::_bswap;
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::_bswap;
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::_bswap64;
-
-#[cfg(all(not(target_arch = "x86"), not(target_arch = "x86_64")))]
-#[inline(always)]
-fn _bswap(x: i32) -> i32 {
-    let mut y2: [i8; 4] = [0; 4];
-    let y: i32;
-    let x2: [i8; 4];
-
-    unsafe {
-        x2 = std::mem::transmute::<i32, [i8; 4]>(x);
-
-        for i in 0..4 {
-            y2[i] = x2[3 - i];
-        }
-
-        y = std::mem::transmute::<[i8; 4], i32>(y2);
-    }
-
-    y
-}
-
-#[cfg(not(target_arch = "x86_64"))]
-unsafe fn _bswap64(x: i64) -> i64 {
-    (((_bswap(x as i32) as u64) << 32) | ((_bswap((x >> 32) as i32) as u64) & 0xFFF_FFFFF)) as i64
-}
-
 const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
     [XR_601, XG_601, XB_601, YR_601, YG_601, ZG_601, Y_OFFSET],
     [XR_709, XG_709, XB_709, YR_709, YG_709, ZG_709, Y_OFFSET],
@@ -790,31 +758,23 @@ pub fn rgb_to_bgra(
                 {
                     storeu(
                         bgra,
-                        _bswap64(
-                            (((rgb0 >> 16) & LOW_MASK) | ((rgb0 << 40) & HIGH_MASK) | ALPHA_MASK)
-                                as i64,
-                        ),
+                        (((rgb0 >> 16) & LOW_MASK) | ((rgb0 << 40) & HIGH_MASK) | ALPHA_MASK)
+                            .swap_bytes() as i64,
                     );
                     storeu(
                         bgra.add(1),
-                        _bswap64(
-                            (((rgb1 >> 16) & LOW_MASK) | ((rgb1 << 40) & HIGH_MASK) | ALPHA_MASK)
-                                as i64,
-                        ),
+                        (((rgb1 >> 16) & LOW_MASK) | ((rgb1 << 40) & HIGH_MASK) | ALPHA_MASK)
+                            .swap_bytes() as i64,
                     );
                     storeu(
                         bgra.add(2),
-                        _bswap64(
-                            (((rgb2 >> 16) & LOW_MASK) | ((rgb2 << 40) & HIGH_MASK) | ALPHA_MASK)
-                                as i64,
-                        ),
+                        (((rgb2 >> 16) & LOW_MASK) | ((rgb2 << 40) & HIGH_MASK) | ALPHA_MASK)
+                            .swap_bytes() as i64,
                     );
                     storeu(
                         bgra.add(3),
-                        _bswap64(
-                            (((rgb3 >> 16) & LOW_MASK) | ((rgb3 << 40) & HIGH_MASK) | ALPHA_MASK)
-                                as i64,
-                        ),
+                        (((rgb3 >> 16) & LOW_MASK) | ((rgb3 << 40) & HIGH_MASK) | ALPHA_MASK)
+                            .swap_bytes() as i64,
                     );
                 }
 
@@ -831,7 +791,7 @@ pub fn rgb_to_bgra(
                 #[allow(clippy::cast_possible_wrap)]
                 storeu(
                     dst_group.add(dst_offset).cast(),
-                    _bswap(((loadu(ptr) << 8) | 0xFF) as i32),
+                    ((loadu(ptr) << 8) | 0xFF).swap_bytes() as i32,
                 );
 
                 x += 1;
@@ -894,11 +854,11 @@ pub fn bgr_to_rgb(
                 )]
                 let (swap_rgb0, swap_rgb1, swap_rgb2) = (
                     // swap_rgb0: B0 G0 R0 B1 G1 R1 B2 G2
-                    _bswap64(bgr0 as i64) as u64,
+                    (bgr0 as i64).swap_bytes() as u64,
                     // swap_rgb1: R2 B3 G3 R3 B4 G4 R4 B5
-                    _bswap64(bgr1 as i64) as u64,
+                    (bgr1 as i64).swap_bytes() as u64,
                     // swap_rgb2: G5 R5 B6 G6 R6 B7 G7 R7
-                    _bswap64(bgr2 as i64) as u64,
+                    (bgr2 as i64).swap_bytes() as u64,
                 );
 
                 // rgb0: G2 R2 B1 G1 R1 B0 G0 R0
@@ -982,13 +942,13 @@ pub fn bgra_to_rgb(
                     clippy::cast_possible_wrap
                 )]
                 let (rgb0, rgb1, rgb2, rgb3) = (
-                    _bswap64((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64)
+                    ((((bgra0 << 40) & HIGH_MASK) | ((bgra0 >> 16) & LOW_MASK)) as i64).swap_bytes()
                         as u64,
-                    _bswap64((((bgra1 << 40) & HIGH_MASK) | ((bgra1 >> 16) & LOW_MASK)) as i64)
+                    ((((bgra1 << 40) & HIGH_MASK) | ((bgra1 >> 16) & LOW_MASK)) as i64).swap_bytes()
                         as u64,
-                    _bswap64((((bgra2 << 40) & HIGH_MASK) | ((bgra2 >> 16) & LOW_MASK)) as i64)
+                    ((((bgra2 << 40) & HIGH_MASK) | ((bgra2 >> 16) & LOW_MASK)) as i64).swap_bytes()
                         as u64,
-                    _bswap64((((bgra3 << 40) & HIGH_MASK) | ((bgra3 >> 16) & LOW_MASK)) as i64)
+                    ((((bgra3 << 40) & HIGH_MASK) | ((bgra3 >> 16) & LOW_MASK)) as i64).swap_bytes()
                         as u64,
                 );
 
