@@ -39,3 +39,6 @@ wasm-bindgen = "0.2"
 
 [features]
 test_instruction_sets = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
