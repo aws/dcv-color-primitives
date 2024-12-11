@@ -2,6 +2,7 @@ News in 0.7.0
 * Added rgb and rgb to yuv neon acceleration
 * Remove internal swap_bytes
 * Remove BgrOverflow case
+* Updated itertools to 0.13
 
 News in 0.6.2
 * Use llvm-cov instead of tarpaulin for coverage
