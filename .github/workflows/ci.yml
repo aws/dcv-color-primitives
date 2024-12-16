@@ -154,7 +154,7 @@ jobs:
         run: cargo +nightly llvm-cov test --features "test_instruction_sets" --lcov --output-path lcov.info
 
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: lcov.info
           fail_ci_if_error: false
