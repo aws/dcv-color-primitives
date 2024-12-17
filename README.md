@@ -17,7 +17,7 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support ARM (aarch64)[**]
 * Support WebAssembly[*]
 
-[*]: Supplemental cpu extension sets not yet supported.
+[*]: Supplemental cpu extension sets not yet supported.  
 [**]: Neon cpu extension sets supported for rgb and rgb to yuv conversions
 
 ## Image format conversion
