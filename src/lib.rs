@@ -1119,8 +1119,7 @@ pub mod c_api {
         };
 
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) =
-            get_buffers_size(width, height, src_format, src_strides, src_sizes)
+        if let Err(error_kind) = get_buffers_size(width, height, src_format, src_strides, src_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1150,8 +1149,7 @@ pub mod c_api {
         };
 
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) =
-            get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)
+        if let Err(error_kind) = get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)
         {
             return set_error(error, error_kind);
         }
