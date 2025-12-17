@@ -614,9 +614,9 @@ pub fn describe_acceleration() -> String {
 /// * `height` - Height of the image in pixels
 /// * `format` - Image format
 /// * `strides` - An array of distances in bytes between starts of consecutive lines
-///               in each image planes
+///   in each image planes
 /// * `buffers_size` - An array describing the minimum number of bytes required in each
-///                    image planes
+///   image planes
 ///
 /// # Examples
 /// Compute how many bytes are needed to store and image of a given format and size
@@ -756,11 +756,11 @@ pub fn get_buffers_size(
 /// * `height` - Height of the image to convert in pixels
 /// * `src_format` - Source image format
 /// * `src_strides` - An array of distances in bytes between starts of consecutive lines
-///                   in each source image planes
+///   in each source image planes
 /// * `src_buffers` - An array of image buffers in each source color plane
 /// * `dst_format` - Destination image format
 /// * `dst_strides` - An array of distances in bytes between starts of consecutive lines
-///                   in each destination image planes
+///   in each destination image planes
 /// * `dst_buffers` - An array of image buffers in each destination color plane
 ///
 /// # Errors
@@ -1120,7 +1120,7 @@ pub mod c_api {
 
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) =
-            get_buffers_size(width, height, &src_format, src_strides, src_sizes)
+            get_buffers_size(width, height, src_format, src_strides, src_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1151,7 +1151,7 @@ pub mod c_api {
 
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) =
-            get_buffers_size(width, height, &dst_format, dst_strides, dst_sizes)
+            get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)
         {
             return set_error(error, error_kind);
         }
