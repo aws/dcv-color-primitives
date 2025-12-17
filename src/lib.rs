@@ -994,8 +994,6 @@ pub mod c_api {
     use std::ptr;
     use std::slice;
 
-    const UNBOUNDED_C_ARRAY: usize = isize::MAX as usize;
-
     type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
 
     #[repr(C)]
@@ -1114,6 +1112,19 @@ pub mod c_api {
             return set_error(error, ErrorKind::InvalidValue);
         }
 
+        let src_strides = if src_strides.is_null() {
+            None
+        } else {
+            Some(slice::from_raw_parts(src_strides, MAX_NUMBER_OF_PLANES))
+        };
+
+        let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
+        if let Err(error_kind) =
+            get_buffers_size(width, height, &src_format, src_strides, src_sizes)
+        {
+            return set_error(error, error_kind);
+        }
+
         let src_buffers = {
             let src_num_planes = src_format.num_planes as usize;
             let num_planes = cmp::min(src_num_planes, MAX_NUMBER_OF_PLANES);
@@ -1126,11 +1137,24 @@ pub mod c_api {
                     return set_error(error, ErrorKind::InvalidValue);
                 }
 
-                *item = MaybeUninit::new(slice::from_raw_parts(ptr, UNBOUNDED_C_ARRAY));
+                *item = MaybeUninit::new(slice::from_raw_parts(ptr, src_sizes[plane_index]));
             }
 
             transmute::<PlaneArray, [&[u8]; MAX_NUMBER_OF_PLANES]>(src_buf)
         };
+
+        let dst_strides = if dst_strides.is_null() {
+            None
+        } else {
+            Some(slice::from_raw_parts(dst_strides, MAX_NUMBER_OF_PLANES))
+        };
+
+        let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
+        if let Err(error_kind) =
+            get_buffers_size(width, height, &dst_format, dst_strides, dst_sizes)
+        {
+            return set_error(error, error_kind);
+        }
 
         let mut dst_buffers = {
             let dst_num_planes = dst_format.num_planes as usize;
@@ -1144,23 +1168,10 @@ pub mod c_api {
                     return set_error(error, ErrorKind::InvalidValue);
                 }
 
-                *item = MaybeUninit::new(slice::from_raw_parts_mut(ptr, UNBOUNDED_C_ARRAY));
+                *item = MaybeUninit::new(slice::from_raw_parts_mut(ptr, dst_sizes[plane_index]));
             }
 
             transmute::<PlaneArray, [&mut [u8]; MAX_NUMBER_OF_PLANES]>(dst_buf)
-        };
-
-        // Convert nullable type to Option
-        let src_strides = if src_strides.is_null() {
-            None
-        } else {
-            Some(slice::from_raw_parts(src_strides, UNBOUNDED_C_ARRAY))
-        };
-
-        let dst_strides = if dst_strides.is_null() {
-            None
-        } else {
-            Some(slice::from_raw_parts(dst_strides, UNBOUNDED_C_ARRAY))
         };
 
         match convert_image(
