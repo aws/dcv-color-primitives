@@ -343,8 +343,8 @@ fn image_dimensions(i: u32, format: PixelFormat) -> (u32, u32) {
         _ /* Bgra */ => 4,
     };
 
-    let payload = 1 << i;
-    let pixels: u32 = payload.div_ceil(components);
+    let payload: u32 = 1 << i;
+    let pixels = payload.div_ceil(components);
 
     let width = (16f32 * ((pixels as f32) / 144_f32).sqrt()).floor() as u32;
     let width = (width + 31) & !31;
