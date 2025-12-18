@@ -344,12 +344,12 @@ fn image_dimensions(i: u32, format: PixelFormat) -> (u32, u32) {
     };
 
     let payload = 1 << i;
-    let pixels = (payload + (components - 1)) / components;
+    let pixels = payload.div_ceil(components);
 
     let width = (16f32 * ((pixels as f32) / 144_f32).sqrt()).floor() as u32;
     let width = (width + 31) & !31;
 
-    let height = (pixels + (width - 1)) / width;
+    let height = pixels.div_ceil(width);
     let height = (height + 1) & !1;
 
     (width, height)

@@ -1120,7 +1120,7 @@ fn rgb_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
         color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for (width, height, src_pad, dst_pad) in
         iproduct!(0..=MAX_WIDTH, 0..=MAX_HEIGHT, 0..MAX_PAD, 0..MAX_PAD)
