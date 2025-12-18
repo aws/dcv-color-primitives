@@ -1,20 +1,19 @@
 use criterion::{
-    criterion_group, criterion_main,
+    BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group, criterion_main,
     measurement::{Measurement, ValueFormatter},
-    BenchmarkId, Criterion, SamplingMode, Throughput,
 };
 #[cfg(target_os = "linux")]
 use std::env;
 use std::time::{Duration, Instant};
 use std::{
-    alloc::{alloc, dealloc, Layout},
+    alloc::{Layout, alloc, dealloc},
     arch::asm,
     ptr::write_bytes,
     slice::from_raw_parts_mut,
 };
 
 #[cfg(target_os = "linux")]
-use perf_event::{events::Hardware, Builder, Counter};
+use perf_event::{Builder, Counter, events::Hardware};
 
 use dcp::*;
 use dcv_color_primitives as dcp;
@@ -344,13 +343,13 @@ fn image_dimensions(i: u32, format: PixelFormat) -> (u32, u32) {
         _ /* Bgra */ => 4,
     };
 
-    let payload = 1 << i;
-    let pixels = (payload + (components - 1)) / components;
+    let payload: u32 = 1 << i;
+    let pixels = payload.div_ceil(components);
 
     let width = (16f32 * ((pixels as f32) / 144_f32).sqrt()).floor() as u32;
     let width = (width + 31) & !31;
 
-    let height = (pixels + (width - 1)) / width;
+    let height = pixels.div_ceil(width);
     let height = (height + 1) & !1;
 
     (width, height)

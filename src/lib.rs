@@ -37,6 +37,7 @@
     // Yield false positives
     clippy::must_use_candidate,
 )]
+#![allow(unsafe_op_in_unsafe_fn)]
 
 //! DCV color primitives is a library to perform image color model conversion.
 //!
@@ -280,9 +281,9 @@ use cpu_info::{CpuManufacturer, InstructionSet};
 use paste::paste;
 use std::error;
 use std::fmt;
+use std::sync::OnceLock;
 #[cfg(feature = "test_instruction_sets")]
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::OnceLock;
 
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
@@ -986,10 +987,10 @@ pub fn initialize_with_instruction_set(instruction_set: &str) {
 pub mod c_api {
     #![allow(clippy::wildcard_imports)]
     use super::*; // We are importing everything
-    use pixel_format::{are_planes_compatible, MAX_NUMBER_OF_PLANES};
+    use pixel_format::{MAX_NUMBER_OF_PLANES, are_planes_compatible};
     use std::cmp;
     use std::ffi::CString;
-    use std::mem::{transmute, MaybeUninit};
+    use std::mem::{MaybeUninit, transmute};
     use std::os::raw::c_char;
     use std::ptr;
     use std::slice;
@@ -1010,7 +1011,7 @@ pub mod c_api {
         self::Result::Err
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn dcp_describe_acceleration() -> *mut c_char {
         let acc = describe_acceleration();
         if let Ok(s) = CString::new(acc) {
@@ -1021,14 +1022,14 @@ pub mod c_api {
         }
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {
         if !string.is_null() {
             let _unused = CString::from_raw(string);
         }
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn dcp_get_buffers_size(
         width: u32,
         height: u32,
@@ -1070,7 +1071,7 @@ pub mod c_api {
         }
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn dcp_convert_image(
         width: u32,
         height: u32,

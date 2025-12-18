@@ -25,22 +25,24 @@ use core::ptr::{read_unaligned as loadu, write_unaligned as storeu};
 use core::arch::x86::{
     __m128i, _mm_add_epi16, _mm_add_epi32, _mm_and_si128, _mm_andnot_si128, _mm_cmpeq_epi32,
     _mm_cvtsi128_si32, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
-    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
-    _mm_set_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16, _mm_shufflelo_epi16,
-    _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16, _mm_srai_epi32, _mm_srli_epi16,
-    _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8,
-    _mm_unpacklo_epi16, _mm_unpacklo_epi32, _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_packus_epi16, _mm_set_epi32, _mm_set_epi64x, _mm_set1_epi16, _mm_set1_epi32,
+    _mm_set1_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16,
+    _mm_shufflelo_epi16, _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16,
+    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16,
+    _mm_unpackhi_epi8, _mm_unpackhi_epi16, _mm_unpacklo_epi8, _mm_unpacklo_epi16,
+    _mm_unpacklo_epi32, _mm_unpacklo_epi64,
 };
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{
     __m128i, _mm_add_epi16, _mm_add_epi32, _mm_and_si128, _mm_andnot_si128, _mm_cmpeq_epi32,
     _mm_cvtsi128_si32, _mm_madd_epi16, _mm_mulhi_epu16, _mm_or_si128, _mm_packs_epi32,
-    _mm_packus_epi16, _mm_set1_epi16, _mm_set1_epi32, _mm_set1_epi64x, _mm_set_epi32,
-    _mm_set_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16, _mm_shufflelo_epi16,
-    _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16, _mm_srai_epi32, _mm_srli_epi16,
-    _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16, _mm_unpackhi_epi16, _mm_unpackhi_epi8,
-    _mm_unpacklo_epi16, _mm_unpacklo_epi32, _mm_unpacklo_epi64, _mm_unpacklo_epi8,
+    _mm_packus_epi16, _mm_set_epi32, _mm_set_epi64x, _mm_set1_epi16, _mm_set1_epi32,
+    _mm_set1_epi64x, _mm_setzero_si128, _mm_shuffle_epi32, _mm_shufflehi_epi16,
+    _mm_shufflelo_epi16, _mm_slli_epi16, _mm_slli_epi32, _mm_slli_si128, _mm_srai_epi16,
+    _mm_srai_epi32, _mm_srli_epi16, _mm_srli_epi32, _mm_srli_si128, _mm_sub_epi16,
+    _mm_unpackhi_epi8, _mm_unpackhi_epi16, _mm_unpacklo_epi8, _mm_unpacklo_epi16,
+    _mm_unpacklo_epi32, _mm_unpacklo_epi64,
 };
 
 const LANE_COUNT: usize = 16;

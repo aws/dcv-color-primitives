@@ -90,11 +90,7 @@ pub fn out_of_bounds(size: usize, width: usize, height_minus_one: usize, stride:
 }
 
 pub fn compute_stride(stride: usize, def: usize) -> usize {
-    if stride == 0 {
-        def
-    } else {
-        stride
-    }
+    if stride == 0 { def } else { stride }
 }
 
 pub const FIX16: i32 = 16;
