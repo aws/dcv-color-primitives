@@ -13,7 +13,7 @@
 )]
 #![allow(clippy::too_many_lines)] // This requires effort to handle
 
-use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat, STRIDE_AUTO};
+use dcp::{ColorSpace, ImageFormat, PixelFormat, STRIDE_AUTO, convert_image};
 
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
@@ -374,10 +374,12 @@ fn get_depth(pixel_format: PixelFormat) -> usize {
 fn check_plane(plane: &[u8], reference: PlaneRef, width: usize, height: usize, stride: usize) {
     for (row, exp) in plane.chunks(stride).zip(reference.iter().take(height)) {
         let (payload, pad) = row.split_at(width);
-        assert!(payload
-            .iter()
-            .zip(exp.iter().take(width))
-            .all(|(&x, &y)| x == y));
+        assert!(
+            payload
+                .iter()
+                .zip(exp.iter().take(width))
+                .all(|(&x, &y)| x == y)
+        );
         assert!(pad.iter().all(|&x| x == 0));
     }
 }
@@ -493,17 +495,19 @@ fn rgb_to_yuv_size_mode_pad(
         _ => unreachable!(),
     }
 
-    assert!(convert_image(
-        image_size.0,
-        image_size.1,
-        src_format,
-        Some(&[src_stride]),
-        &[&src_image[..]],
-        dst_format,
-        Some(&dst_strides[..]),
-        &mut dst_buffers[..],
-    )
-    .is_ok());
+    assert!(
+        convert_image(
+            image_size.0,
+            image_size.1,
+            src_format,
+            Some(&[src_stride]),
+            &[&src_image[..]],
+            dst_format,
+            Some(&dst_strides[..]),
+            &mut dst_buffers[..],
+        )
+        .is_ok()
+    );
 
     if w == 0 || h == 0 {
         return;
@@ -517,10 +521,12 @@ fn rgb_to_yuv_size_mode_pad(
                 .zip(plane_ref.1.iter().zip(plane_ref.2).take(ch))
             {
                 let (payload, pad) = uv_row.split_at(w);
-                assert!(payload
-                    .chunks(2)
-                    .zip(u_exp.iter().zip(v_exp.iter().take(cw)))
-                    .all(|(uv, (&u, &v))| uv[0] == u && uv[1] == v));
+                assert!(
+                    payload
+                        .chunks(2)
+                        .zip(u_exp.iter().zip(v_exp.iter().take(cw)))
+                        .all(|(uv, (&u, &v))| uv[0] == u && uv[1] == v)
+                );
                 assert!(pad.iter().all(|&x| x == 0));
             }
         }
@@ -815,17 +821,19 @@ fn yuv_to_bgra_size_format_mode_stride(
         pixel[2] = if (index & 1) == 0 { 0 } else { 255 };
     }
 
-    assert!(convert_image(
-        image_size.0,
-        image_size.1,
-        src_format,
-        Some(&src_strides[..]),
-        &src_buffers[..],
-        dst_format,
-        Some(&[dst_stride]),
-        &mut [&mut dst_image[..]],
-    )
-    .is_ok());
+    assert!(
+        convert_image(
+            image_size.0,
+            image_size.1,
+            src_format,
+            Some(&src_strides[..]),
+            &src_buffers[..],
+            dst_format,
+            Some(&[dst_stride]),
+            &mut [&mut dst_image[..]],
+        )
+        .is_ok()
+    );
 
     let (r_offset, b_offset) = match dst_format.pixel_format {
         PixelFormat::Bgra => (0, 2),
@@ -1001,17 +1009,19 @@ fn yuv_to_rgb_size_format_mode_stride(
         pixel[2] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
     }
 
-    assert!(convert_image(
-        image_size.0,
-        image_size.1,
-        src_format,
-        Some(&src_strides[..]),
-        &src_buffers[..],
-        dst_format,
-        Some(&[dst_stride]),
-        &mut [&mut dst_image[..]],
-    )
-    .is_ok());
+    assert!(
+        convert_image(
+            image_size.0,
+            image_size.1,
+            src_format,
+            Some(&src_strides[..]),
+            &src_buffers[..],
+            dst_format,
+            Some(&[dst_stride]),
+            &mut [&mut dst_image[..]],
+        )
+        .is_ok()
+    );
 
     let pack_stride = 3 * w;
     i = 0;
@@ -1137,26 +1147,28 @@ fn rgb_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
             for x in 0..w {
                 let offset = y * src_stride + x * src_depth;
 
-                src_image[offset] = rng.gen::<u8>();
-                src_image[offset + 1] = rng.gen::<u8>();
-                src_image[offset + 2] = rng.gen::<u8>();
+                src_image[offset] = rng.random::<u8>();
+                src_image[offset + 1] = rng.random::<u8>();
+                src_image[offset + 2] = rng.random::<u8>();
                 if src_depth == 4 {
                     src_image[offset + 3] = 255;
                 }
             }
         }
 
-        assert!(convert_image(
-            width,
-            height,
-            &src_format,
-            Some(&[src_strides]),
-            &[&src_image[..]],
-            &dst_format,
-            Some(&[dst_strides]),
-            &mut [&mut dst_image[..]],
-        )
-        .is_ok());
+        assert!(
+            convert_image(
+                width,
+                height,
+                &src_format,
+                Some(&[src_strides]),
+                &[&src_image[..]],
+                &dst_format,
+                Some(&[dst_strides]),
+                &mut [&mut dst_image[..]],
+            )
+            .is_ok()
+        );
 
         for y in 0..h {
             for x in 0..w {
@@ -1176,7 +1188,7 @@ fn rgb_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
 
 #[cfg(all(test, not(feature = "test_instruction_sets")))]
 mod conversions {
-    use super::{rgb_ok, rgb_to_yuv_ok, yuv_to_bgra_ok, yuv_to_rgb_ok, PixelFormat};
+    use super::{PixelFormat, rgb_ok, rgb_to_yuv_ok, yuv_to_bgra_ok, yuv_to_rgb_ok};
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 

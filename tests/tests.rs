@@ -18,13 +18,13 @@ use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
 use std::{
-    alloc::{alloc, alloc_zeroed, dealloc, Layout},
+    alloc::{Layout, alloc, alloc_zeroed, dealloc},
     ptr::write_bytes,
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use dcp::{
-    describe_acceleration, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat,
+    ColorSpace, ErrorKind, ImageFormat, PixelFormat, describe_acceleration, get_buffers_size,
 };
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
@@ -184,14 +184,10 @@ fn buffers_size() {
                         strides.push(((WIDTH as usize) * mul) >> row);
                     }
 
-                    assert!(get_buffers_size(
-                        WIDTH,
-                        HEIGHT,
-                        &format,
-                        Some(&strides[..]),
-                        buffers_size
-                    )
-                    .is_ok());
+                    assert!(
+                        get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides[..]), buffers_size)
+                            .is_ok()
+                    );
 
                     for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
                         assert_eq!(
@@ -276,17 +272,19 @@ fn over_4gb() {
             let src_buffers = &[src_image];
             let dst_buffers = &mut [&mut *dst_image];
 
-            assert!(dcp::convert_image(
-                WIDTH,
-                HEIGHT,
-                &src_format,
-                None,
-                src_buffers,
-                &dst_format,
-                None,
-                dst_buffers,
-            )
-            .is_ok());
+            assert!(
+                dcp::convert_image(
+                    WIDTH,
+                    HEIGHT,
+                    &src_format,
+                    None,
+                    src_buffers,
+                    &dst_format,
+                    None,
+                    dst_buffers,
+                )
+                .is_ok()
+            );
 
             // Check all samples are correct
             #[allow(clippy::cast_ptr_alignment)]

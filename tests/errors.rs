@@ -13,7 +13,7 @@
 )]
 #![allow(clippy::too_many_lines)] // This requires effort to handle
 
-use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+use dcp::{ColorSpace, ErrorKind, ImageFormat, PixelFormat, convert_image};
 
 use dcv_color_primitives as dcp;
 use itertools::iproduct;
@@ -484,7 +484,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
 
 #[cfg(all(test, not(feature = "test_instruction_sets")))]
 mod errors {
-    use super::{rgb_conversion_errors, rgb_to_yuv_errors, yuv_to_rgb_errors, PixelFormat};
+    use super::{PixelFormat, rgb_conversion_errors, rgb_to_yuv_errors, yuv_to_rgb_errors};
     #[cfg(target_arch = "wasm32")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
