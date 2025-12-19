@@ -1,6 +1,6 @@
 [package]
 name = "dcv-color-primitives"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 rust-version = "1.85"
 description = "a library to perform image color model conversion"
