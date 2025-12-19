@@ -45,7 +45,7 @@ Both standard range (0-235) and full range (0-255) are supported.
 
 ## Requirements
 
-* Rust 1.70 and newer
+* Rust 1.85 and newer
 
 ### Windows
 
