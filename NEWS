@@ -1,3 +1,7 @@
+News in 0.7.1
+* Fixed C bindings for convert_image
+* Updated rust edition to 2024, version to 1.85 and all deps to latest available
+
 News in 0.7.0
 * Added rgb and rgb to yuv neon acceleration
 * Remove internal swap_bytes
