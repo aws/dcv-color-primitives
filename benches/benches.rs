@@ -379,7 +379,8 @@ fn convert_from(
         _ => 1,
     };
     let num_planes = match to_format {
-        PixelFormat::Rgb | PixelFormat::Nv12 => 1,
+        PixelFormat::Rgb => 1,
+        PixelFormat::Nv12 => 2,
         _ => 3,
     };
     let color_space = match to_format {
@@ -392,7 +393,13 @@ fn convert_from(
 
     let mut output_data = Vec::with_capacity(3);
     match to_format {
-        PixelFormat::Rgb | PixelFormat::Nv12 => output_data.push(&mut output_buffer[..]),
+        PixelFormat::Rgb => output_data.push(&mut output_buffer[..]),
+        PixelFormat::Nv12 => {
+            let (y_data, uv_data) = output_buffer.split_at_mut(pixels);
+
+            output_data.push(&mut *y_data);
+            output_data.push(&mut *uv_data);
+        }
         _ => {
             let (y_data, uv_data) = output_buffer.split_at_mut(pixels);
             let (u_data, v_data) = uv_data.split_at_mut(pixels >> (2 * shift));
@@ -451,7 +458,8 @@ fn convert_to(
         _ => 1,
     };
     let num_planes = match from_format {
-        PixelFormat::Rgb | PixelFormat::Nv12 => 1,
+        PixelFormat::Rgb => 1,
+        PixelFormat::Nv12 => 2,
         _ => 3,
     };
     let color_space = match from_format {
@@ -464,7 +472,12 @@ fn convert_to(
 
     let mut input_data = Vec::with_capacity(3);
     match from_format {
-        PixelFormat::Rgb | PixelFormat::Nv12 => input_data.push(input_buffer),
+        PixelFormat::Rgb => input_data.push(input_buffer),
+        PixelFormat::Nv12 => {
+            let (y_data, uv_data) = input_buffer.split_at(pixels);
+            input_data.push(y_data);
+            input_data.push(uv_data);
+        }
         _ => {
             let (y_data, uv_data) = input_buffer.split_at(pixels);
             let (u_data, v_data) = uv_data.split_at(pixels >> (2 * shift));
