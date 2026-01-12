@@ -61,11 +61,7 @@ fn is_valid_format(format: &ImageFormat, width: u32, height: u32) -> bool {
         PixelFormat::I422 | PixelFormat::I420 => {
             format.num_planes != 3 || (width & 1) == 1 || (height & 1) == 1
         }
-        PixelFormat::Nv12 => {
-            (format.num_planes < 1 || format.num_planes > 2)
-                || (width & 1) == 1
-                || (height & 1) == 1
-        }
+        PixelFormat::Nv12 => format.num_planes != 2 || (width & 1) == 1 || (height & 1) == 1,
         _ => format.num_planes != 1,
     }
 }

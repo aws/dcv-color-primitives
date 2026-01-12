@@ -1071,7 +1071,7 @@ fn yuv_to_rgb_size_format_mode(
     }
 }
 
-fn yuv_to_rgb_ok(num_planes: u32) {
+fn yuv_to_rgb_ok() {
     const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
         ColorSpace::Bt601,
         ColorSpace::Bt709,
@@ -1091,7 +1091,7 @@ fn yuv_to_rgb_ok(num_planes: u32) {
         let src_format = ImageFormat {
             pixel_format: PixelFormat::Nv12,
             color_space: *color_space,
-            num_planes,
+            num_planes: 2,
         };
 
         for width in (0..=MAX_WIDTH).step_by(2) {
@@ -1193,12 +1193,7 @@ mod conversions {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     #[test]
-    fn nv12_to_rgbx_1() {
-        yuv_to_bgra_ok(PixelFormat::Nv12, 1);
-    }
-
-    #[test]
-    fn nv12_to_rgbx_2() {
+    fn nv12_to_rgbx() {
         yuv_to_bgra_ok(PixelFormat::Nv12, 2);
     }
 
@@ -1213,12 +1208,7 @@ mod conversions {
     }
 
     #[test]
-    fn rgb_to_nv12_1() {
-        rgb_to_yuv_ok(PixelFormat::Nv12, 1);
-    }
-
-    #[test]
-    fn rgb_to_nv12_2() {
+    fn rgb_to_nv12() {
         rgb_to_yuv_ok(PixelFormat::Nv12, 2);
     }
 
@@ -1233,13 +1223,8 @@ mod conversions {
     }
 
     #[test]
-    fn nv12_to_rgb_1() {
-        yuv_to_rgb_ok(1);
-    }
-
-    #[test]
-    fn nv12_to_rgb_2() {
-        yuv_to_rgb_ok(2);
+    fn nv12_to_rgb() {
+        yuv_to_rgb_ok();
     }
 
     #[test]
@@ -1280,14 +1265,11 @@ mod conversions {
             rgb_ok(PixelFormat::Rgb, PixelFormat::Bgra);
             rgb_to_yuv_ok(PixelFormat::I420, 3);
             rgb_to_yuv_ok(PixelFormat::I444, 3);
-            rgb_to_yuv_ok(PixelFormat::Nv12, 1);
             rgb_to_yuv_ok(PixelFormat::Nv12, 2);
             yuv_to_bgra_ok(PixelFormat::I420, 3);
             yuv_to_bgra_ok(PixelFormat::I444, 3);
-            yuv_to_bgra_ok(PixelFormat::Nv12, 1);
             yuv_to_bgra_ok(PixelFormat::Nv12, 2);
-            yuv_to_rgb_ok(1);
-            yuv_to_rgb_ok(2);
+            yuv_to_rgb_ok();
         }
     }
 }
