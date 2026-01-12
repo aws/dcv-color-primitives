@@ -82,8 +82,8 @@ pub fn lower_multiple_of_pot(x: usize, p: usize) -> usize {
     x & !(p - 1)
 }
 
-pub fn out_of_bounds(size: usize, width: usize, height_minus_one: usize, stride: usize) -> bool {
-    width > size
+pub fn out_of_bounds(size: usize, stride: usize, height_minus_one: usize, width: usize) -> bool {
+    size < width
         || (height_minus_one != 0
             && ((stride > usize::MAX / height_minus_one)
                 || (stride * height_minus_one > size - width)))
