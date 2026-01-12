@@ -9,14 +9,14 @@ repository = "https://github.com/aws/dcv-color-primitives"
 authors = ["Fabio Lagalla <lagfabio@amazon.com>"]
 readme = "README.md"
 keywords = ["colors", "converter", "rgb", "yuv", "video"]
-categories = ["graphics"]
+categories = ["graphics", "no-std", "no-std::no-alloc"]
 
 [lib]
 name = "dcv_color_primitives"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-paste = "1.0.15"
+spin = "0.10.0"
 
 [dev-dependencies]
 criterion = {version = "0.8.1", features = ["html_reports"]}
@@ -38,7 +38,9 @@ getrandom = { version = "0.3.4", features = ["wasm_js"] }
 wasm-bindgen = "0.2.106"
 
 [features]
+default = ['std']
 test_instruction_sets = []
+std = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }

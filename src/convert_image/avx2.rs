@@ -181,7 +181,7 @@ macro_rules! fix_to_i16_16x {
 #[cfg(target_arch = "x86")]
 #[inline(always)]
 unsafe fn _mm256_extract_epi64(a: __m256i, index: i32) -> i64 {
-    let slice = std::mem::transmute::<__m256i, [i64; 4]>(a);
+    let slice = core::mem::transmute::<__m256i, [i64; 4]>(a);
     return slice[index as usize];
 }
 
