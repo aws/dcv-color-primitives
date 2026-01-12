@@ -17,27 +17,111 @@
 use core::arch::x86::__cpuid;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::__cpuid;
-#[cfg(target_arch = "aarch64")]
-use std::arch::is_aarch64_feature_detected;
 
-#[derive(Debug)]
-pub enum CpuManufacturer {
-    Unknown,
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    Intel,
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    Amd,
+const CPU_MANUFACTURER_LABEL: &[u8] = "{cpu-manufacturer:".as_bytes();
+const INST_SET_LABEL: &[u8] = ",instruction-set:".as_bytes();
+const TRAILING_LABEL: &[u8] = "}".as_bytes();
+
+macro_rules! define_enum_with_max_len {
+    (
+        $(#[$enum_attr:meta])*
+        $vis:vis enum $name:ident {
+            $(
+                $(#[$variant_attr:meta])*
+                $variant:ident,
+            )*
+        }
+    ) => {
+        $(#[$enum_attr])*
+        $vis enum $name {
+            $(
+                $(#[$variant_attr])*
+                $variant,
+            )*
+        }
+
+        impl $name {
+            const fn max_len() -> usize {
+                const fn max(a: usize, b: usize) -> usize {
+                    if a > b { a } else { b }
+                }
+                let mut max_len = 0;
+                $(
+                    $(#[$variant_attr])*
+                    {
+                        max_len = max(max_len, stringify!($variant).as_bytes().len());
+                    }
+                )*
+                max_len
+            }
+        }
+    };
 }
 
-#[derive(Debug)]
-pub enum InstructionSet {
-    X86,
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    Sse2,
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    Avx2,
-    #[cfg(target_arch = "aarch64")]
-    Neon,
+macro_rules! manufacturer {
+    ($manufacturer:ident) => {
+        paste::paste! {
+            (CpuManufacturer::$manufacturer, stringify!($manufacturer).as_bytes() )
+        }
+    };
+}
+
+macro_rules! instruction_set {
+    ($instruction_set:ident) => {
+        paste::paste! {
+            (InstructionSet::$instruction_set, stringify!($instruction_set).as_bytes() )
+        }
+    };
+}
+
+define_enum_with_max_len! {
+    enum CpuManufacturer {
+        Unknown,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Intel,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Amd,
+    }
+}
+
+define_enum_with_max_len! {
+    #[allow(unused)]
+    pub enum InstructionSet {
+        X86,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Sse2,
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        Avx2,
+        #[cfg(target_arch = "aarch64")]
+        Neon,
+    }
+}
+
+const fn max_desc_len() -> usize {
+    CPU_MANUFACTURER_LABEL.len()
+        + CpuManufacturer::max_len()
+        + INST_SET_LABEL.len()
+        + InstructionSet::max_len()
+        + TRAILING_LABEL.len()
+        + 1
+}
+
+pub type AccelerationDescriptor = [u8; max_desc_len()];
+
+fn write_desc(desc: &mut [u8], offset: usize, value: &[u8]) -> usize {
+    desc[offset..offset + value.len()].copy_from_slice(value);
+    offset + value.len()
+}
+
+fn get_desc(manufacturer: &[u8], set: &[u8]) -> (AccelerationDescriptor, usize) {
+    let mut desc = [0u8; max_desc_len()];
+    let mut size = write_desc(&mut desc, 0, CPU_MANUFACTURER_LABEL);
+    size = write_desc(&mut desc, size, manufacturer);
+    size = write_desc(&mut desc, size, INST_SET_LABEL);
+    size = write_desc(&mut desc, size, set);
+    size = write_desc(&mut desc, size, TRAILING_LABEL);
+
+    (desc, size)
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -64,20 +148,20 @@ fn compare_cpu_manufacturer(features: &[u32; 4], name: &[u8; 12]) -> u32 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn get() -> (CpuManufacturer, InstructionSet) {
-    let mut manufacturer = CpuManufacturer::Unknown;
-    let mut set = InstructionSet::X86;
+pub fn get() -> (InstructionSet, AccelerationDescriptor, usize) {
+    let mut manufacturer = manufacturer!(Unknown);
+    let mut set = instruction_set!(X86);
 
     let features = &mut [0; 4];
     cpuid(0, features);
 
     if features[0] != 0 {
         if compare_cpu_manufacturer(features, b"GenuineIntel") == 0 {
-            manufacturer = CpuManufacturer::Intel;
+            manufacturer = manufacturer!(Intel);
         } else if (compare_cpu_manufacturer(features, b"AuthenticAMD") == 0)
             | (compare_cpu_manufacturer(features, b"AMDisbetter!") == 0)
         {
-            manufacturer = CpuManufacturer::Amd;
+            manufacturer = manufacturer!(Amd);
         }
 
         // This ensures we always use hardware intrinsics and we do not use software emulation
@@ -86,35 +170,35 @@ pub fn get() -> (CpuManufacturer, InstructionSet) {
             // On AMD cpus, all encode/decode using avx2 have worse performance than sse2 ones
             // For now, disable the avx2 path even if supported.
             // See https://en.wikipedia.org/wiki/CPUID for additional details
-            match manufacturer {
+            match manufacturer.0 {
                 CpuManufacturer::Amd => features[1] = 0,
                 _ => cpuid(7, features),
             }
 
             set = if (features[1] & (1 << 5)) == 0 {
-                InstructionSet::Sse2
+                instruction_set!(Sse2)
             } else {
-                InstructionSet::Avx2
+                instruction_set!(Avx2)
             };
         }
     }
 
-    (manufacturer, set)
+    let (desc, size) = get_desc(manufacturer.1, set.1);
+    (set.0, desc, size)
 }
 
 #[cfg(target_arch = "aarch64")]
-pub fn get() -> (CpuManufacturer, InstructionSet) {
-    (
-        CpuManufacturer::Unknown,
-        if is_aarch64_feature_detected!("neon") {
-            InstructionSet::Neon
-        } else {
-            InstructionSet::X86
-        },
-    )
+pub fn get() -> (InstructionSet, AccelerationDescriptor, usize) {
+    const MANUFACTURER: (CpuManufacturer, &[u8]) = manufacturer!(Unknown);
+    const SET: (InstructionSet, &[u8]) = instruction_set!(Neon);
+    let (desc, size) = get_desc(MANUFACTURER.1, SET.1);
+    (SET.0, desc, size)
 }
 
 #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
-pub fn get() -> (CpuManufacturer, InstructionSet) {
-    (CpuManufacturer::Unknown, InstructionSet::X86)
+pub fn get() -> (InstructionSet, AccelerationDescriptor, usize) {
+    const MANUFACTURER: (CpuManufacturer, &[u8]) = manufacturer!(Unknown);
+    const SET: (InstructionSet, &[u8]) = instruction_set!(X86);
+    let (desc, size) = get_desc(MANUFACTURER.1, SET.1);
+    (SET.0, desc, size)
 }

@@ -83,16 +83,19 @@ message('Building DCV Color Primitives')
 
 if get_option('buildtype') == 'release'
   dcp_build_dir = 'release'
-  cargo_target = ['build', '--release', ]
+  cargo_target = ['build', '--release', '--no-default-features' ]
 elif get_option('buildtype') == 'debugoptimized'
   dcp_build_dir = 'release'
-  cargo_target = ['build', '--release', ]
+  cargo_target = ['build', '--release', '--no-default-features' ]
 else
   dcp_build_dir = 'debug'
-  cargo_target = ['build', ]
+  cargo_target = ['build', '--no-default-features' ]
 endif
 
-cargo_result = run_command('cargo', cargo_target, check: false)
+rust_env = environment()
+rust_env.set('RUSTFLAGS', '-C panic=abort')
+
+cargo_result = run_command('cargo', cargo_target, env: rust_env, check: false)
 
 message(cargo_result.stdout())
 message(cargo_result.stderr())
@@ -114,27 +117,7 @@ install_data(
   install_dir: libdir
 )
 
-thread_dep = dependency('threads')
 dcv_color_primitives_dep = cc.find_library('dcv_color_primitives', dirs: [dcp_lib_path])
-libm_dep = cc.find_library('m', required: is_win == false)
-libdl_dep = cc.find_library('dl', required: is_win == false)
-ws2_32_dep = cc.find_library('ws2_32', required: is_win)
-userenv_dep = cc.find_library('userenv', required: is_win)
-bcrypt_dep = cc.find_library('bcrypt', required: is_win)
-ntdll_dep = cc.find_library('ntdll', required: is_win)
-
-clock_gettime_test_code = '''
-  #include <time.h>
-  struct timespec t;
-  int main (int argc, char ** argv) {
-    return clock_gettime(CLOCK_REALTIME, &t);
-  }'''
-librt_dep = []
-if cc.links(clock_gettime_test_code, name : 'clock_gettime')
-  # nothing to link to
-elif cc.links(clock_gettime_test_code, args : '-lrt', name : 'clock_gettime in librt')
-  librt_dep = cc.find_library('rt')
-endif
 
 subdir('include')
 subdir('c_tests')
