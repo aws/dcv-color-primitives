@@ -95,7 +95,7 @@ fn mulhi_i32(a: i32, b: i32) -> i32 {
 unsafe fn unpack_ui8x2_i32(image: *const u8, read_y: bool) -> (i32, i32) {
     (
         i32::from(*image),
-        i32::from(*image.add(if read_y { 1 } else { 0 })),
+        i32::from(*image.add(usize::from(read_y))),
     )
 }
 
