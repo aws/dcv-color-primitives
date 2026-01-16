@@ -673,6 +673,97 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 }
 
 #[inline(never)]
+pub fn i420_to_rgb<const COLORIMETRY: usize>(
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize, usize),
+    src_buffers: (&[u8], &[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const DEPTH: usize = 3;
+    let (y_stride, u_stride, v_stride) = src_strides;
+
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
+    let xxym = weights[0];
+    let rcrm = weights[1];
+    let gcrm = weights[2];
+    let gcbm = weights[3];
+    let bcbm = weights[4];
+    let rn = weights[5];
+    let gp = weights[6];
+    let bn = weights[7];
+
+    let wg_width = width.div_ceil(2);
+    let wg_height = height.div_ceil(2);
+
+    unsafe {
+        let y_group = src_buffers.0.as_ptr();
+        let u_group = src_buffers.1.as_ptr();
+        let v_group = src_buffers.2.as_ptr();
+        let dst_group = dst_buffer.as_mut_ptr();
+
+        for y in 0..wg_height {
+            let y0 = 2 * y;
+            let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
+
+            for x in 0..wg_width {
+                let cb = i32::from(*u_group.add(wg_index(x, y, 1, u_stride)));
+                let cr = i32::from(*v_group.add(wg_index(x, y, 1, v_stride)));
+
+                let sr = mulhi_i32(cr, rcrm) - rn;
+                let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
+                let sb = mulhi_i32(cb, bcbm) - bn;
+
+                let x0 = 2 * x;
+                let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
+                let (y00, y10) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)), x1 != x0);
+
+                let sy00 = mulhi_i32(y00, xxym);
+
+                pack_rgb(
+                    dst_group.add(wg_index(x0, y0, DEPTH, dst_stride)),
+                    fix_to_u8_sat(sy00 + sr, FIX6),
+                    fix_to_u8_sat(sy00 + sg, FIX6),
+                    fix_to_u8_sat(sy00 + sb, FIX6),
+                );
+
+                let sy10 = mulhi_i32(y10, xxym);
+                pack_rgb(
+                    dst_group.add(wg_index(x1, y0, DEPTH, dst_stride)),
+                    fix_to_u8_sat(sy10 + sr, FIX6),
+                    fix_to_u8_sat(sy10 + sg, FIX6),
+                    fix_to_u8_sat(sy10 + sb, FIX6),
+                );
+
+                let (y01, y11) = if y1 == y0 {
+                    (y00, y10)
+                } else {
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)), x1 != x0)
+                };
+
+                let sy01 = mulhi_i32(y01, xxym);
+                pack_rgb(
+                    dst_group.add(wg_index(x0, y1, DEPTH, dst_stride)),
+                    fix_to_u8_sat(sy01 + sr, FIX6),
+                    fix_to_u8_sat(sy01 + sg, FIX6),
+                    fix_to_u8_sat(sy01 + sb, FIX6),
+                );
+
+                let sy11 = mulhi_i32(y11, xxym);
+                pack_rgb(
+                    dst_group.add(wg_index(x1, y1, DEPTH, dst_stride)),
+                    fix_to_u8_sat(sy11 + sr, FIX6),
+                    fix_to_u8_sat(sy11 + sg, FIX6),
+                    fix_to_u8_sat(sy11 + sb, FIX6),
+                );
+            }
+        }
+    }
+}
+
+#[inline(never)]
 pub fn i444_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
@@ -716,6 +807,56 @@ pub fn i444_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
                     fix_to_u8_sat(sl + sb, FIX6),
                     fix_to_u8_sat(sl + sg, FIX6),
                     fix_to_u8_sat(sl + sr, FIX6),
+                );
+            }
+        }
+    }
+}
+
+#[inline(never)]
+pub fn i444_to_rgb<const COLORIMETRY: usize>(
+    width: usize,
+    height: usize,
+    src_strides: (usize, usize, usize),
+    src_buffers: (&[u8], &[u8], &[u8]),
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const DEPTH: usize = 3;
+    let (y_stride, u_stride, v_stride) = src_strides;
+
+    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
+    let xxym = weights[0];
+    let rcrm = weights[1];
+    let gcrm = weights[2];
+    let gcbm = weights[3];
+    let bcbm = weights[4];
+    let rn = weights[5];
+    let gp = weights[6];
+    let bn = weights[7];
+
+    unsafe {
+        let y_group = src_buffers.0.as_ptr();
+        let u_group = src_buffers.1.as_ptr();
+        let v_group = src_buffers.2.as_ptr();
+        let dst_group = dst_buffer.as_mut_ptr();
+
+        for y in 0..height {
+            for x in 0..width {
+                let l = i32::from(*y_group.add(wg_index(x, y, 1, y_stride)));
+                let cb = i32::from(*u_group.add(wg_index(x, y, 1, u_stride)));
+                let cr = i32::from(*v_group.add(wg_index(x, y, 1, v_stride)));
+
+                let sr = mulhi_i32(cr, rcrm) - rn;
+                let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
+                let sb = mulhi_i32(cb, bcbm) - bn;
+                let sl = mulhi_i32(l, xxym);
+
+                pack_rgb(
+                    dst_group.add(wg_index(x, y, DEPTH, dst_stride)),
+                    fix_to_u8_sat(sl + sr, FIX6),
+                    fix_to_u8_sat(sl + sg, FIX6),
+                    fix_to_u8_sat(sl + sb, FIX6),
                 );
             }
         }
@@ -1124,7 +1265,18 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         return false;
     }
 
-    i420_to_bgra::<COLORIMETRY, REVERSED>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    if DEPTH == 4 {
+        i420_to_bgra::<COLORIMETRY, REVERSED>(
+            w,
+            h,
+            src_strides,
+            src_buffers,
+            dst_stride,
+            dst_buffer,
+        );
+    } else {
+        i420_to_rgb::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    }
 
     true
 }
@@ -1176,7 +1328,18 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         return false;
     }
 
-    i444_to_bgra::<COLORIMETRY, REVERSED>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    if DEPTH == 4 {
+        i444_to_bgra::<COLORIMETRY, REVERSED>(
+            w,
+            h,
+            src_strides,
+            src_buffers,
+            dst_stride,
+            dst_buffer,
+        );
+    } else {
+        i444_to_rgb::<COLORIMETRY>(w, h, src_strides, src_buffers, dst_stride, dst_buffer);
+    }
 
     true
 }
@@ -1403,20 +1566,28 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_converter!(I420, Bt601, Rgba);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_converter!(I420, Bt709, Rgba);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_converter!(I444, Bt601, Rgba);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_converter!(I444, Bt709, Rgba);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
