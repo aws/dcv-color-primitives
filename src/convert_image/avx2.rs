@@ -1457,6 +1457,7 @@ unsafe fn rgb_to_bgra_avx2(
 
 // Internal module functions
 #[inline(never)]
+#[allow(clippy::too_many_lines)]
 fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
