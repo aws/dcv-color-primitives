@@ -14,6 +14,7 @@
 #![allow(clippy::too_many_lines)] // This requires effort to handle
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
+#![allow(clippy::similar_names)]
 
 mod common;
 
@@ -436,11 +437,11 @@ fn get_expected_plane_data(
             let p01 = bottom_row[x0];
             let p11 = bottom_row[x1];
 
-            let r = p00[0] + p10[0] + p01[0] + p11[0];
-            let g = p00[1] + p10[1] + p01[1] + p11[1];
-            let b = p00[2] + p10[2] + p01[2] + p11[2];
-            let u = ((yr * r + yg * g + yb * b + UV_SHIFT_18) >> FIX18) as u8;
-            let v = ((zr * r + zg * g + zb * b + UV_SHIFT_18) >> FIX18) as u8;
+            let red = p00[0] + p10[0] + p01[0] + p11[0];
+            let green = p00[1] + p10[1] + p01[1] + p11[1];
+            let blue = p00[2] + p10[2] + p01[2] + p11[2];
+            let u = ((yr * red + yg * green + yb * blue + UV_SHIFT_18) >> FIX18) as u8;
+            let v = ((zr * red + zg * green + zb * blue + UV_SHIFT_18) >> FIX18) as u8;
 
             u_row[x] = u;
             v_row[x] = v;

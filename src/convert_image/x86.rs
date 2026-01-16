@@ -92,8 +92,11 @@ fn mulhi_i32(a: i32, b: i32) -> i32 {
 }
 
 /// Deinterleave 2 uchar samples into 2 deinterleaved int
-unsafe fn unpack_ui8x2_i32(image: *const u8) -> (i32, i32) {
-    (i32::from(*image), i32::from(*image.add(1)))
+unsafe fn unpack_ui8x2_i32(image: *const u8, read_y: bool) -> (i32, i32) {
+    (
+        i32::from(*image),
+        i32::from(*image.add(usize::from(read_y))),
+    )
 }
 
 /// Deinterleave 3 uchar samples into 3 deinterleaved int
@@ -428,7 +431,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
             let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
 
             for x in 0..wg_width {
-                let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)));
+                let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)), true);
 
                 // [-12600,10280]   Cr(16)              Cr(240)
                 let sr = mulhi_i32(cr, rcrm) - rn;
@@ -439,10 +442,8 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let x0 = 2 * x;
                 let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)), x1 != x0);
 
                 // [ 1192, 17512]   Y(16)               Y(235)
                 let sy00 = mulhi_i32(y00, xxym);
@@ -468,8 +469,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
                 let (y01, y11) = if y1 == y0 {
                     (y00, y10)
                 } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)), x1 != x0)
                 };
 
                 let sy01 = mulhi_i32(y01, xxym);
@@ -527,7 +527,7 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
             let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
 
             for x in 0..wg_width {
-                let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)));
+                let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)), true);
 
                 let sr = mulhi_i32(cr, rcrm) - rn;
                 let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
@@ -535,10 +535,8 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
 
                 let x0 = 2 * x;
                 let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)), x1 != x0);
 
                 let sy00 = mulhi_i32(y00, xxym);
 
@@ -560,8 +558,7 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
                 let (y01, y11) = if y1 == y0 {
                     (y00, y10)
                 } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)), x1 != x0)
                 };
 
                 let sy01 = mulhi_i32(y01, xxym);
@@ -629,10 +626,8 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let x0 = 2 * x;
                 let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)), x1 != x0);
 
                 let sy00 = mulhi_i32(y00, xxym);
 
@@ -654,8 +649,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
                 let (y01, y11) = if y1 == y0 {
                     (y00, y10)
                 } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
+                    unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)), x1 != x0)
                 };
 
                 let sy01 = mulhi_i32(y01, xxym);
