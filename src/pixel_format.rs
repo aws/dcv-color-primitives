@@ -119,132 +119,77 @@ pub const STRIDE_AUTO: usize = 0;
 
 pub const DEFAULT_STRIDES: [usize; MAX_NUMBER_OF_PLANES] = [STRIDE_AUTO; MAX_NUMBER_OF_PLANES];
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-const fn make_pf_spec(planes: u32, width: u32, height: u32) -> u32 {
-    (height << 3) | (width << 2) | planes
-}
+const PF_PLANES: [u32; 9] = [1, 1, 1, 1, 1, 3, 3, 3, 2];
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-const fn make_plane_spec(plane0: u32, plane1: u32, plane2: u32, plane3: u32) -> u32 {
-    (plane3 << 18) | (plane2 << 12) | (plane1 << 6) | plane0
-}
-
-const INVALID_PLANE: u32 = 32;
-
-const PF_SPECS: [u32; 9] = [
-    make_pf_spec(0, 0, 0),
-    make_pf_spec(0, 0, 0),
-    make_pf_spec(0, 0, 0),
-    make_pf_spec(0, 0, 0),
-    make_pf_spec(0, 0, 0),
-    make_pf_spec(2, 0, 0),
-    make_pf_spec(2, 1, 0),
-    make_pf_spec(2, 1, 1),
-    make_pf_spec(1, 1, 1),
-];
-
-const STRIDE_SPECS: [u32; 9] = [
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 1, 1, INVALID_PLANE),
-    make_plane_spec(0, 1, 1, INVALID_PLANE),
-    make_plane_spec(0, 0, INVALID_PLANE, INVALID_PLANE),
-];
-
-const HEIGHT_SPECS: [u32; 9] = [
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 0, 0, 0),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 0, 0, INVALID_PLANE),
-    make_plane_spec(0, 1, 1, INVALID_PLANE),
-    make_plane_spec(0, 1, INVALID_PLANE, INVALID_PLANE),
-];
-
-fn get_pf_width(pf: u32) -> u32 {
-    (pf >> 2) & 1
-}
-
-fn get_pf_height(pf: u32) -> u32 {
-    pf >> 3
-}
-
-fn get_pf_planes(pf: u32) -> u32 {
-    pf & 3
-}
-
-fn get_plane_value(bpp: u32, plane: usize) -> u32 {
-    (bpp >> (6 * plane)) & 0x3F
-}
-
-fn get_plane_mask(bpp: u32, plane: usize) -> usize {
-    usize::from(INVALID_PLANE != get_plane_value(bpp, plane))
-}
-
-fn get_plane_spec(dimension: u32, bpp: u32, plane: usize) -> usize {
-    (dimension.wrapping_shr(get_plane_value(bpp, plane))) as usize
-}
-
-pub fn is_compatible(pixel_format: u32, width: u32, height: u32, last_plane: u32) -> bool {
-    let spec = PF_SPECS[pixel_format as usize];
-    let planes = get_pf_planes(spec);
-
-    ((width & get_pf_width(spec))
-        | (height & get_pf_height(spec))
-        | last_plane.wrapping_sub(planes))
-        == 0
+pub fn is_compatible(pixel_format: u32, num_planes: u32) -> bool {
+    num_planes == PF_PLANES[pixel_format as usize]
 }
 
 pub fn get_buffers_size(
-    pixel_format: u32,
+    pixel_format: PixelFormat,
     width: u32,
     height: u32,
-    last_plane: u32,
     strides: &[usize],
     buffers_size: &mut [usize],
 ) -> bool {
-    let last_plane = last_plane as usize;
-    if last_plane >= MAX_NUMBER_OF_PLANES
-        || last_plane >= strides.len()
-        || last_plane >= buffers_size.len()
-    {
+    if strides.len() > MAX_NUMBER_OF_PLANES || buffers_size.len() > MAX_NUMBER_OF_PLANES {
         return false;
     }
 
-    let stride = &mut [0_usize; MAX_NUMBER_OF_PLANES];
-
-    let pixel_format = pixel_format as usize;
-    let stride_spec = STRIDE_SPECS[pixel_format];
-    for i in 0..MAX_NUMBER_OF_PLANES {
-        stride[i] = if i >= strides.len() {
-            stride[i - 1]
-        } else if strides[i] == STRIDE_AUTO {
-            get_plane_mask(stride_spec, i) * get_plane_spec(width, stride_spec, i)
-        } else {
-            strides[i]
-        };
+    let min_plane_len = match pixel_format {
+        PixelFormat::Argb
+        | PixelFormat::Bgra
+        | PixelFormat::Rgba
+        | PixelFormat::Rgb
+        | PixelFormat::Bgr => 1,
+        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => 3,
+        PixelFormat::Nv12 => 2,
+    };
+    if strides.len() < min_plane_len || buffers_size.len() < min_plane_len {
+        return false;
     }
 
-    let height_spec = HEIGHT_SPECS[pixel_format];
-    if last_plane == 0 {
-        buffers_size[0] = ((stride[0] * get_plane_spec(height, height_spec, 0))
-            + (stride[1] * get_plane_spec(height, height_spec, 1)))
-            + ((stride[2] * get_plane_spec(height, height_spec, 2))
-                + (stride[3] * get_plane_spec(height, height_spec, 3)));
+    let width = width as usize;
+    let height = height as usize;
+    let main_default_stride = match pixel_format {
+        PixelFormat::Argb | PixelFormat::Bgra | PixelFormat::Rgba => 4 * width,
+        PixelFormat::Rgb | PixelFormat::Bgr => 3 * width,
+        _ => width,
+    };
+    let main_stride = if strides[0] == STRIDE_AUTO {
+        main_default_stride
     } else {
-        let buffer_array = &mut buffers_size[..=last_plane];
-        let stride_array = &stride[..=last_plane];
+        strides[0]
+    };
+    buffers_size[0] = main_stride * height;
 
-        for (buffer_size, (i, stride)) in
-            buffer_array.iter_mut().zip(stride_array.iter().enumerate())
-        {
-            *buffer_size = *stride * get_plane_spec(height, height_spec, i);
+    if matches!(
+        pixel_format,
+        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 | PixelFormat::Nv12
+    ) {
+        let width_shift = usize::from(!matches!(pixel_format, PixelFormat::I444));
+        let n_components = 1 + usize::from(matches!(pixel_format, PixelFormat::Nv12));
+        let chroma_default_stride = n_components * width.div_ceil(1 + width_shift);
+        let stride = if strides[1] == STRIDE_AUTO {
+            chroma_default_stride
+        } else {
+            strides[1]
+        };
+
+        let height_shift = usize::from(!matches!(
+            pixel_format,
+            PixelFormat::I444 | PixelFormat::I422
+        ));
+        buffers_size[1] = stride * height.div_ceil(1 + height_shift);
+
+        if !matches!(pixel_format, PixelFormat::Nv12) {
+            let stride = if strides[2] == STRIDE_AUTO {
+                chroma_default_stride
+            } else {
+                strides[2]
+            };
+
+            buffers_size[2] = stride * height.div_ceil(1 + height_shift);
         }
     }
 
@@ -254,7 +199,5 @@ pub fn get_buffers_size(
 #[cfg(not(feature = "test_instruction_sets"))]
 #[inline(always)]
 pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
-    let last_plane = num_planes.wrapping_sub(1);
-    let spec = PF_SPECS[pixel_format as usize];
-    last_plane.wrapping_sub(get_pf_planes(spec)) == 0
+    num_planes == PF_PLANES[pixel_format as usize]
 }
