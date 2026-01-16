@@ -769,6 +769,37 @@ unsafe fn bgra_to_rgb_neon(
 
 #[inline]
 #[target_feature(enable = "neon")]
+unsafe fn argb_to_rgb_neon(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+
+    let src_group = src_buffer.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
+
+    for i in 0..height {
+        let mut src_offset = src_stride * i;
+        let mut dst_offset = dst_stride * i;
+
+        for _ in (0..width).step_by(LANE_COUNT) {
+            let src = vld4q_u8(src_group.add(src_offset).cast());
+            let rgb = uint8x16x3_t(src.1, src.2, src.3);
+            vst3q_u8(dst_group.add(dst_offset).cast(), rgb);
+
+            src_offset += SRC_DEPTH * LANE_COUNT;
+            dst_offset += DST_DEPTH * LANE_COUNT;
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "neon")]
 unsafe fn rgb_to_bgra_neon(
     width: usize,
     height: usize,
@@ -1009,6 +1040,82 @@ pub fn bgra_rgb(
         let dx = x * DST_DEPTH;
 
         x86::bgra_to_rgb(
+            scalar_part,
+            h,
+            src_stride,
+            &src_buffer[sx..],
+            dst_stride,
+            &mut dst_buffer[dx..],
+        );
+    }
+
+    true
+}
+
+pub fn argb_rgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], SRC_DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DST_DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut *dst_buffers[0];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    // Process vector part and scalar one
+    let vector_part = lower_multiple_of_pot(w, LANE_COUNT);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
+        unsafe {
+            argb_to_rgb_neon(
+                vector_part,
+                h,
+                src_stride,
+                src_buffer,
+                dst_stride,
+                dst_buffer,
+            );
+        }
+    }
+
+    if scalar_part > 0 {
+        let x = vector_part;
+        let sx = x * SRC_DEPTH;
+        let dx = x * DST_DEPTH;
+
+        x86::argb_to_rgb(
             scalar_part,
             h,
             src_stride,

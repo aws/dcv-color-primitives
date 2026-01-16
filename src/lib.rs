@@ -46,7 +46,7 @@
 //!
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
-//! | ARGB                 | I420, I444, NV12           |
+//! | ARGB                 | I420, I444, NV12, RGB      |
 //! | BGR                  | I420, I444, NV12, RGB      |
 //! | BGRA                 | I420, I444, NV12, RGB      |
 //! | I420                 | BGRA, RGB, RGBA            |
@@ -430,6 +430,7 @@ macro_rules! rgb_to_rgb {
 
 macro_rules! set_dispatch_table {
     ($conv:expr, $set:ident) => {
+        rgb_to_rgb!($conv, $set, Argb, Rgb);
         rgb_to_rgb!($conv, $set, Bgr, Rgb);
         rgb_to_rgb!($conv, $set, Bgra, Rgb);
         rgb_to_rgb!($conv, $set, Rgb, Bgra);
@@ -771,6 +772,7 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Argb`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Argb`             | `PixelFormat::Rgb`  [`6`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::Nv12` [`1`]
@@ -870,6 +872,9 @@ pub fn get_buffers_size(
 /// # Algorithm 5
 /// Conversion from BGR to RGB
 ///
+/// # Algorithm 6
+/// Conversion from ARGB to RGB
+///
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
@@ -877,6 +882,9 @@ pub fn get_buffers_size(
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
 /// [`3`]: ./fn.convert_image.html#algorithm-3
+/// [`4`]: ./fn.convert_image.html#algorithm-4
+/// [`5`]: ./fn.convert_image.html#algorithm-5
+/// [`6`]: ./fn.convert_image.html#algorithm-6
 pub fn convert_image(
     width: u32,
     height: u32,

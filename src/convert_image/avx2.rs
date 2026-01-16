@@ -1487,6 +1487,124 @@ unsafe fn bgra_to_rgb_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
+unsafe fn argb_to_rgb_avx2(
+    width: usize,
+    height: usize,
+    src_stride: usize,
+    src_buffer: &[u8],
+    dst_stride: usize,
+    dst_buffer: &mut [u8],
+) {
+    const ITEMS_PER_ITERATION: usize = 8;
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+
+    // For ARGB: A R G B -> R G B (skip alpha, keep RGB)
+    let shf_mask = _mm256_setr_epi8(
+        1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, -128, -128, -128, -128, 1, 2, 3, 5, 6, 7, 9, 10,
+        11, 13, 14, 15, -128, -128, -128, -128,
+    );
+    let shf_mask_no_comb = _mm256_setr_epi8(
+        1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15, 0, 0, 0, 0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14,
+        15, 0, 0, 0, 0,
+    );
+    let pk_mask = _mm256_setr_epi32(0, 1, 2, 4, 5, 6, 3, 7);
+
+    let src_group = src_buffer.as_ptr();
+    let dst_group = dst_buffer.as_mut_ptr();
+
+    let src_stride_diff = src_stride - (SRC_DEPTH * width);
+    let dst_stride_diff = dst_stride - (DST_DEPTH * width);
+    let limit_4x = lower_multiple_of_pot(width, LANE_COUNT);
+    let limit = lower_multiple_of_pot(width, ITEMS_PER_ITERATION);
+
+    for i in 0..height {
+        let mut y = 0;
+        let mut src_offset = ((SRC_DEPTH * width) + src_stride_diff) * i;
+        let mut dst_offset = ((DST_DEPTH * width) + dst_stride_diff) * i;
+
+        while y < limit_4x {
+            let src_ptr: *const __m256i = src_group.add(src_offset).cast();
+            let dst_ptr: *mut __m256i = dst_group.add(dst_offset).cast();
+
+            let argb0 = loadu(src_ptr);
+            let argb1 = loadu(src_ptr.add(1));
+            let argb2 = loadu(src_ptr.add(2));
+            let argb3 = loadu(src_ptr.add(3));
+
+            let rgb0 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(argb0, shf_mask), pk_mask);
+            let rgb1 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(argb1, shf_mask), pk_mask);
+            let rgb2 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(argb2, shf_mask), pk_mask);
+            let rgb3 = _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(argb3, shf_mask), pk_mask);
+
+            storeu(
+                dst_ptr,
+                _mm256_or_si256(rgb0, _mm256_permute4x64_epi64(rgb1, shuffle(0, 3, 3, 3))),
+            );
+
+            storeu(
+                dst_ptr.add(1),
+                _mm256_or_si256(
+                    _mm256_permute4x64_epi64(rgb1, shuffle(3, 3, 2, 1)),
+                    _mm256_permute4x64_epi64(rgb2, shuffle(1, 0, 3, 3)),
+                ),
+            );
+
+            storeu(
+                dst_ptr.add(2),
+                _mm256_or_si256(
+                    _mm256_permute4x64_epi64(rgb2, shuffle(3, 3, 3, 2)),
+                    _mm256_permute4x64_epi64(rgb3, shuffle(2, 1, 0, 3)),
+                ),
+            );
+
+            src_offset += 4 * LANE_COUNT;
+            dst_offset += 3 * LANE_COUNT;
+            y += LANE_COUNT;
+        }
+
+        while y < limit {
+            let argb0 = loadu(src_group.add(src_offset).cast());
+            let rgb0 =
+                _mm256_permutevar8x32_epi32(_mm256_shuffle_epi8(argb0, shf_mask_no_comb), pk_mask);
+
+            storeu(
+                dst_group.add(dst_offset).cast(),
+                _mm256_extracti128_si256(rgb0, 0),
+            );
+            storeu(
+                dst_group.add(dst_offset + 16).cast(),
+                _mm256_extract_epi64(rgb0, 2),
+            );
+
+            src_offset += 4 * ITEMS_PER_ITERATION;
+            dst_offset += 3 * ITEMS_PER_ITERATION;
+            y += ITEMS_PER_ITERATION;
+        }
+    }
+
+    if limit != width {
+        let mut src_offset = 0;
+        let mut dst_offset = 0;
+
+        for _ in 0..height {
+            for y in limit..width {
+                *dst_group.add((DST_DEPTH * y) + dst_offset) =
+                    *src_group.add((SRC_DEPTH * y) + 1 + src_offset);
+                *dst_group.add((DST_DEPTH * y) + 1 + dst_offset) =
+                    *src_group.add((SRC_DEPTH * y) + 2 + src_offset);
+                *dst_group.add((DST_DEPTH * y) + 2 + dst_offset) =
+                    *src_group.add((SRC_DEPTH * y) + 3 + src_offset);
+            }
+
+            src_offset += (SRC_DEPTH * width) + src_stride_diff;
+            dst_offset += (DST_DEPTH * width) + dst_stride_diff;
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
 unsafe fn rgb_to_bgra_avx2(
     width: usize,
     height: usize,
@@ -2447,6 +2565,55 @@ pub fn bgra_rgb(
 
     unsafe {
         bgra_to_rgb_avx2(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
+    }
+
+    true
+}
+
+pub fn argb_rgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    const SRC_DEPTH: usize = 4;
+    const DST_DEPTH: usize = 3;
+
+    // Degenerate case, trivially accept
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // Check there are sufficient strides and buffers
+    if src_strides.is_empty()
+        || src_buffers.is_empty()
+        || dst_strides.is_empty()
+        || dst_buffers.is_empty()
+    {
+        return false;
+    }
+
+    let w = width as usize;
+    let h = height as usize;
+
+    // Compute actual strides
+    let src_stride = compute_stride(src_strides[0], SRC_DEPTH * w);
+    let dst_stride = compute_stride(dst_strides[0], DST_DEPTH * w);
+
+    // Ensure there is sufficient data in the buffers according
+    // to the image dimensions and computed strides
+    let src_buffer = src_buffers[0];
+    let dst_buffer = &mut *dst_buffers[0];
+    if out_of_bounds(src_buffer.len(), src_stride, h - 1, w)
+        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, w)
+    {
+        return false;
+    }
+
+    unsafe {
+        argb_to_rgb_avx2(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
     }
 
     true
