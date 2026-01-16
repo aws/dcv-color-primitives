@@ -346,22 +346,19 @@ impl fmt::Display for ErrorKind {
 /// `PixelFormat::Nv12` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 ///
 /// Some pixel formats might impose additional restrictions on the accepted number of
-/// planes and the image size:
+/// planes:
 ///
-/// pixel format        | subsampling | w   | h   | #planes | #1     | #2     | #3
-/// --------------------|:-----------:|:---:|:---:|:-------:|:------:|:------:|:-------:
-/// `PixelFormat::Argb` | 4:4:4       |     |     | 1       | argb:4 |        |
-/// `PixelFormat::Bgra` | 4:4:4       |     |     | 1       | bgra:4 |        |
-/// `PixelFormat::Bgr`  | 4:4:4       |     |     | 1       | bgr:3  |        |
-/// `PixelFormat::Rgba` | 4:4:4       |     |     | 1       | rgba:4 |        |
-/// `PixelFormat::Rgb`  | 4:4:4       |     |     | 1       | rgb:3  |        |
-/// `PixelFormat::I444` | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
-/// `PixelFormat::I422` | 4:2:2       |  2  |     | 3       | y:1    | u:1/2  | v:1/2
-/// `PixelFormat::I420` | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
-/// `PixelFormat::Nv12` | 4:2:0       |  2  |  2  | 2       | y:1    | uv:1/2 |
-///
-/// The values reported in columns `w` and `h`, when specified, indicate that the described
-/// image should have width and height that are multiples of the specified values
+/// pixel format        | subsampling | #planes | #1     | #2     | #3
+/// --------------------|:-----------:|:-------:|:------:|:------:|:-------:
+/// `PixelFormat::Argb` | 4:4:4       | 1       | argb:4 |        |
+/// `PixelFormat::Bgra` | 4:4:4       | 1       | bgra:4 |        |
+/// `PixelFormat::Bgr`  | 4:4:4       | 1       | bgr:3  |        |
+/// `PixelFormat::Rgba` | 4:4:4       | 1       | rgba:4 |        |
+/// `PixelFormat::Rgb`  | 4:4:4       | 1       | rgb:3  |        |
+/// `PixelFormat::I444` | 4:4:4       | 3       | y:1    | u:1    | v:1
+/// `PixelFormat::I422` | 4:2:2       | 3       | y:1    | u:1/2  | v:1/2
+/// `PixelFormat::I420` | 4:2:0       | 3       | y:1    | u:1/4  | v:1/4
+/// `PixelFormat::Nv12` | 4:2:0       | 2       | y:1    | uv:1/2 |
 #[derive(Debug)]
 pub struct ImageFormat {
     /// Pixel format
@@ -699,9 +696,6 @@ pub fn describe_acceleration() -> &'static str {
 ///
 /// # Errors
 ///
-/// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`] that might by
-///   imposed by the image pixel format
-///
 /// * [`InvalidValue`] if the image format has a number of planes which is not compatible
 ///   with its pixel format
 ///
@@ -713,7 +707,6 @@ pub fn describe_acceleration() -> &'static str {
 ///
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
-/// [`size constraints`]: ./struct.ImageFormat.html#note
 /// [`STRIDE_AUTO`]: ./constant.STRIDE_AUTO.html
 pub fn get_buffers_size(
     width: u32,
@@ -723,16 +716,14 @@ pub fn get_buffers_size(
     buffers_size: &mut [usize],
 ) -> Result<(), ErrorKind> {
     let pixel_format = format.pixel_format as u32;
-    let last_plane = format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(pixel_format, width, height, last_plane) {
+    if !pixel_format::is_compatible(pixel_format, format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 
     if pixel_format::get_buffers_size(
-        pixel_format,
+        format.pixel_format,
         width,
         height,
-        last_plane,
         strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
         buffers_size,
     ) {
@@ -758,9 +749,6 @@ pub fn get_buffers_size(
 /// * `dst_buffers` - An array of image buffers in each destination color plane
 ///
 /// # Errors
-///
-/// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`]
-///   that might by imposed by the source and destination image pixel formats
 ///
 /// * [`InvalidValue`] if source or destination image formats have a number of planes
 ///   which is not compatible with their pixel formats
@@ -877,7 +865,6 @@ pub fn get_buffers_size(
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
-/// [`size constraints`]: ./struct.ImageFormat.html#note
 /// [`get_buffers_size`]: ./fn.get_buffers_size.html
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
@@ -908,16 +895,11 @@ pub fn convert_image(
         return Err(ErrorKind::InvalidValue);
     }
 
-    // Cross-correlate pixel format with planes and alignment.
-    // wrapping_sub is wanted. If num_planes is 0, this turns in a very big number that
-    // still represents an invalid number of planes.
-    let last_src_plane = src_format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(src_pixel_format, width, height, last_src_plane) {
+    if !pixel_format::is_compatible(src_pixel_format, src_format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 
-    let last_dst_plane = dst_format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(dst_pixel_format, width, height, last_dst_plane) {
+    if !pixel_format::is_compatible(dst_pixel_format, dst_format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 

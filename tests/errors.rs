@@ -38,6 +38,9 @@ const COLOR_SPACES: &[ColorSpace; 5] = &[
     ColorSpace::Bt709FR,
 ];
 
+const WIDTH_YUV: u32 = 33;
+const HEIGHT_YUV: u32 = 3;
+
 const PIXEL_FORMAT_I444: u32 = PixelFormat::I444 as u32;
 const COLOR_SPACE_RGB: u32 = ColorSpace::Rgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
@@ -55,14 +58,11 @@ macro_rules! set_expected {
     };
 }
 
-fn is_valid_format(format: &ImageFormat, width: u32, height: u32) -> bool {
+fn is_valid_format(format: &ImageFormat) -> bool {
     match format.pixel_format {
-        PixelFormat::I444 => format.num_planes != 3,
-        PixelFormat::I422 | PixelFormat::I420 => {
-            format.num_planes != 3 || (width & 1) == 1 || (height & 1) == 1
-        }
-        PixelFormat::Nv12 => format.num_planes != 2 || (width & 1) == 1 || (height & 1) == 1,
-        _ => format.num_planes != 1,
+        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => format.num_planes == 3,
+        PixelFormat::Nv12 => format.num_planes == 2,
+        _ => format.num_planes == 1,
     }
 }
 
@@ -186,8 +186,8 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
     let src_size: usize = src_stride * (HEIGHT as usize);
     let dst_size: usize = dst_stride * (HEIGHT as usize);
 
-    let src_image = vec![0_u8; src_size].into_boxed_slice();
-    let mut dst_image = vec![0_u8; dst_size].into_boxed_slice();
+    let src_image = vec![0_u8; src_size];
+    let mut dst_image = vec![0_u8; dst_size];
 
     for num_planes in 0..4 {
         let src_format = ImageFormat {
@@ -207,12 +207,12 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
         let mut expected = Ok(());
         set_expected!(
             expected,
-            is_valid_format(&src_format, WIDTH, HEIGHT),
+            !is_valid_format(&src_format),
             ErrorKind::InvalidValue
         );
         set_expected!(
             expected,
-            is_valid_format(&dst_format, WIDTH, HEIGHT),
+            !is_valid_format(&dst_format),
             ErrorKind::InvalidValue
         );
 
@@ -243,33 +243,30 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
 }
 
 fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
-    let (w, h) = match pixel_format {
-        PixelFormat::I444 => (33, 3),
-        _ => (34, 2),
-    };
     let cw = match pixel_format {
-        PixelFormat::I420 => w / 2,
-        _ => w,
+        PixelFormat::Nv12 => 2 * WIDTH_YUV.div_ceil(2),
+        PixelFormat::I420 => WIDTH_YUV.div_ceil(2),
+        _ => WIDTH_YUV,
     } as usize;
     let ch = match pixel_format {
-        PixelFormat::I444 => h,
-        _ => h / 2,
+        PixelFormat::I444 => HEIGHT_YUV,
+        _ => HEIGHT_YUV.div_ceil(2),
     } as usize;
-    let y_size = (w as usize) * (h as usize);
+    let y_size = (WIDTH_YUV as usize) * (HEIGHT_YUV as usize);
     let uv_size = cw * ch;
 
     let slices = &[0, y_size + uv_size, y_size, 0];
     let mut y_plane = match pixel_format {
-        PixelFormat::Nv12 => vec![0_u8; y_size + uv_size].into_boxed_slice(),
-        _ => vec![0_u8; y_size].into_boxed_slice(),
+        PixelFormat::Nv12 => vec![0_u8; y_size + uv_size],
+        _ => vec![0_u8; y_size],
     };
-    let mut u_plane = vec![0_u8; uv_size].into_boxed_slice();
-    let mut v_plane = vec![0_u8; uv_size].into_boxed_slice();
+    let mut u_plane = vec![0_u8; uv_size];
+    let mut v_plane = vec![0_u8; uv_size];
 
     for src_pixel_format in PIXEL_FORMATS {
-        let src_stride = get_depth(*src_pixel_format) * (w as usize);
-        let src_size = src_stride * (h as usize);
-        let src_image = vec![0_u8; src_size].into_boxed_slice();
+        let src_stride = get_depth(*src_pixel_format) * (WIDTH_YUV as usize);
+        let src_size = src_stride * (HEIGHT_YUV as usize);
+        let src_image = vec![0_u8; src_size];
 
         for (num_planes, src_color_space, dst_color_space) in
             iproduct!(0..4, COLOR_SPACES, COLOR_SPACES)
@@ -289,7 +286,7 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             let mut dst_strides = Vec::with_capacity(1);
             let mut dst_buffers = Vec::with_capacity(1);
 
-            dst_strides.push(w as usize);
+            dst_strides.push(WIDTH_YUV as usize);
             if let PixelFormat::Nv12 = pixel_format {
                 dst_buffers.push(&mut y_plane[..slices[num_planes as usize]]);
                 dst_buffers.push(&mut u_plane[..]);
@@ -317,12 +314,12 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             set_expected!(expected, dst_cs_rgb, ErrorKind::InvalidValue);
             set_expected!(
                 expected,
-                is_valid_format(&src_format, w, h),
+                !is_valid_format(&src_format),
                 ErrorKind::InvalidValue
             );
             set_expected!(
                 expected,
-                is_valid_format(&dst_format, w, h),
+                !is_valid_format(&dst_format),
                 ErrorKind::InvalidValue
             );
             set_expected!(
@@ -339,8 +336,8 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             );
 
             let status = convert_image(
-                w,
-                h,
+                WIDTH_YUV,
+                HEIGHT_YUV,
                 &src_format,
                 None,
                 src_buffers,
@@ -352,8 +349,8 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             assert_eq!(expected.is_ok(), status.is_ok());
             match status {
                 Ok(()) => check_bounds(
-                    w,
-                    h,
+                    WIDTH_YUV,
+                    HEIGHT_YUV,
                     &src_format,
                     src_buffers,
                     &dst_format,
@@ -366,30 +363,27 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
 }
 
 fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
-    let (w, h) = match pixel_format {
-        PixelFormat::I444 => (33, 3),
-        _ => (34, 2),
-    };
     let cw = match pixel_format {
-        PixelFormat::I420 => w / 2,
-        _ => w,
+        PixelFormat::I420 => WIDTH_YUV.div_ceil(2),
+        PixelFormat::Nv12 => 2 * WIDTH_YUV.div_ceil(2),
+        _ => WIDTH_YUV,
     } as usize;
     let ch = match pixel_format {
-        PixelFormat::I444 => h,
-        _ => h / 2,
+        PixelFormat::I444 => HEIGHT_YUV,
+        _ => HEIGHT_YUV.div_ceil(2),
     } as usize;
-    let y_size = (w as usize) * (h as usize);
+    let y_size = (WIDTH_YUV as usize) * (HEIGHT_YUV as usize);
     let uv_size = cw * ch;
-    let dst_size = (w as usize) * (h as usize) * 4;
+    let dst_size = (WIDTH_YUV as usize) * (HEIGHT_YUV as usize) * 4;
 
     let slices = &[0, y_size + uv_size, y_size, 0];
     let y_plane = match pixel_format {
-        PixelFormat::Nv12 => vec![0_u8; y_size + uv_size].into_boxed_slice(),
-        _ => vec![0_u8; y_size].into_boxed_slice(),
+        PixelFormat::Nv12 => vec![0_u8; y_size + uv_size],
+        _ => vec![0_u8; y_size],
     };
-    let u_plane = vec![0_u8; uv_size].into_boxed_slice();
-    let v_plane = vec![0_u8; uv_size].into_boxed_slice();
-    let mut dst_image = vec![0_u8; dst_size].into_boxed_slice();
+    let u_plane = vec![0_u8; uv_size];
+    let v_plane = vec![0_u8; uv_size];
+    let mut dst_image = vec![0_u8; dst_size];
 
     for (num_planes, dst_pixel_format, dst_color_space, src_color_space) in
         iproduct!(0..4, PIXEL_FORMATS, COLOR_SPACES, COLOR_SPACES)
@@ -409,7 +403,7 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         let mut src_buffers = Vec::with_capacity(1);
         let dst_buffers = &mut [&mut dst_image[..]];
 
-        src_strides.push(w as usize);
+        src_strides.push(WIDTH_YUV as usize);
         if let PixelFormat::Nv12 = pixel_format {
             src_buffers.push(&y_plane[..slices[num_planes as usize]]);
             src_buffers.push(&u_plane[..]);
@@ -438,12 +432,12 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         set_expected!(expected, dst_pf_rgb && !dst_cs_rgb, ErrorKind::InvalidValue);
         set_expected!(
             expected,
-            is_valid_format(&src_format, w, h),
+            !is_valid_format(&src_format),
             ErrorKind::InvalidValue
         );
         set_expected!(
             expected,
-            is_valid_format(&dst_format, w, h),
+            !is_valid_format(&dst_format),
             ErrorKind::InvalidValue
         );
         set_expected!(
@@ -460,8 +454,8 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         );
 
         let status = convert_image(
-            w,
-            h,
+            WIDTH_YUV,
+            HEIGHT_YUV,
             &src_format,
             Some(&src_strides),
             &src_buffers,
@@ -472,7 +466,14 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
 
         assert_eq!(expected.is_ok(), status.is_ok());
         match status {
-            Ok(()) => check_bounds(w, h, &src_format, &src_buffers, &dst_format, dst_buffers),
+            Ok(()) => check_bounds(
+                WIDTH_YUV,
+                HEIGHT_YUV,
+                &src_format,
+                &src_buffers,
+                &dst_format,
+                dst_buffers,
+            ),
             Err(err) => check_err(err, expected.unwrap_err()),
         }
     }
