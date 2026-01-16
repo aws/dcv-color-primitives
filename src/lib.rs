@@ -13,6 +13,7 @@
 // HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(missing_docs)]
 #![deny(trivial_casts)]
@@ -61,7 +62,7 @@
 //!
 //! # Examples
 //!
-//! Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
+//! Convert an image from bgra to nv12 (two planes) format, with Bt601 color space:
 //! ```
 //! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
@@ -70,8 +71,9 @@
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
-//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
+//!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
+//!     let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
+//!     let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -82,7 +84,7 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 1,
+//!         num_planes: 2,
 //!     };
 //!
 //!     convert_image(
@@ -90,10 +92,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         &[&*src_data],
+//!         &[&src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut *dst_data],
+//!         &mut [&mut y_data, &mut uv_data],
 //!     );
 //! }
 //! ```
@@ -101,15 +103,15 @@
 //! Handle conversion errors:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
-//! use std::error;
+//! use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 //!
-//! fn convert() -> Result<(), Box<dyn error::Error>> {
+//! fn convert() -> Result<(), ErrorKind> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
-//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
+//!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
+//!     let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
+//!     let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -120,7 +122,7 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 1,
+//!         num_planes: 2,
 //!     };
 //!
 //!     convert_image(
@@ -128,10 +130,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         &[&*src_data],
+//!         &[&src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut *dst_data],
+//!         &mut [&mut y_data, &mut uv_data],
 //!     )?;
 //!
 //!     Ok(())
@@ -141,10 +143,9 @@
 //! Compute how many bytes are needed to store and image of a given format and size:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-//! use std::error;
+//! use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 //!
-//! fn compute_size() -> Result<(), Box<dyn error::Error>> {
+//! fn compute_size() -> Result<(), ErrorKind> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_PLANES: u32 = 1;
@@ -155,10 +156,10 @@
 //!         num_planes: NUM_PLANES,
 //!     };
 //!
-//!     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &format, None, sizes)?;
+//!     let mut sizes = [0usize; NUM_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &format, None, &mut sizes)?;
 //!
-//!     let buffer: Vec<_> = vec![0u8; sizes[0]];
+//!     let buffer = vec![0u8; sizes[0]];
 //!
 //!     // Do something with buffer
 //!     // --snip--
@@ -171,10 +172,9 @@
 //! necessarily contiguous:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-//! use std::error;
+//! use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 //!
-//! fn convert() -> Result<(), Box<dyn error::Error>> {
+//! fn convert() -> Result<(), ErrorKind> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 2;
@@ -186,11 +186,11 @@
 //!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
-//!     let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_sizes)?;
+//!     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &src_format, None, &mut src_sizes)?;
 //!
-//!     let src_y: Vec<_> = vec![0u8; src_sizes[0]];
-//!     let src_uv: Vec<_> = vec![0u8; src_sizes[1]];
+//!     let src_y = vec![0u8; src_sizes[0]];
+//!     let src_uv = vec![0u8; src_sizes[1]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -198,10 +198,10 @@
 //!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
-//!     let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
+//!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
 //!
-//!     let mut dst_rgba: Vec<_> = vec![0u8; dst_sizes[0]];
+//!     let mut dst_rgba = vec![0u8; dst_sizes[0]];
 //!
 //!     convert_image(
 //!         WIDTH,
@@ -221,15 +221,14 @@
 //! Provide image strides to convert data which is not tightly packed:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-//! use std::error;
+//! use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 //!
-//! fn convert() -> Result<(), Box<dyn error::Error>> {
+//! fn convert() -> Result<(), ErrorKind> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 1;
 //!     const NUM_DST_PLANES: u32 = 2;
-//!     const RGB_STRIDE: usize = 4 * (((3 * (WIDTH as usize)) + 3) / 4);
+//!     const RGB_STRIDE: usize = 4 * (3 * (WIDTH as usize)).div_ceil(4);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgr,
@@ -237,12 +236,12 @@
 //!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
-//!     let src_strides: &[usize] = &[RGB_STRIDE];
+//!     let src_strides = [RGB_STRIDE];
 //!
-//!     let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(src_strides), src_sizes)?;
+//!     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(&src_strides), &mut src_sizes)?;
 //!
-//!     let src_rgba: Vec<_> = vec![0u8; src_sizes[0]];
+//!     let src_rgba = vec![0u8; src_sizes[0]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
@@ -250,21 +249,21 @@
 //!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
-//!     let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
+//!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
 //!
-//!     let mut dst_y: Vec<_> = vec![0u8; dst_sizes[0]];
-//!     let mut dst_uv: Vec<_> = vec![0u8; dst_sizes[1]];
+//!     let mut dst_y = vec![0u8; dst_sizes[0]];
+//!     let mut dst_uv = vec![0u8; dst_sizes[1]];
 //!
 //!     convert_image(
 //!         WIDTH,
 //!         HEIGHT,
 //!         &src_format,
-//!         Some(src_strides),
-//!         &[&src_rgba[..]],
+//!         Some(&src_strides),
+//!         &[&src_rgba],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut dst_y[..], &mut dst_uv[..]],
+//!         &mut [&mut dst_y, &mut dst_uv],
 //!     )?;
 //!
 //!     Ok(())
@@ -277,16 +276,24 @@ mod dispatcher;
 mod pixel_format;
 mod static_assert;
 
-use cpu_info::{CpuManufacturer, InstructionSet};
-use paste::paste;
-use std::error;
-use std::fmt;
-use std::sync::OnceLock;
+use core::fmt;
 #[cfg(feature = "test_instruction_sets")]
-use std::sync::atomic::{AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, Ordering};
+use cpu_info::{AccelerationDescriptor, InstructionSet};
+use pastey::paste;
 
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
+
+#[cfg(not(feature = "std"))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
+#[cfg(not(feature = "std"))]
+#[unsafe(no_mangle)]
+extern "C" fn rust_eh_personality() {}
 
 /// An enumeration of errors.
 #[derive(Debug)]
@@ -318,13 +325,6 @@ impl fmt::Display for ErrorKind {
     }
 }
 
-impl error::Error for ErrorKind {
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    fn cause(&self) -> Option<&dyn error::Error> {
-        None
-    }
-}
-
 /// Describes how the image data is laid out in memory and its color space.
 ///
 /// # Note
@@ -346,24 +346,20 @@ impl error::Error for ErrorKind {
 /// `PixelFormat::Nv12` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 ///
 /// Some pixel formats might impose additional restrictions on the accepted number of
-/// planes and the image size:
+/// planes:
 ///
-/// pixel format        | subsampling | w   | h   | #planes | #1     | #2     | #3
-/// --------------------|:-----------:|:---:|:---:|:-------:|:------:|:------:|:-------:
-/// `PixelFormat::Argb` | 4:4:4       |     |     | 1       | argb:4 |        |
-/// `PixelFormat::Bgra` | 4:4:4       |     |     | 1       | bgra:4 |        |
-/// `PixelFormat::Bgr`  | 4:4:4       |     |     | 1       | bgr:3  |        |
-/// `PixelFormat::Rgba` | 4:4:4       |     |     | 1       | rgba:4 |        |
-/// `PixelFormat::Rgb`  | 4:4:4       |     |     | 1       | rgb:3  |        |
-/// `PixelFormat::I444` | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
-/// `PixelFormat::I422` | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
-/// `PixelFormat::I420` | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
-/// `PixelFormat::Nv12` | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
-///
-/// The values reported in columns `w` and `h`, when specified, indicate that the described
-/// image should have width and height that are multiples of the specified values
+/// pixel format        | subsampling | #planes | #1     | #2     | #3
+/// --------------------|:-----------:|:-------:|:------:|:------:|:-------:
+/// `PixelFormat::Argb` | 4:4:4       | 1       | argb:4 |        |
+/// `PixelFormat::Bgra` | 4:4:4       | 1       | bgra:4 |        |
+/// `PixelFormat::Bgr`  | 4:4:4       | 1       | bgr:3  |        |
+/// `PixelFormat::Rgba` | 4:4:4       | 1       | rgba:4 |        |
+/// `PixelFormat::Rgb`  | 4:4:4       | 1       | rgb:3  |        |
+/// `PixelFormat::I444` | 4:4:4       | 3       | y:1    | u:1    | v:1
+/// `PixelFormat::I422` | 4:2:2       | 3       | y:1    | u:1/2  | v:1/2
+/// `PixelFormat::I420` | 4:2:0       | 3       | y:1    | u:1/4  | v:1/4
+/// `PixelFormat::Nv12` | 4:2:0       | 2       | y:1    | uv:1/2 |
 #[derive(Debug)]
-#[repr(C)]
 pub struct ImageFormat {
     /// Pixel format
     pub pixel_format: PixelFormat,
@@ -373,8 +369,7 @@ pub struct ImageFormat {
     pub num_planes: u32,
 }
 
-type ConvertDispatcher =
-    fn(u32, u32, u32, &[usize], &[&[u8]], u32, &[usize], &mut [&mut [u8]]) -> bool;
+type ConvertDispatcher = fn(u32, u32, &[usize], &[&[u8]], &[usize], &mut [&mut [u8]]) -> bool;
 
 macro_rules! rgb_to_yuv {
     ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident, $dst_cs:ident) => {
@@ -511,8 +506,9 @@ static TEST_SET: AtomicI32 = AtomicI32::new(-1);
 type DispatchTable = [Option<ConvertDispatcher>; dispatcher::TABLE_SIZE];
 
 struct Context {
-    manufacturer: CpuManufacturer,
     set: InstructionSet,
+    acceleration_desc: AccelerationDescriptor,
+    acceleration_len: usize,
     converters: DispatchTable,
     #[cfg(feature = "test_instruction_sets")]
     test_converters: [Option<DispatchTable>; 3],
@@ -520,15 +516,16 @@ struct Context {
 
 impl Context {
     pub fn global() -> &'static Context {
-        static INSTANCE: OnceLock<Context> = OnceLock::new();
-        INSTANCE.get_or_init(Context::new)
+        static INSTANCE: spin::Once<Context> = spin::Once::new();
+        INSTANCE.call_once(Context::new)
     }
 
     pub fn new() -> Self {
-        let (manufacturer, set) = cpu_info::get();
+        let (set, acceleration_desc, acceleration_len) = cpu_info::get();
         let mut context = Context {
-            manufacturer,
             set,
+            acceleration_desc,
+            acceleration_len,
             converters: [None; dispatcher::TABLE_SIZE],
             #[cfg(feature = "test_instruction_sets")]
             test_converters: [None; 3],
@@ -598,13 +595,9 @@ impl Context {
 /// use dcv_color_primitives as dcp;
 /// println!("{}", dcp::describe_acceleration());
 /// // => {cpu-manufacturer:Intel,instruction-set:Avx2}
-pub fn describe_acceleration() -> String {
-    let state = Context::global();
-
-    format!(
-        "{{cpu-manufacturer:{:?},instruction-set:{:?}}}",
-        state.manufacturer, state.set
-    )
+pub fn describe_acceleration() -> &'static str {
+    let context = Context::global();
+    core::str::from_utf8(&context.acceleration_desc[..context.acceleration_len]).unwrap_or_default()
 }
 
 /// Compute number of bytes required to store an image given its format, dimensions
@@ -624,10 +617,9 @@ pub fn describe_acceleration() -> String {
 /// assuming *all planes contain data which is tightly packed*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-/// use std::error;
+/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 ///
-/// fn compute_size_packed() -> Result<(), Box<dyn error::Error>> {
+/// fn compute_size_packed() -> Result<(), ErrorKind> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -638,8 +630,8 @@ pub fn describe_acceleration() -> String {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, None, sizes)?;
+///     let mut sizes = [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, None, &mut sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -649,10 +641,9 @@ pub fn describe_acceleration() -> String {
 /// in which *all planes have custom strides*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-/// use std::error;
+/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 ///
-/// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
+/// fn compute_size_custom_strides() -> Result<(), ErrorKind> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -665,9 +656,9 @@ pub fn describe_acceleration() -> String {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let strides: &[usize] = &[ Y_STRIDE, UV_STRIDE, ];
-///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, Some(strides), sizes)?;
+///     let strides = [ Y_STRIDE, UV_STRIDE, ];
+///     let mut sizes = [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides), &mut sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -678,10 +669,9 @@ pub fn describe_acceleration() -> String {
 /// contain data which is tightly packed*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat, STRIDE_AUTO};
-/// use std::error;
+/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat, STRIDE_AUTO};
 ///
-/// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
+/// fn compute_size_custom_strides() -> Result<(), ErrorKind> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -693,9 +683,9 @@ pub fn describe_acceleration() -> String {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let strides: &[usize] = &[ Y_STRIDE, STRIDE_AUTO, ];
-///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, Some(strides), sizes)?;
+///     let strides = [ Y_STRIDE, STRIDE_AUTO, ];
+///     let mut sizes = [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides), &mut sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -705,9 +695,6 @@ pub fn describe_acceleration() -> String {
 /// using the constant [`STRIDE_AUTO`]
 ///
 /// # Errors
-///
-/// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`] that might by
-///   imposed by the image pixel format
 ///
 /// * [`InvalidValue`] if the image format has a number of planes which is not compatible
 ///   with its pixel format
@@ -720,7 +707,6 @@ pub fn describe_acceleration() -> String {
 ///
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
-/// [`size constraints`]: ./struct.ImageFormat.html#note
 /// [`STRIDE_AUTO`]: ./constant.STRIDE_AUTO.html
 pub fn get_buffers_size(
     width: u32,
@@ -730,16 +716,14 @@ pub fn get_buffers_size(
     buffers_size: &mut [usize],
 ) -> Result<(), ErrorKind> {
     let pixel_format = format.pixel_format as u32;
-    let last_plane = format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(pixel_format, width, height, last_plane) {
+    if !pixel_format::is_compatible(pixel_format, format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 
     if pixel_format::get_buffers_size(
-        pixel_format,
+        format.pixel_format,
         width,
         height,
-        last_plane,
         strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
         buffers_size,
     ) {
@@ -765,9 +749,6 @@ pub fn get_buffers_size(
 /// * `dst_buffers` - An array of image buffers in each destination color plane
 ///
 /// # Errors
-///
-/// * [`InvalidValue`] if `width` or `height` violate the [`size constraints`]
-///   that might by imposed by the source and destination image pixel formats
 ///
 /// * [`InvalidValue`] if source or destination image formats have a number of planes
 ///   which is not compatible with their pixel formats
@@ -884,7 +865,6 @@ pub fn get_buffers_size(
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
-/// [`size constraints`]: ./struct.ImageFormat.html#note
 /// [`get_buffers_size`]: ./fn.get_buffers_size.html
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
@@ -915,16 +895,11 @@ pub fn convert_image(
         return Err(ErrorKind::InvalidValue);
     }
 
-    // Cross-correlate pixel format with planes and alignment.
-    // wrapping_sub is wanted. If num_planes is 0, this turns in a very big number that
-    // still represents an invalid number of planes.
-    let last_src_plane = src_format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(src_pixel_format, width, height, last_src_plane) {
+    if !pixel_format::is_compatible(src_pixel_format, src_format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 
-    let last_dst_plane = dst_format.num_planes.wrapping_sub(1);
-    if !pixel_format::is_compatible(dst_pixel_format, width, height, last_dst_plane) {
+    if !pixel_format::is_compatible(dst_pixel_format, dst_format.num_planes) {
         return Err(ErrorKind::InvalidValue);
     }
 
@@ -957,10 +932,8 @@ pub fn convert_image(
             if image_converter(
                 width,
                 height,
-                last_src_plane,
                 src_strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
                 src_buffers,
-                last_dst_plane,
                 dst_strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
                 dst_buffers,
             ) {
@@ -987,15 +960,33 @@ pub fn initialize_with_instruction_set(instruction_set: &str) {
 pub mod c_api {
     #![allow(clippy::wildcard_imports)]
     use super::*; // We are importing everything
+    use core::cmp;
+    use core::ffi::c_char;
+    use core::mem::{MaybeUninit, transmute};
+    use core::slice;
     use pixel_format::{MAX_NUMBER_OF_PLANES, are_planes_compatible};
-    use std::cmp;
-    use std::ffi::CString;
-    use std::mem::{MaybeUninit, transmute};
-    use std::os::raw::c_char;
-    use std::ptr;
-    use std::slice;
 
     type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
+
+    // C enums are untrusted in the sense you can cast any value to an enum type
+    #[repr(C)]
+    pub struct ImageFormat {
+        pixel_format: i32,
+        color_space: i32,
+        num_planes: u32,
+    }
+
+    impl TryFrom<&ImageFormat> for crate::ImageFormat {
+        type Error = ();
+
+        fn try_from(format: &ImageFormat) -> core::result::Result<Self, Self::Error> {
+            Ok(crate::ImageFormat {
+                pixel_format: PixelFormat::try_from(format.pixel_format)?,
+                color_space: ColorSpace::try_from(format.color_space)?,
+                num_planes: format.num_planes,
+            })
+        }
+    }
 
     #[repr(C)]
     pub enum Result {
@@ -1012,24 +1003,13 @@ pub mod c_api {
     }
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn dcp_describe_acceleration() -> *mut c_char {
-        let acc = describe_acceleration();
-        if let Ok(s) = CString::new(acc) {
-            s.into_raw()
-        } else {
-            let p: *const c_char = ptr::null();
-            p.cast_mut()
-        }
+    pub extern "C" fn dcp_describe_acceleration() -> *const c_char {
+        let context = Context::global();
+        context.acceleration_desc.as_ptr().cast()
     }
 
     #[unsafe(no_mangle)]
-    pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {
-        if !string.is_null() {
-            let _unused = CString::from_raw(string);
-        }
-    }
-
-    #[unsafe(no_mangle)]
+    #[allow(clippy::cast_sign_loss)]
     pub unsafe extern "C" fn dcp_get_buffers_size(
         width: u32,
         height: u32,
@@ -1043,8 +1023,7 @@ pub mod c_api {
             return set_error(error, ErrorKind::InvalidValue);
         }
 
-        // C enums are untrusted in the sense you can cast any value to an enum type
-        let format = &*format;
+        let format: &ImageFormat = &*format;
         let pixel_format = format.pixel_format as u32;
         if !dispatcher::is_pixel_format_valid(pixel_format) {
             return set_error(error, ErrorKind::InvalidValue);
@@ -1065,13 +1044,23 @@ pub mod c_api {
         };
 
         let buffers_size = slice::from_raw_parts_mut(buffers_size, num_planes);
-        match get_buffers_size(width, height, format, strides, buffers_size) {
+        let format = crate::ImageFormat {
+            pixel_format: match PixelFormat::try_from(format.pixel_format) {
+                Ok(pf) => pf,
+                Err(()) => return set_error(error, ErrorKind::InvalidValue),
+            },
+            color_space: ColorSpace::try_from(format.color_space).unwrap_or(ColorSpace::Rgb),
+            num_planes: format.num_planes,
+        };
+
+        match get_buffers_size(width, height, &format, strides, buffers_size) {
             Ok(()) => self::Result::Ok,
             Err(error_kind) => set_error(error, error_kind),
         }
     }
 
     #[unsafe(no_mangle)]
+    #[allow(clippy::cast_sign_loss)]
     pub unsafe extern "C" fn dcp_convert_image(
         width: u32,
         height: u32,
@@ -1092,7 +1081,6 @@ pub mod c_api {
             return set_error(error, ErrorKind::InvalidValue);
         }
 
-        // C enums are untrusted in the sense you can cast any value to an enum type
         let src_format: &ImageFormat = &*src_format;
         let dst_format: &ImageFormat = &*dst_format;
         let src_pixel_format = src_format.pixel_format as u32;
@@ -1114,10 +1102,14 @@ pub mod c_api {
         }
 
         let src_strides = (!src_strides.is_null())
-            .then(|| slice::from_raw_parts(src_strides, MAX_NUMBER_OF_PLANES));
+            .then(|| slice::from_raw_parts(src_strides, src_format.num_planes as usize));
 
+        let Ok(src_format) = crate::ImageFormat::try_from(src_format) else {
+            return set_error(error, ErrorKind::InvalidValue);
+        };
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) = get_buffers_size(width, height, src_format, src_strides, src_sizes)
+        if let Err(error_kind) =
+            get_buffers_size(width, height, &src_format, src_strides, src_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1141,10 +1133,14 @@ pub mod c_api {
         };
 
         let dst_strides = (!dst_strides.is_null())
-            .then(|| slice::from_raw_parts(dst_strides, MAX_NUMBER_OF_PLANES));
+            .then(|| slice::from_raw_parts(dst_strides, dst_format.num_planes as usize));
 
+        let Ok(dst_format) = crate::ImageFormat::try_from(dst_format) else {
+            return set_error(error, ErrorKind::InvalidValue);
+        };
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) = get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)
+        if let Err(error_kind) =
+            get_buffers_size(width, height, &dst_format, dst_strides, dst_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1170,10 +1166,10 @@ pub mod c_api {
         match convert_image(
             width,
             height,
-            src_format,
+            &src_format,
             src_strides,
             &src_buffers[..],
-            dst_format,
+            &dst_format,
             dst_strides,
             &mut dst_buffers[..],
         ) {

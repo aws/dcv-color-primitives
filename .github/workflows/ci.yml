@@ -29,7 +29,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-targets -- -D warnings
+          args: --all-targets --features std -- -D warnings
 
   build:
     name: Build (${{matrix.os}}, Rust ${{matrix.rust}})
@@ -64,20 +64,20 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose
+          args: --verbose --features std
 
       - name: Test (instruction sets)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --tests --features "test_instruction_sets"
+          args: --verbose --tests --features "test_instruction_sets" --features std
 
       # Generate assembly for automatic inspection
       - name: Emit ASM
         uses: actions-rs/cargo@v1
         with:
           command: rustc
-          args: --release -- --emit asm
+          args: --release --lib -- --emit asm
 
       - name: Check ASM
         run: |
@@ -125,12 +125,12 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - name: Sanitizer
-        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu
+        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features std
         env:
           RUSTFLAGS: -Zsanitizer=address
 
       - name: Sanitizer (instruction sets)
-        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets"
+        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets" --features std
         env:
           RUSTFLAGS: -Zsanitizer=address
 
@@ -151,7 +151,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Coverage
-        run: cargo +nightly llvm-cov test --features "test_instruction_sets" --lcov --output-path lcov.info
+        run: cargo +nightly llvm-cov test --features "test_instruction_sets" --features std --lcov --output-path lcov.info
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5

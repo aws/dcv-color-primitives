@@ -14,6 +14,8 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+use core::fmt;
+
 /// An enumeration of supported color models.
 ///
 /// It includes:
@@ -22,7 +24,6 @@
 /// * Range (headroom / footroom)
 /// * Primaries
 #[derive(Copy, Clone, Debug)]
-#[repr(C)]
 pub enum ColorSpace {
     /// Gamma-corrected R'G'B'.
     /// The gamma is the one defined in ITU-R Recommendation BT.709-6 page 3, item 1.2
@@ -41,15 +42,30 @@ pub enum ColorSpace {
     Bt709FR,
 }
 
-impl std::fmt::Display for ColorSpace {
+impl fmt::Display for ColorSpace {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ColorSpace::Rgb => write!(f, "rgb"),
             ColorSpace::Bt601 => write!(f, "bt-601"),
             ColorSpace::Bt709 => write!(f, "bt-709"),
             ColorSpace::Bt601FR => write!(f, "bt-601-fr"),
             ColorSpace::Bt709FR => write!(f, "bt-709-fr"),
+        }
+    }
+}
+
+impl TryFrom<i32> for ColorSpace {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(ColorSpace::Rgb),
+            1 => Ok(ColorSpace::Bt601),
+            2 => Ok(ColorSpace::Bt709),
+            3 => Ok(ColorSpace::Bt601FR),
+            4 => Ok(ColorSpace::Bt709FR),
+            _ => Err(()),
         }
     }
 }

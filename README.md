@@ -17,7 +17,7 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support ARM (aarch64)[**]
 * Support WebAssembly[*]
 
-[*]: Supplemental cpu extension sets not yet supported.  
+[*]: Supplemental cpu extension sets not yet supported.
 [**]: Neon cpu extension sets supported for rgb and rgb to yuv conversions
 
 ## Image format conversion
@@ -76,12 +76,12 @@ cargo build --release
 
 Run unit tests:
 ```
-cargo test
+cargo test --features std
 ```
 
 Run benchmark:
 ```
-cargo bench
+cargo bench --features std
 ```
 
 Advanced benchmark mode.
@@ -124,7 +124,7 @@ wasm-pack test --node
 
 ### Image conversion
 
-Convert an image from bgra to nv12 (single plane) format containing yuv in BT601:
+Convert an image from bgra to nv12 (two planes) format containing yuv in BT601:
 
 ```rust
 use dcv_color_primitives as dcp;
@@ -134,8 +134,9 @@ fn main() {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
-    let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
-    let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
+    let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
+    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
+    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -146,7 +147,7 @@ fn main() {
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 1,
+        num_planes: 2,
     };
 
     convert_image(
@@ -154,10 +155,10 @@ fn main() {
         HEIGHT,
         &src_format,
         None,
-        &[&*src_data],
+        &[&src_data],
         &dst_format,
         None,
-        &mut [&mut *dst_data],
+        &mut [&mut y_data, &mut uv_data],
     );
 }
 ```
@@ -184,19 +185,20 @@ fn main() {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
-    let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
-    let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
+    let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
+    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
+    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Bt709,
+        color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 1,
+        num_planes: 2,
     };
 
     let status = convert_image(
@@ -204,10 +206,10 @@ fn main() {
         HEIGHT,
         &src_format,
         None,
-        &[&*src_data],
+        &[&src_data],
         &dst_format,
         None,
-        &mut [&mut *dst_data],
+        &mut [&mut y_data, &mut uv_data],
     );
 
     match status {
@@ -220,26 +222,26 @@ fn main() {
 Even better, you might want to propagate errors to the caller function or mix with some other error types:
 ```rust
 use dcv_color_primitives as dcp;
-use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
-use std::error;
+use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
-fn main() -> Result<(), Box<dyn error::Error>> {
+fn main() -> Result<(), ErrorKind> {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
 
-    let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
-    let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
+    let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
+    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
+    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Bt709,
+        color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 1,
+        num_planes: 2,
     };
 
     convert_image(
@@ -247,10 +249,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         HEIGHT,
         &src_format,
         None,
-        &[&*src_data],
+        &[&src_data],
         &dst_format,
         None,
-        &mut [&mut *dst_data],
+        &mut [&mut y_data, &mut uv_data],
     )?;
 
     Ok(())
@@ -265,10 +267,9 @@ and size:
 
 ```rust
 use dcv_color_primitives as dcp;
-use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-use std::error;
+use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
-fn main() -> Result<(), Box<dyn error::Error>> {
+fn main() -> Result<(), ErrorKind> {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_PLANES: u32 = 1;
@@ -279,10 +280,10 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         num_planes: NUM_PLANES,
     };
 
-    let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
-    get_buffers_size(WIDTH, HEIGHT, &format, None, sizes)?;
+    let mut sizes = [0usize; NUM_PLANES as usize];
+    get_buffers_size(WIDTH, HEIGHT, &format, None, &mut sizes)?;
 
-    let buffer: Vec<_> = vec![0u8; sizes[0]];
+    let buffer = vec![0u8; sizes[0]];
 
     // Do something with buffer
     // --snip--
@@ -297,10 +298,9 @@ If your data is scattered in multiple buffers that are not necessarily contiguou
 
 ```rust
 use dcv_color_primitives as dcp;
-use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-use std::error;
+use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
-fn main() -> Result<(), Box<dyn error::Error>> {
+fn main() -> Result<(), ErrorKind> {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_SRC_PLANES: u32 = 2;
@@ -312,11 +312,11 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         num_planes: NUM_SRC_PLANES,
     };
 
-    let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
-    get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_sizes)?;
+    let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
+    get_buffers_size(WIDTH, HEIGHT, &src_format, None, &mut src_sizes)?;
 
-    let src_y: Vec<_> = vec![0u8; src_sizes[0]];
-    let src_uv: Vec<_> = vec![0u8; src_sizes[1]];
+    let src_y = vec![0u8; src_sizes[0]];
+    let src_uv = vec![0u8; src_sizes[1]];
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -324,20 +324,20 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         num_planes: NUM_DST_PLANES,
     };
 
-    let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
-    get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
+    let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
+    get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
 
-    let mut dst_rgba: Vec<_> = vec![0u8; dst_sizes[0]];
+    let mut dst_data = vec![0u8; dst_sizes[0]];
 
     convert_image(
         WIDTH,
         HEIGHT,
         &src_format,
         None,
-        &[&src_y[..], &src_uv[..]],
+        &[&src_y, &src_uv],
         &dst_format,
         None,
-        &mut [&mut dst_rgba[..]],
+        &mut [&mut dst_data],
     )?;
 
     Ok(())
@@ -350,15 +350,14 @@ To take into account data which is not tightly packed, you can provide image str
 
 ```rust
 use dcv_color_primitives as dcp;
-use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
-use std::error;
+use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
 
-fn main() -> Result<(), Box<dyn error::Error>> {
+fn main() -> Result<(), ErrorKind> {
     const WIDTH: u32 = 640;
     const HEIGHT: u32 = 480;
     const NUM_SRC_PLANES: u32 = 1;
     const NUM_DST_PLANES: u32 = 2;
-    const RGB_STRIDE: usize = 4 * (((3 * (WIDTH as usize)) + 3) / 4);
+    const RGB_STRIDE: usize = 4 * (3 * (WIDTH as usize)).div_ceil(4);
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgr,
@@ -366,12 +365,12 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         num_planes: NUM_SRC_PLANES,
     };
 
-    let src_strides: &[usize] = &[RGB_STRIDE];
+    let src_strides = [RGB_STRIDE];
 
-    let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
-    get_buffers_size(WIDTH, HEIGHT, &src_format, Some(src_strides), src_sizes)?;
+    let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
+    get_buffers_size(WIDTH, HEIGHT, &src_format, Some(&src_strides), &mut src_sizes)?;
 
-    let src_rgba: Vec<_> = vec![0u8; src_sizes[0]];
+    let src_data = vec![0u8; src_sizes[0]];
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
@@ -379,21 +378,21 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         num_planes: NUM_DST_PLANES,
     };
 
-    let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
-    get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
+    let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
+    get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
 
-    let mut dst_y: Vec<_> = vec![0u8; dst_sizes[0]];
-    let mut dst_uv: Vec<_> = vec![0u8; dst_sizes[1]];
+    let mut dst_y = vec![0u8; dst_sizes[0]];
+    let mut dst_uv = vec![0u8; dst_sizes[1]];
 
     convert_image(
         WIDTH,
         HEIGHT,
         &src_format,
-        Some(src_strides),
-        &[&src_rgba[..]],
+        Some(&src_strides),
+        &[&src_data],
         &dst_format,
         None,
-        &mut [&mut dst_y[..], &mut dst_uv[..]],
+        &mut [&mut dst_y, &mut dst_uv],
     )?;
 
     Ok(())
@@ -407,10 +406,7 @@ See documentation for further information.
 DCV Color Primitives provides C bindings. A static library will be automatically generated for the
 default build.
 
-In order to include DCV Color Primitives inside your application library, you need to:
-* Statically link to dcv_color_primitives
-* Link to ws2_32.lib, userenv.lib, bcrypt.lib and ntdll.lib, for Windows
-* Link to libdl and libm, for Linux
+In order to include DCV Color Primitives inside your application library, you need to statically link to dcv_color_primitives
 
 The API is slightly different than the rust one. Check dcv_color_primitives.h for examples and further information.
 

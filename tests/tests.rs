@@ -16,7 +16,10 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
-#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "aarch64"),
+    not(feature = "test_instruction_sets")
+))]
 use std::{
     alloc::{Layout, alloc, alloc_zeroed, dealloc},
     ptr::write_bytes,
@@ -43,9 +46,6 @@ const PIXEL_FORMATS: &[PixelFormat; 9] = &[
     PixelFormat::Nv12,
 ];
 
-const PIXEL_FORMAT_I422: u32 = PixelFormat::I422 as u32;
-const PIXEL_FORMAT_I420: u32 = PixelFormat::I420 as u32;
-
 const NUM_LOG2_DEN: [[usize; 2]; 9] = [
     [4, 0],
     [4, 0],
@@ -65,8 +65,8 @@ const NUM_LOG2_DEN_PER_PLANE: [[usize; (2 * MAX_NUMBER_OF_PLANES) as usize]; 9] 
     [4, 0, 0, 0, 0, 0],
     [3, 0, 0, 0, 0, 0],
     [1, 0, 1, 0, 1, 0],
+    [1, 0, 1, 0, 1, 0],
     [1, 0, 1, 1, 1, 1],
-    [1, 0, 1, 2, 1, 2],
     [1, 0, 1, 1, 0, 0],
 ];
 
@@ -78,18 +78,11 @@ macro_rules! set_expected {
     };
 }
 
-fn is_valid_format(format: &ImageFormat, width: u32, height: u32) -> bool {
+fn is_valid_format(format: &ImageFormat) -> bool {
     match format.pixel_format {
-        PixelFormat::I444 => format.num_planes != 3,
-        PixelFormat::I422 | PixelFormat::I420 => {
-            format.num_planes != 3 || (width & 1) == 1 || (height & 1) == 1
-        }
-        PixelFormat::Nv12 => {
-            (format.num_planes < 1 || format.num_planes > 2)
-                || (width & 1) == 1
-                || (height & 1) == 1
-        }
-        _ => format.num_planes != 1,
+        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => format.num_planes == 3,
+        PixelFormat::Nv12 => format.num_planes == 2,
+        _ => format.num_planes == 1,
     }
 }
 
@@ -104,8 +97,8 @@ fn bootstrap() {
 
 #[test]
 fn buffers_size() {
-    const WIDTH: u32 = 4098;
-    const HEIGHT: u32 = 258;
+    const WIDTH: u32 = 4097;
+    const HEIGHT: u32 = 257;
     let buffers_size = &mut [0_usize; MAX_NUMBER_OF_PLANES as usize];
 
     for (num_planes, pixel_format) in iproduct!(0..=MAX_NUMBER_OF_PLANES + 1, PIXEL_FORMATS) {
@@ -116,14 +109,8 @@ fn buffers_size() {
             num_planes,
         };
 
-        // Invalid width
         let mut expected = Ok(());
-        set_expected!(expected, pf >= PIXEL_FORMAT_I422, ErrorKind::InvalidValue);
-        set_expected!(
-            expected,
-            is_valid_format(&format, WIDTH, HEIGHT),
-            ErrorKind::InvalidValue
-        );
+        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
 
         let status = get_buffers_size(1, HEIGHT, &format, None, buffers_size);
         match status {
@@ -131,14 +118,8 @@ fn buffers_size() {
             Err(err) => check_err(err, expected.err().unwrap()),
         }
 
-        // Invalid height
         let mut expected = Ok(());
-        set_expected!(expected, pf >= PIXEL_FORMAT_I420, ErrorKind::InvalidValue);
-        set_expected!(
-            expected,
-            is_valid_format(&format, WIDTH, HEIGHT),
-            ErrorKind::InvalidValue
-        );
+        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
 
         let status = get_buffers_size(WIDTH, 1, &format, None, buffers_size);
         match status {
@@ -148,11 +129,7 @@ fn buffers_size() {
 
         // Test size is valid
         let mut expected = Ok(());
-        set_expected!(
-            expected,
-            is_valid_format(&format, WIDTH, HEIGHT),
-            ErrorKind::InvalidValue
-        );
+        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
 
         let status = get_buffers_size(WIDTH, HEIGHT, &format, None, buffers_size);
         assert_eq!(expected.is_ok(), status.is_ok());
@@ -161,7 +138,9 @@ fn buffers_size() {
             Ok(()) => {
                 let pf = pf as usize;
                 let num_planes = num_planes as usize;
-                let area = (WIDTH as usize) * (HEIGHT as usize);
+                let width = WIDTH as usize;
+                let height = HEIGHT as usize;
+                let area = width * height;
 
                 if num_planes == 1 {
                     assert_eq!(
@@ -172,16 +151,30 @@ fn buffers_size() {
                     let mut strides = Vec::new();
 
                     for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
-                        let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
-                        let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
-                        assert_eq!(*buffer_size, (area * mul) >> shf);
-
-                        let row = match pixel_format {
-                            PixelFormat::I422 | PixelFormat::I420 => i32::from(i > 0),
-                            _ => 0,
+                        let (stride, size) = match pixel_format {
+                            PixelFormat::Nv12 if i > 0 => {
+                                let stride =
+                                    2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                                let height =
+                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                                (stride, stride * height)
+                            }
+                            PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
+                                let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                                let height =
+                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                                (stride, stride * height)
+                            }
+                            _ => {
+                                let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
+                                let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
+                                ((width * mul) >> shf, (area * mul) >> shf)
+                            }
                         };
 
-                        strides.push(((WIDTH as usize) * mul) >> row);
+                        assert_eq!(*buffer_size, size);
+
+                        strides.push(stride);
                     }
 
                     assert!(
@@ -190,11 +183,28 @@ fn buffers_size() {
                     );
 
                     for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
-                        assert_eq!(
-                            *buffer_size,
-                            (area * NUM_LOG2_DEN_PER_PLANE[pf][2 * i])
-                                >> NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]
-                        );
+                        let size = match pixel_format {
+                            PixelFormat::Nv12 if i > 0 => {
+                                let stride =
+                                    2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                                let height =
+                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                                stride * height
+                            }
+                            PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
+                                let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                                let height =
+                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                                stride * height
+                            }
+                            _ => {
+                                let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
+                                let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
+                                (area * mul) >> shf
+                            }
+                        };
+
+                        assert_eq!(*buffer_size, size);
                     }
                 }
 
@@ -208,7 +218,10 @@ fn buffers_size() {
     }
 }
 
-#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "aarch64"),
+    not(feature = "test_instruction_sets")
+))]
 #[test]
 fn over_4gb() {
     // In this test the output image will larger than 4GB:
@@ -225,7 +238,7 @@ fn over_4gb() {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 1,
+        num_planes: 2,
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -233,9 +246,9 @@ fn over_4gb() {
         num_planes: 1,
     };
 
-    let src_size = &mut [0_usize; 1];
-    assert!(get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_size).is_ok());
-    assert_eq!(src_size[0], EXPECTED_SRC_BUFFER_SIZE);
+    let src_sizes = &mut [0_usize; 2];
+    assert!(get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_sizes).is_ok());
+    assert_eq!(src_sizes[0] + src_sizes[1], EXPECTED_SRC_BUFFER_SIZE);
 
     let dst_size = &mut [0_usize; 1];
     assert!(get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_size).is_ok());
@@ -259,7 +272,9 @@ fn over_4gb() {
         let dst_layout = Layout::from_size_align_unchecked(EXPECTED_DST_BUFFER_SIZE, 1);
         let dst_ptr = alloc_zeroed(dst_layout);
         if !dst_ptr.is_null() {
-            let src_image: &[u8] = from_raw_parts_mut(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
+            let src_luma: &[u8] = from_raw_parts_mut(src_ptr, LUMA_SIZE);
+            let src_chroma: &[u8] =
+                from_raw_parts_mut(src_ptr.add(LUMA_SIZE), EXPECTED_SRC_BUFFER_SIZE - LUMA_SIZE);
             let dst_image = from_raw_parts_mut(dst_ptr, EXPECTED_DST_BUFFER_SIZE);
 
             // Touch output
@@ -269,7 +284,7 @@ fn over_4gb() {
 
             dst_image[dst_image.len() - 1] = 0;
 
-            let src_buffers = &[src_image];
+            let src_buffers = &[src_luma, src_chroma];
             let dst_buffers = &mut [&mut *dst_image];
 
             assert!(
