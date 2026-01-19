@@ -1150,77 +1150,6 @@ pub fn bgra_to_rgb(
     }
 }
 
-#[inline(never)]
-pub fn argb_to_rgb(
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    src_buffer: &[u8],
-    dst_stride: usize,
-    dst_buffer: &mut [u8],
-) {
-    const SRC_DEPTH: usize = 4;
-    const DST_DEPTH: usize = 3;
-    const ITEMS_PER_ITERATION_4X: usize = 8;
-    const HIGH_MASK: u64 = 0x0000_FFFF_FF00_0000;
-    const LOW_MASK: u64 = 0x0000_0000_00FF_FFFF;
-
-    let src_stride_diff = src_stride - (SRC_DEPTH * width);
-    let dst_stride_diff = dst_stride - (DST_DEPTH * width);
-    let limit_4x = lower_multiple_of_pot(width, ITEMS_PER_ITERATION_4X);
-
-    unsafe {
-        let src_group = src_buffer.as_ptr();
-        let dst_group = dst_buffer.as_mut_ptr();
-
-        for i in 0..height {
-            let mut y = 0;
-            let mut src_offset = ((SRC_DEPTH * width) + src_stride_diff) * i;
-            let mut dst_offset = ((DST_DEPTH * width) + dst_stride_diff) * i;
-
-            while y < limit_4x {
-                let src_ptr: *const u64 = src_group.add(src_offset).cast();
-                let bgra0 = loadu(src_ptr);
-                let bgra1 = loadu(src_ptr.add(1));
-                let bgra2 = loadu(src_ptr.add(2));
-                let bgra3 = loadu(src_ptr.add(3));
-
-                // Checked: we want to reinterpret the bits
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    clippy::cast_sign_loss,
-                    clippy::cast_possible_wrap
-                )]
-                let (rgb0, rgb1, rgb2, rgb3) = (
-                    ((((bgra0 >> 16) & HIGH_MASK) | ((bgra0 >> 8) & LOW_MASK)) as i64) as u64,
-                    ((((bgra1 >> 16) & HIGH_MASK) | ((bgra1 >> 8) & LOW_MASK)) as i64) as u64,
-                    ((((bgra2 >> 16) & HIGH_MASK) | ((bgra2 >> 8) & LOW_MASK)) as i64) as u64,
-                    ((((bgra3 >> 16) & HIGH_MASK) | ((bgra3 >> 8) & LOW_MASK)) as i64) as u64,
-                );
-
-                let dst_ptr: *mut u64 = dst_group.add(dst_offset).cast();
-                storeu(dst_ptr, (rgb1 << 48) | rgb0);
-                storeu(dst_ptr.add(1), (rgb1 >> 16) | (rgb2 << 32));
-                storeu(dst_ptr.add(2), (rgb2 >> 32) | (rgb3 << 16));
-
-                src_offset += SRC_DEPTH * ITEMS_PER_ITERATION_4X;
-                dst_offset += DST_DEPTH * ITEMS_PER_ITERATION_4X;
-                y += ITEMS_PER_ITERATION_4X;
-            }
-
-            while y < width {
-                *dst_group.add(dst_offset) = *src_group.add(src_offset);
-                *dst_group.add(dst_offset + 1) = *src_group.add(src_offset + 1);
-                *dst_group.add(dst_offset + 2) = *src_group.add(src_offset + 2);
-
-                src_offset += SRC_DEPTH;
-                dst_offset += DST_DEPTH;
-                y += 1;
-            }
-        }
-    }
-}
-
 // Internal module functions
 #[inline(never)]
 fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
@@ -1763,53 +1692,6 @@ pub fn bgra_rgb(
     }
 
     bgra_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
-
-    true
-}
-
-pub fn argb_rgb(
-    width: u32,
-    height: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    const SRC_DEPTH: usize = 4;
-    const DST_DEPTH: usize = 3;
-
-    // Degenerate case, trivially accept
-    if width == 0 || height == 0 {
-        return true;
-    }
-
-    // Check there are sufficient strides and buffers
-    if src_strides.is_empty()
-        || src_buffers.is_empty()
-        || dst_strides.is_empty()
-        || dst_buffers.is_empty()
-    {
-        return false;
-    }
-
-    let w = width as usize;
-    let h = height as usize;
-
-    // Compute actual strides
-    let src_stride = compute_stride(src_strides[0], SRC_DEPTH * w);
-    let dst_stride = compute_stride(dst_strides[0], DST_DEPTH * w);
-
-    // Ensure there is sufficient data in the buffers according
-    // to the image dimensions and computed strides
-    let src_buffer = src_buffers[0];
-    let dst_buffer = &mut *dst_buffers[0];
-    if out_of_bounds(src_buffer.len(), src_stride, h - 1, SRC_DEPTH * w)
-        || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, DST_DEPTH * w)
-    {
-        return false;
-    }
-
-    argb_to_rgb(w, h, src_stride, src_buffer, dst_stride, dst_buffer);
 
     true
 }

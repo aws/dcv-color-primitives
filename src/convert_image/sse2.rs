@@ -1867,24 +1867,6 @@ pub fn bgra_rgb(
     )
 }
 
-pub fn argb_rgb(
-    width: u32,
-    height: u32,
-    src_strides: &[usize],
-    src_buffers: &[&[u8]],
-    dst_strides: &[usize],
-    dst_buffers: &mut [&mut [u8]],
-) -> bool {
-    x86::argb_rgb(
-        width,
-        height,
-        src_strides,
-        src_buffers,
-        dst_strides,
-        dst_buffers,
-    )
-}
-
 pub fn rgb_bgra(
     width: u32,
     height: u32,
