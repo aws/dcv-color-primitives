@@ -393,36 +393,7 @@ unsafe fn sum_i16x2_neighborhood_4x(xy0: __m256i, xy1: __m256i) -> __m256i {
 
 /// Convert linear rgb to yuv colorspace (8-wide)
 #[inline(always)]
-unsafe fn rgb_to_yuv_8x<const SAMPLER: usize>(
-    rgb0: *const u8,
-    rgb1: *const u8,
-    y0: *mut u8,
-    y1: *mut u8,
-    uv: *mut u8,
-    y_weigths: &[__m256i; 3],
-    uv_weights: &[__m256i; 3],
-) {
-    let (rg0, bg0) = unpack_ui8x3_i16x2_8x::<SAMPLER>(rgb0);
-    pack_i32_8x(
-        y0,
-        fix_to_i32_8x!(affine_transform(rg0, bg0, y_weigths), FIX16),
-    );
-
-    let (rg1, bg1) = unpack_ui8x3_i16x2_8x::<SAMPLER>(rgb1);
-    pack_i32_8x(
-        y1,
-        fix_to_i32_8x!(affine_transform(rg1, bg1, y_weigths), FIX16),
-    );
-
-    let srg = sum_i16x2_neighborhood_4x(rg0, rg1);
-    let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
-    let t = affine_transform(srg, sbg, uv_weights);
-
-    pack_i32_8x(uv, fix_to_i32_8x!(t, FIX18));
-}
-
-#[inline(always)]
-unsafe fn rgb_to_i420_8x<const SAMPLER: usize>(
+unsafe fn rgb_to_subsampled_yuv_8x<const SAMPLER: usize, const BIPLANAR: bool>(
     rgb0: *const u8,
     rgb1: *const u8,
     y0: *mut u8,
@@ -448,29 +419,33 @@ unsafe fn rgb_to_i420_8x<const SAMPLER: usize>(
     let sbg = sum_i16x2_neighborhood_4x(bg0, bg1);
     let t = affine_transform(srg, sbg, uv_weights);
 
-    let shuff = _mm256_permutevar8x32_epi32(
-        fix_to_i32_8x!(t, FIX18),
-        _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0),
-    );
+    if BIPLANAR {
+        pack_i32_8x(u, fix_to_i32_8x!(t, FIX18));
+    } else {
+        let shuff = _mm256_permutevar8x32_epi32(
+            fix_to_i32_8x!(t, FIX18),
+            _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0),
+        );
 
-    let packed_to_32 = _mm256_packs_epi32(shuff, shuff);
-    let packed_to_16 = _mm256_packus_epi16(packed_to_32, packed_to_32);
-    let permuted = _mm256_permutevar8x32_epi32(packed_to_16, pack_lo_dword_2x128!());
+        let packed_to_32 = _mm256_packs_epi32(shuff, shuff);
+        let packed_to_16 = _mm256_packus_epi16(packed_to_32, packed_to_32);
+        let permuted = _mm256_permutevar8x32_epi32(packed_to_16, pack_lo_dword_2x128!());
 
-    // Checked: we want to reinterpret the bits
-    #[allow(clippy::cast_sign_loss)]
-    let uv_res = _mm256_extract_epi64(permuted, 0) as u64;
+        // Checked: we want to reinterpret the bits
+        #[allow(clippy::cast_sign_loss)]
+        let uv_res = _mm256_extract_epi64(permuted, 0) as u64;
 
-    // Checked: we are extracting the lower and upper part of a 64-bit integer
-    #[allow(clippy::cast_possible_truncation)]
-    {
-        storeu(u.cast(), uv_res as u32);
-        storeu(v.cast(), (uv_res >> 32) as u32);
+        // Checked: we are extracting the lower and upper part of a 64-bit integer
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            storeu(u.cast(), uv_res as u32);
+            storeu(v.cast(), (uv_res >> 32) as u32);
+        }
     }
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i444_8x<const SAMPLER: usize>(
+unsafe fn rgb_to_yuv_8x<const SAMPLER: usize>(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
@@ -501,68 +476,18 @@ const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn rgb_to_nv12_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    src_buffer: &[u8],
-    dst_strides: (usize, usize),
-    dst_buffers: &mut (&mut [u8], &mut [u8]),
-) {
-    const DST_DEPTH: usize = RGB_TO_YUV_WAVES;
-
-    let (y_stride, uv_stride) = dst_strides;
-
-    let weights = &FORWARD_WEIGHTS[COLORIMETRY];
-    let y_weigths = [
-        _mm256_set1_epi32(weights[0]),
-        _mm256_set1_epi32(weights[1]),
-        _mm256_set1_epi32(weights[6]),
-    ];
-
-    let uv_weights = [
-        _mm256_set_epi32(
-            weights[2], weights[3], weights[2], weights[3], weights[2], weights[3], weights[2],
-            weights[3],
-        ),
-        _mm256_set_epi32(
-            weights[4], weights[5], weights[4], weights[5], weights[4], weights[5], weights[4],
-            weights[5],
-        ),
-        _mm256_set1_epi32(FIX18_C_HALF + (FIX18_HALF - 1)),
-    ];
-
-    let src_group = src_buffer.as_ptr();
-    let y_group = dst_buffers.0.as_mut_ptr();
-    let uv_group = dst_buffers.1.as_mut_ptr();
-
-    let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = height / 2;
-    for y in 0..wg_height {
-        for x in 0..wg_width {
-            rgb_to_yuv_8x::<SAMPLER>(
-                src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
-                src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
-                y_group.add(wg_index(x, 2 * y + 1, DST_DEPTH, y_stride)),
-                uv_group.add(wg_index(x, y, DST_DEPTH, uv_stride)),
-                &y_weigths,
-                &uv_weights,
-            );
-        }
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_subsampled_yuv_avx2<
+    const SAMPLER: usize,
+    const DEPTH: usize,
+    const BIPLANAR: bool,
+    const COLORIMETRY: usize,
+>(
     width: usize,
     height: usize,
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
-    dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
+    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
 
@@ -595,13 +520,23 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let wg_height = height / 2;
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i420_8x::<SAMPLER>(
+            let (u_data, v_data) = if BIPLANAR {
+                let uv_data = u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride));
+                (uv_data, uv_data)
+            } else {
+                (
+                    u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
+                    v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
+                )
+            };
+
+            rgb_to_subsampled_yuv_8x::<SAMPLER, BIPLANAR>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, 2 * y + 1, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
+                u_data,
+                v_data,
                 &y_weigths,
                 &uv_weights,
             );
@@ -611,7 +546,7 @@ unsafe fn rgb_to_i420_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_yuv_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -649,7 +584,7 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
     let wg_width = width / RGB_TO_YUV_WAVES;
     for y in 0..height {
         for x in 0..wg_width {
-            rgb_to_i444_8x::<SAMPLER>(
+            rgb_to_yuv_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
@@ -664,18 +599,23 @@ unsafe fn rgb_to_i444_avx2<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
+unsafe fn subsampled_yuv_to_rgb_avx2<
+    const COLORIMETRY: usize,
+    const DEPTH: usize,
+    const REVERSED: bool,
+    const BIPLANAR: bool,
+>(
     width: usize,
     height: usize,
-    src_strides: (usize, usize),
-    src_buffers: (&[u8], &[u8]),
+    src_strides: (usize, usize, usize),
+    src_buffers: (&[u8], &[u8], &[u8]),
     dst_stride: usize,
     dst_buffer: &mut [u8],
 ) {
     const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
-    const DST_DEPTH: usize = if DEPTH == 4 { 2 * YUV_TO_RGB_WAVES } else { 48 };
+    const DST_DEPTH: usize = DEPTH * 16;
 
-    let (y_stride, uv_stride) = src_strides;
+    let (y_stride, u_stride, v_stride) = src_strides;
 
     let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
     let xxym = _mm256_set1_epi16(weights[0]);
@@ -688,7 +628,8 @@ unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const R
     let bn = _mm256_set1_epi16(weights[7]);
 
     let y_group = src_buffers.0.as_ptr();
-    let uv_group = src_buffers.1.as_ptr();
+    let u_group = src_buffers.1.as_ptr();
+    let v_group = src_buffers.2.as_ptr();
     let dst_group = dst_buffer.as_mut_ptr();
 
     let wg_width = width / YUV_TO_RGB_WAVES;
@@ -696,8 +637,13 @@ unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const R
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            let (cb, cr) =
-                unpack_ui8x2_i16be_16x(uv_group.add(wg_index(x, y, SRC_DEPTH, uv_stride)));
+            let (cb, cr) = if BIPLANAR {
+                unpack_ui8x2_i16be_16x(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)))
+            } else {
+                let cb = unpack_ui8_i16be_16x(u_group.add(wg_index(x, y, SRC_DEPTH / 2, u_stride)));
+                let cr = unpack_ui8_i16be_16x(v_group.add(wg_index(x, y, SRC_DEPTH / 2, v_stride)));
+                (cb, cr)
+            };
 
             let sb = _mm256_sub_epi16(_mm256_mulhi_epu16(cb, bcbm), bn);
             let sr = _mm256_sub_epi16(_mm256_mulhi_epu16(cr, rcrm), rn);
@@ -819,247 +765,7 @@ unsafe fn nv12_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const R
 
 #[inline]
 #[target_feature(enable = "avx2")]
-unsafe fn i420_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
-    width: usize,
-    height: usize,
-    src_strides: (usize, usize, usize),
-    src_buffers: (&[u8], &[u8], &[u8]),
-    dst_stride: usize,
-    dst_buffer: &mut [u8],
-) {
-    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
-    const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
-
-    let (y_stride, u_stride, v_stride) = src_strides;
-
-    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
-    let xxym = _mm256_set1_epi16(weights[0]);
-    let rcrm = _mm256_set1_epi16(weights[1]);
-    let gcrm = _mm256_set1_epi16(weights[2]);
-    let gcbm = _mm256_set1_epi16(weights[3]);
-    let bcbm = _mm256_set1_epi16(weights[4]);
-    let rn = _mm256_set1_epi16(weights[5]);
-    let gp = _mm256_set1_epi16(weights[6]);
-    let bn = _mm256_set1_epi16(weights[7]);
-
-    let y_group = src_buffers.0.as_ptr();
-    let u_group = src_buffers.1.as_ptr();
-    let v_group = src_buffers.2.as_ptr();
-    let dst_group = dst_buffer.as_mut_ptr();
-
-    let wg_width = width / YUV_TO_RGB_WAVES;
-    let wg_height = height / 2;
-
-    for y in 0..wg_height {
-        for x in 0..wg_width {
-            let cb = unpack_ui8_i16be_16x(u_group.add(wg_index(x, y, SRC_DEPTH / 2, u_stride)));
-            let cr = unpack_ui8_i16be_16x(v_group.add(wg_index(x, y, SRC_DEPTH / 2, v_stride)));
-
-            let sb = _mm256_sub_epi16(_mm256_mulhi_epu16(cb, bcbm), bn);
-            let sr = _mm256_sub_epi16(_mm256_mulhi_epu16(cr, rcrm), rn);
-            let sg = _mm256_sub_epi16(
-                gp,
-                _mm256_add_epi16(_mm256_mulhi_epu16(cb, gcbm), _mm256_mulhi_epu16(cr, gcrm)),
-            );
-
-            let (sb_lo, sb_hi) = i16_to_i16x2_16x(sb);
-            let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
-            let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
-
-            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
-
-            let y00 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y0),
-                    _mm256_unpackhi_epi8(zero!(), y0),
-                    PACK_LO_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_i16x3_16x::<REVERSED>(
-                dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y00), FIX6),
-            );
-
-            let y10 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y0),
-                    _mm256_unpackhi_epi8(zero!(), y0),
-                    PACK_HI_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_i16x3_16x::<REVERSED>(
-                dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
-            );
-
-            let y1 = loadu(
-                y_group
-                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
-                    .cast(),
-            );
-
-            let y01 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y1),
-                    _mm256_unpackhi_epi8(zero!(), y1),
-                    PACK_LO_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_i16x3_16x::<REVERSED>(
-                dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y01), FIX6),
-            );
-
-            let y11 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y1),
-                    _mm256_unpackhi_epi8(zero!(), y1),
-                    PACK_HI_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_i16x3_16x::<REVERSED>(
-                dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y11), FIX6),
-            );
-        }
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn i420_to_rgb_avx2<const COLORIMETRY: usize>(
-    width: usize,
-    height: usize,
-    src_strides: (usize, usize, usize),
-    src_buffers: (&[u8], &[u8], &[u8]),
-    dst_stride: usize,
-    dst_buffer: &mut [u8],
-) {
-    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES;
-    const DST_DEPTH: usize = 48;
-
-    let (y_stride, u_stride, v_stride) = src_strides;
-
-    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
-    let xxym = _mm256_set1_epi16(weights[0]);
-    let rcrm = _mm256_set1_epi16(weights[1]);
-    let gcrm = _mm256_set1_epi16(weights[2]);
-    let gcbm = _mm256_set1_epi16(weights[3]);
-    let bcbm = _mm256_set1_epi16(weights[4]);
-    let rn = _mm256_set1_epi16(weights[5]);
-    let gp = _mm256_set1_epi16(weights[6]);
-    let bn = _mm256_set1_epi16(weights[7]);
-
-    let y_group = src_buffers.0.as_ptr();
-    let u_group = src_buffers.1.as_ptr();
-    let v_group = src_buffers.2.as_ptr();
-    let dst_group = dst_buffer.as_mut_ptr();
-
-    let wg_width = width / YUV_TO_RGB_WAVES;
-    let wg_height = height / 2;
-
-    for y in 0..wg_height {
-        for x in 0..wg_width {
-            let cb = unpack_ui8_i16be_16x(u_group.add(wg_index(x, y, SRC_DEPTH / 2, u_stride)));
-            let cr = unpack_ui8_i16be_16x(v_group.add(wg_index(x, y, SRC_DEPTH / 2, v_stride)));
-
-            let sb = _mm256_sub_epi16(_mm256_mulhi_epu16(cb, bcbm), bn);
-            let sr = _mm256_sub_epi16(_mm256_mulhi_epu16(cr, rcrm), rn);
-            let sg = _mm256_sub_epi16(
-                gp,
-                _mm256_add_epi16(_mm256_mulhi_epu16(cb, gcbm), _mm256_mulhi_epu16(cr, gcrm)),
-            );
-
-            let (sb_lo, sb_hi) = i16_to_i16x2_16x(sb);
-            let (sr_lo, sr_hi) = i16_to_i16x2_16x(sr);
-            let (sg_lo, sg_hi) = i16_to_i16x2_16x(sg);
-
-            let y0 = loadu(y_group.add(wg_index(x, 2 * y, SRC_DEPTH, y_stride)).cast());
-
-            let y00 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y0),
-                    _mm256_unpackhi_epi8(zero!(), y0),
-                    PACK_LO_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_rgb_16x(
-                dst_group.add(wg_index(2 * x, 2 * y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y00), FIX6),
-            );
-
-            let y10 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y0),
-                    _mm256_unpackhi_epi8(zero!(), y0),
-                    PACK_HI_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_rgb_16x(
-                dst_group.add(wg_index(2 * x + 1, 2 * y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
-            );
-
-            let y1 = loadu(
-                y_group
-                    .add(wg_index(x, 2 * y + 1, SRC_DEPTH, y_stride))
-                    .cast(),
-            );
-
-            let y01 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y1),
-                    _mm256_unpackhi_epi8(zero!(), y1),
-                    PACK_LO_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_rgb_16x(
-                dst_group.add(wg_index(2 * x, 2 * y + 1, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y01), FIX6),
-            );
-
-            let y11 = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y1),
-                    _mm256_unpackhi_epi8(zero!(), y1),
-                    PACK_HI_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_rgb_16x(
-                dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y11), FIX6),
-            );
-        }
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
+unsafe fn yuv_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: usize,
     height: usize,
     src_strides: (usize, usize, usize),
@@ -1068,7 +774,7 @@ unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
     dst_buffer: &mut [u8],
 ) {
     const SRC_DEPTH: usize = YUV_TO_RGB_WAVES / 2;
-    const DST_DEPTH: usize = 2 * YUV_TO_RGB_WAVES;
+    const DST_DEPTH: usize = DEPTH * 16;
 
     let (y_stride, u_stride, v_stride) = src_strides;
 
@@ -1135,100 +841,21 @@ unsafe fn i444_to_bgra_avx2<const COLORIMETRY: usize, const REVERSED: bool>(
                 ),
                 xxym,
             );
-            pack_i16x3_16x::<REVERSED>(
-                dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y_lo), FIX6),
-            );
-        }
-    }
-}
-
-#[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn i444_to_rgb_avx2<const COLORIMETRY: usize>(
-    width: usize,
-    height: usize,
-    src_strides: (usize, usize, usize),
-    src_buffers: (&[u8], &[u8], &[u8]),
-    dst_stride: usize,
-    dst_buffer: &mut [u8],
-) {
-    const SRC_DEPTH: usize = YUV_TO_RGB_WAVES / 2;
-    const DST_DEPTH: usize = 48;
-
-    let (y_stride, u_stride, v_stride) = src_strides;
-
-    let weights = &BACKWARD_WEIGHTS[COLORIMETRY];
-    let xxym = _mm256_set1_epi16(weights[0]);
-    let rcrm = _mm256_set1_epi16(weights[1]);
-    let gcrm = _mm256_set1_epi16(weights[2]);
-    let gcbm = _mm256_set1_epi16(weights[3]);
-    let bcbm = _mm256_set1_epi16(weights[4]);
-    let rn = _mm256_set1_epi16(weights[5]);
-    let gp = _mm256_set1_epi16(weights[6]);
-    let bn = _mm256_set1_epi16(weights[7]);
-    let zero_128 = _mm_setzero_si128();
-
-    let y_group = src_buffers.0.as_ptr();
-    let u_group = src_buffers.1.as_ptr();
-    let v_group = src_buffers.2.as_ptr();
-    let dst_group = dst_buffer.as_mut_ptr();
-
-    let wg_width = width / SRC_DEPTH;
-
-    for y in 0..height {
-        for x in 0..wg_width {
-            let cb = _mm256_set_m128i(
-                zero_128,
-                loadu(u_group.add(wg_index(x, y, SRC_DEPTH, u_stride)).cast()),
-            );
-            let cr = _mm256_set_m128i(
-                zero_128,
-                loadu(v_group.add(wg_index(x, y, SRC_DEPTH, v_stride)).cast()),
-            );
-            let y0 = _mm256_set_m128i(
-                zero_128,
-                loadu(y_group.add(wg_index(x, y, SRC_DEPTH, y_stride)).cast()),
-            );
-
-            let cb_lo = _mm256_permute2x128_si256(
-                _mm256_unpacklo_epi8(zero!(), cb),
-                _mm256_unpackhi_epi8(zero!(), cb),
-                PACK_LO_DQWORD_2X256,
-            );
-
-            let cr_lo = _mm256_permute2x128_si256(
-                _mm256_unpacklo_epi8(zero!(), cr),
-                _mm256_unpackhi_epi8(zero!(), cr),
-                PACK_LO_DQWORD_2X256,
-            );
-
-            let sb_lo = _mm256_sub_epi16(_mm256_mulhi_epu16(cb_lo, bcbm), bn);
-            let sr_lo = _mm256_sub_epi16(_mm256_mulhi_epu16(cr_lo, rcrm), rn);
-            let sg_lo = _mm256_sub_epi16(
-                gp,
-                _mm256_add_epi16(
-                    _mm256_mulhi_epu16(cb_lo, gcbm),
-                    _mm256_mulhi_epu16(cr_lo, gcrm),
-                ),
-            );
-
-            let y_lo = _mm256_mulhi_epu16(
-                _mm256_permute2x128_si256(
-                    _mm256_unpacklo_epi8(zero!(), y0),
-                    _mm256_unpackhi_epi8(zero!(), y0),
-                    PACK_LO_DQWORD_2X256,
-                ),
-                xxym,
-            );
-            pack_rgb_16x(
-                dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
-                fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
-                fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y_lo), FIX6),
-            );
+            if DEPTH == 4 {
+                pack_i16x3_16x::<REVERSED>(
+                    dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y_lo), FIX6),
+                );
+            } else {
+                pack_rgb_16x(
+                    dst_group.add(wg_index(x, y, DST_DEPTH, dst_stride)),
+                    fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
+                    fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y_lo), FIX6),
+                );
+            }
         }
     }
 }
@@ -1753,11 +1380,11 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 && vector_height > 0 {
         unsafe {
-            nv12_to_rgb_avx2::<COLORIMETRY, DEPTH, REVERSED>(
+            subsampled_yuv_to_rgb_avx2::<COLORIMETRY, DEPTH, REVERSED, true>(
                 width,
                 height,
-                src_strides,
-                src_buffers,
+                (src_strides.0, src_strides.1, src_strides.1),
+                (src_buffers.0, src_buffers.1, src_buffers.1),
                 dst_stride,
                 dst_buffer,
             );
@@ -1877,25 +1504,14 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 && vector_height > 0 {
         unsafe {
-            if DEPTH == 4 {
-                i420_to_bgra_avx2::<COLORIMETRY, REVERSED>(
-                    vector_width,
-                    vector_height,
-                    src_strides,
-                    src_buffers,
-                    dst_stride,
-                    dst_buffer,
-                );
-            } else {
-                i420_to_rgb_avx2::<COLORIMETRY>(
-                    vector_width,
-                    vector_height,
-                    src_strides,
-                    src_buffers,
-                    dst_stride,
-                    dst_buffer,
-                );
-            }
+            subsampled_yuv_to_rgb_avx2::<COLORIMETRY, DEPTH, REVERSED, false>(
+                width,
+                height,
+                src_strides,
+                src_buffers,
+                dst_stride,
+                dst_buffer,
+            );
         }
     }
 
@@ -2020,25 +1636,14 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            if DEPTH == 4 {
-                i444_to_bgra_avx2::<COLORIMETRY, REVERSED>(
-                    vector_part,
-                    h,
-                    src_strides,
-                    src_buffers,
-                    dst_stride,
-                    dst_buffer,
-                );
-            } else {
-                i444_to_rgb_avx2::<COLORIMETRY>(
-                    vector_part,
-                    h,
-                    src_strides,
-                    src_buffers,
-                    dst_stride,
-                    dst_buffer,
-                );
-            }
+            yuv_to_rgb_avx2::<COLORIMETRY, DEPTH, REVERSED>(
+                vector_part,
+                h,
+                src_strides,
+                src_buffers,
+                dst_stride,
+                dst_buffer,
+            );
         }
     }
 
@@ -2136,13 +1741,13 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 && vector_height > 0 {
         unsafe {
-            rgb_to_nv12_avx2::<SAMPLER, DEPTH, COLORIMETRY>(
-                vector_width,
-                vector_height,
+            rgb_to_subsampled_yuv_avx2::<SAMPLER, DEPTH, true, COLORIMETRY>(
+                width,
+                height,
                 src_stride,
                 src_buffer,
-                dst_strides,
-                &mut (y_plane, uv_plane),
+                (dst_strides.0, dst_strides.1, dst_strides.1),
+                (dst_buffers.0, dst_buffers.1, dst_buffers.1),
             );
         }
     }
@@ -2240,13 +1845,13 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 {
         unsafe {
-            rgb_to_i420_avx2::<SAMPLER, DEPTH, COLORIMETRY>(
-                vector_width,
-                vector_height,
+            rgb_to_subsampled_yuv_avx2::<SAMPLER, DEPTH, false, COLORIMETRY>(
+                width,
+                height,
                 src_stride,
                 src_buffer,
                 dst_strides,
-                &mut (y_plane, u_plane, v_plane),
+                (dst_buffers.0, dst_buffers.1, dst_buffers.2),
             );
         }
     }
@@ -2344,7 +1949,7 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            rgb_to_i444_avx2::<SAMPLER, DEPTH, COLORIMETRY>(
+            rgb_to_yuv_avx2::<SAMPLER, DEPTH, COLORIMETRY>(
                 vector_part,
                 h,
                 src_stride,
