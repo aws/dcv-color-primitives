@@ -441,15 +441,14 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     let w = width as usize;
     let h = height as usize;
-    let ch = h.div_ceil(2);
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
-    let uv_stride = 2 * w.div_ceil(2);
 
     // Compute actual strides
     let src_stride = compute_stride(src_strides[0], rgb_stride);
     let dst_strides = (
         compute_stride(dst_strides[0], w),
-        compute_stride(dst_strides[1], uv_stride),
+        compute_stride(dst_strides[1], w),
     );
 
     // Ensure there is sufficient data in the buffers according
@@ -460,19 +459,19 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
-        || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, uv_stride)
+        || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, w)
     {
         return false;
     }
 
     // Process vector part and scalar one
-    let vector_width = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
-    let vector_height = lower_multiple_of_pot(h, 2);
-    if vector_width > 0 && vector_height > 0 {
+    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
         unsafe {
             rgb_to_nv12_neon::<SAMPLER, DEPTH, COLORIMETRY>(
-                vector_width,
-                vector_height,
+                vector_part,
+                h,
                 src_stride,
                 src_buffer,
                 dst_strides,
@@ -481,33 +480,17 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         }
     }
 
-    let scalar_width = w - vector_width;
-    if scalar_width > 0 {
-        let x = vector_width;
+    if scalar_part > 0 {
+        let x = vector_part;
         let sx = x * DEPTH;
 
         x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
-            scalar_width,
+            scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
             &mut (&mut y_plane[x..], &mut uv_plane[x..]),
-        );
-    }
-
-    let scalar_height = h - vector_height;
-    if scalar_height > 0 {
-        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
-            w,
-            scalar_height,
-            src_stride,
-            &src_buffer[src_stride * vector_height..],
-            dst_strides,
-            &mut (
-                &mut y_plane[dst_strides.0 * vector_height..],
-                &mut uv_plane[dst_strides.1 * (vector_height >> 1)..],
-            ),
         );
     }
 
@@ -539,8 +522,8 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     let w = width as usize;
     let h = height as usize;
-    let cw = w.div_ceil(2);
-    let ch = h.div_ceil(2);
+    let cw = w / 2;
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
 
     // Compute actual strides
@@ -566,13 +549,13 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_width = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
-    let vector_height = lower_multiple_of_pot(h, 2);
-    if vector_width > 0 {
+    let vector_part = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
+    let scalar_part = w - vector_part;
+    if vector_part > 0 {
         unsafe {
             rgb_to_i420_neon::<SAMPLER, DEPTH, COLORIMETRY>(
-                vector_width,
-                vector_height,
+                vector_part,
+                h,
                 src_stride,
                 src_buffer,
                 dst_strides,
@@ -581,35 +564,18 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         }
     }
 
-    let scalar_width = w - vector_width;
-    if scalar_width > 0 {
-        let x = vector_width;
+    if scalar_part > 0 {
+        let x = vector_part;
         let cx = x / 2;
         let sx = x * DEPTH;
 
         x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
-            scalar_width,
+            scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
             &mut (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
-        );
-    }
-
-    let scalar_height = h - vector_height;
-    if scalar_height > 0 {
-        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
-            w,
-            scalar_height,
-            src_stride,
-            &src_buffer[src_stride * vector_height..],
-            dst_strides,
-            &mut (
-                &mut y_plane[dst_strides.0 * vector_height..],
-                &mut u_plane[dst_strides.1 * (vector_height >> 1)..],
-                &mut v_plane[dst_strides.2 * (vector_height >> 1)..],
-            ),
         );
     }
 

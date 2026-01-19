@@ -37,10 +37,6 @@ perf-event = "0.4.8"
 name = "benches"
 harness = false
 
-[[bin]]
-name = "genweights"
-path = "tests/genweights.rs"
-
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3.56"
 getrandom = { version = "0.3.4", features = ["wasm_js"] }

@@ -351,6 +351,11 @@ typedef enum {
  *
  * Describes how the image data is laid out in memory and its color space.
  *
+ * # Note # {#size-constraint}
+ *
+ * Not all combinations of pixel format, color space and number of planes
+ * describe a valid image format.
+ *
  * Each pixel format has one or more compatible color spaces:
  *
  * pixel_format          | color_space
@@ -366,19 +371,22 @@ typedef enum {
  * DCP_PIXEL_FORMAT_NV12 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  *
  * Some pixel formats might impose additional restrictions on the accepted number of
- * planes:
+ * planes and the image size:
  *
- * pixel_format          | subsampling | #planes | #1     | #2     | #3
- * ----------------------|:-----------:|:-------:|:------:|:------:|:-------:
- * DCP_PIXEL_FORMAT_ARGB | 4:4:4       | 1       | argb:4 |        |
- * DCP_PIXEL_FORMAT_BGRA | 4:4:4       | 1       | bgra:4 |        |
- * DCP_PIXEL_FORMAT_BGR  | 4:4:4       | 1       | bgr:3  |        |
- * DCP_PIXEL_FORMAT_RGBA | 4:4:4       | 1       | rgba:4 |        |
- * DCP_PIXEL_FORMAT_RGB  | 4:4:4       | 1       | rgb:3  |        |
- * DCP_PIXEL_FORMAT_I444 | 4:4:4       | 3       | y:1    | u:1    | v:1
- * DCP_PIXEL_FORMAT_I422 | 4:2:2       | 3       | y:1    | u:1/2  | v:1/2
- * DCP_PIXEL_FORMAT_I420 | 4:2:0       | 3       | y:1    | u:1/4  | v:1/4
- * DCP_PIXEL_FORMAT_NV12 | 4:2:0       | 2       | y:1    | uv:1/2 |
+ * pixel_format          | subsampling | w   | h   | #planes | #1     | #2     | #3
+ * ----------------------|:-----------:|:---:|:---:|:-------:|:------:|:------:|:-------:
+ * DCP_PIXEL_FORMAT_ARGB | 4:4:4       |     |     | 1       | argb:4 |        |
+ * DCP_PIXEL_FORMAT_BGRA | 4:4:4       |     |     | 1       | bgra:4 |        |
+ * DCP_PIXEL_FORMAT_BGR  | 4:4:4       |     |     | 1       | bgr:3  |        |
+ * DCP_PIXEL_FORMAT_RGBA | 4:4:4       |     |     | 1       | rgba:4 |        |
+ * DCP_PIXEL_FORMAT_RGB  | 4:4:4       |     |     | 1       | rgb:3  |        |
+ * DCP_PIXEL_FORMAT_I444 | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
+ * DCP_PIXEL_FORMAT_I422 | 4:2:2       |  2  |     | 3       | y:1    | u:1/2  | v:1/2
+ * DCP_PIXEL_FORMAT_I420 | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
+ * DCP_PIXEL_FORMAT_NV12 | 4:2:0       |  2  |  2  | 2       | y:1    | uv:1/2 |
+ *
+ * The values reported in columns `w` and `h`, when specified, indicate that the described
+ * image should have width and height that are multiples of the specified values
  */
 typedef struct {
     DcpPixelFormat pixel_format;
@@ -431,6 +439,7 @@ const char *        dcp_describe_acceleration   (void);
  *
  * - %DCP_ERROR_KIND_INVALID_VALUE if @format or @buffers_size is %NULL
  * - %DCP_ERROR_KIND_INVALID_VALUE if the image pixel format is not a #DcpPixelFormat
+ * - %DCP_ERROR_KIND_INVALID_VALUE if @width or @height violate the [size constraints][size-constraint]
  *   that might by imposed by the image pixel format
  * - %DCP_ERROR_KIND_INVALID_VALUE if the image format has a number of planes which is not compatible
  *   with its pixel format
@@ -551,6 +560,7 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * - %DCP_ERROR_KIND_INVALID_VALUE if @src_buffers or @dst_buffers is %NULL
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image pixel format is not a #DcpPixelFormat
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image color space is not a #DcpColorSpace
+ * - %DCP_ERROR_KIND_INVALID_VALUE if @width or @height violate the [size constraints][size-constraint]
  *   that might by imposed by the source and destination image pixel formats
  * - %DCP_ERROR_KIND_INVALID_VALUE if source or destination image formats have a number of planes
  *   which is not compatible with their pixel formats

@@ -124,12 +124,10 @@ fn fix_to_i32(fix: i32, frac_bits: i32) -> i32 {
 
 /// Truncate and interleave 2 int to 2 uchar
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32, write_y: bool) {
+unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32) {
     // Checked: truncation is explicitly wanted
     *image = x as u8;
-    if write_y {
-        *image.add(1) = y as u8;
-    }
+    *image.add(1) = y as u8;
 }
 
 /// Truncate and interleave 3 int into a dword
@@ -178,8 +176,8 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let zb = -(yb + zg);
     let co = FIX18_C_HALF + (FIX18_HALF - 1);
 
-    let wg_width = width.div_ceil(2);
-    let wg_height = height.div_ceil(2);
+    let wg_width = width / 2;
+    let wg_height = height / 2;
 
     unsafe {
         let src_group = src_buffer.as_ptr();
@@ -187,53 +185,46 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
         let uv_group = dst_buffers.1.as_mut_ptr();
 
         for y in 0..wg_height {
-            let y0 = 2 * y;
-            let y1 = y0 + 1;
-            let y1_valid = y1 < height;
-
             for x in 0..wg_width {
-                let x0 = 2 * x;
-                let x1 = x0 + 1;
-                let x1_valid = x1 < width;
+                let (r00, g00, b00) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x,
+                    2 * y,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                let (r00, g00, b00) =
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x0, y0, DEPTH, src_stride)));
-
-                let (r10, g10, b10) = if x1_valid {
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x1, y0, DEPTH, src_stride)))
-                } else {
-                    (r00, g00, b00)
-                };
+                let (r10, g10, b10) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x + 1,
+                    2 * y,
+                    DEPTH,
+                    src_stride,
+                )));
 
                 pack_i32x2(
-                    y_group.add(wg_index(x0, y0, 1, y_stride)),
+                    y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)),
                     fix_to_i32(affine_transform(r00, g00, b00, xr, xg, xb, yo), FIX16),
                     fix_to_i32(affine_transform(r10, g10, b10, xr, xg, xb, yo), FIX16),
-                    x1_valid,
                 );
 
-                let (r01, g01, b01) = if y1_valid {
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x0, y1, DEPTH, src_stride)))
-                } else {
-                    (r00, g00, b00)
-                };
+                let (r01, g01, b01) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x,
+                    2 * y + 1,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                let (r11, g11, b11) = if y1_valid && x1_valid {
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x1, y1, DEPTH, src_stride)))
-                } else if y1_valid {
-                    (r01, g01, b01)
-                } else {
-                    (r10, g10, b10)
-                };
+                let (r11, g11, b11) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x + 1,
+                    2 * y + 1,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                if y1_valid {
-                    pack_i32x2(
-                        y_group.add(wg_index(x0, y1, 1, y_stride)),
-                        fix_to_i32(affine_transform(r01, g01, b01, xr, xg, xb, yo), FIX16),
-                        fix_to_i32(affine_transform(r11, g11, b11, xr, xg, xb, yo), FIX16),
-                        x1_valid,
-                    );
-                }
+                pack_i32x2(
+                    y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)),
+                    fix_to_i32(affine_transform(r01, g01, b01, xr, xg, xb, yo), FIX16),
+                    fix_to_i32(affine_transform(r11, g11, b11, xr, xg, xb, yo), FIX16),
+                );
 
                 let sr = (r00 + r10) + (r01 + r11);
                 let sg = (g00 + g10) + (g01 + g11);
@@ -242,7 +233,6 @@ pub fn rgb_to_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
                     uv_group.add(wg_index(x, y, 2, uv_stride)),
                     fix_to_i32(affine_transform(sr, sg, sb, yr, yg, yb, co), FIX18),
                     fix_to_i32(affine_transform(sr, sg, sb, yb, zg, zb, co), FIX18),
-                    true,
                 );
             }
         }
@@ -271,8 +261,8 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
     let yb = -(yr + yg);
     let zb = -(yb + zg);
     let co = FIX18_C_HALF + (FIX18_HALF - 1);
-    let wg_width = width.div_ceil(2);
-    let wg_height = height.div_ceil(2);
+    let wg_width = width / 2;
+    let wg_height = height / 2;
 
     unsafe {
         let src_group = src_buffer.as_ptr();
@@ -281,40 +271,46 @@ pub fn rgb_to_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: 
         let v_group = dst_buffers.2.as_mut_ptr();
 
         for y in 0..wg_height {
-            let y0 = 2 * y;
-            let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
-
             for x in 0..wg_width {
-                let x0 = 2 * x;
-                let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
+                let (r00, g00, b00) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x,
+                    2 * y,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                let (r00, g00, b00) =
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x0, y0, DEPTH, src_stride)));
-
-                let (r10, g10, b10) =
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x1, y0, DEPTH, src_stride)));
+                let (r10, g10, b10) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x + 1,
+                    2 * y,
+                    DEPTH,
+                    src_stride,
+                )));
 
                 pack_i32x2(
-                    y_group.add(wg_index(x0, y0, 1, y_stride)),
+                    y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)),
                     fix_to_i32(affine_transform(r00, g00, b00, xr, xg, xb, yo), FIX16),
                     fix_to_i32(affine_transform(r10, g10, b10, xr, xg, xb, yo), FIX16),
-                    x0 != x1,
                 );
 
-                let (r01, g01, b01) =
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x0, y1, DEPTH, src_stride)));
+                let (r01, g01, b01) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x,
+                    2 * y + 1,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                let (r11, g11, b11) =
-                    unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(x1, y1, DEPTH, src_stride)));
+                let (r11, g11, b11) = unpack_ui8x3_i32::<SAMPLER>(src_group.add(wg_index(
+                    2 * x + 1,
+                    2 * y + 1,
+                    DEPTH,
+                    src_stride,
+                )));
 
-                if y1 != y0 {
-                    pack_i32x2(
-                        y_group.add(wg_index(x0, y1, 1, y_stride)),
-                        fix_to_i32(affine_transform(r01, g01, b01, xr, xg, xb, yo), FIX16),
-                        fix_to_i32(affine_transform(r11, g11, b11, xr, xg, xb, yo), FIX16),
-                        x0 != x1,
-                    );
-                }
+                pack_i32x2(
+                    y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)),
+                    fix_to_i32(affine_transform(r01, g01, b01, xr, xg, xb, yo), FIX16),
+                    fix_to_i32(affine_transform(r11, g11, b11, xr, xg, xb, yo), FIX16),
+                );
 
                 let sr = (r00 + r10) + (r01 + r11);
                 let sg = (g00 + g10) + (g01 + g11);
@@ -406,8 +402,8 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     let gp = weights[6];
     let bn = weights[7];
 
-    let wg_width = width.div_ceil(2);
-    let wg_height = height.div_ceil(2);
+    let wg_width = width / 2;
+    let wg_height = height / 2;
 
     // In this fixed point approximation, we should take care
     // all the intermediate operations do never overflow nor underflow
@@ -424,9 +420,6 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
         let dst_group = dst_buffer.as_mut_ptr();
 
         for y in 0..wg_height {
-            let y0 = 2 * y;
-            let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
-
             for x in 0..wg_width {
                 let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)));
 
@@ -437,18 +430,13 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
                 // [-15620,13299]   Cb(16)              Cb(240)
                 let sb = mulhi_i32(cb, bcbm) - bn;
 
-                let x0 = 2 * x;
-                let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) = unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)));
 
                 // [ 1192, 17512]   Y(16)               Y(235)
                 let sy00 = mulhi_i32(y00, xxym);
 
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x0, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y, DEPTH, dst_stride)),
                     // [-14428,30811]   Y(16)Cb(16)         Y(235)Cb(240)
                     fix_to_u8_sat(sy00 + sb, FIX6),
                     // [ -8603,24988]   Y(16)Cb(240)Cr(240) Y(235)Cb(16)Cr(16)
@@ -459,22 +447,18 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let sy10 = mulhi_i32(y10, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x1, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy10 + sb, FIX6),
                     fix_to_u8_sat(sy10 + sg, FIX6),
                     fix_to_u8_sat(sy10 + sr, FIX6),
                 );
 
-                let (y01, y11) = if y1 == y0 {
-                    (y00, y10)
-                } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
-                };
+                let (y01, y11) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
 
                 let sy01 = mulhi_i32(y01, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x0, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy01 + sb, FIX6),
                     fix_to_u8_sat(sy01 + sg, FIX6),
                     fix_to_u8_sat(sy01 + sr, FIX6),
@@ -482,7 +466,7 @@ pub fn nv12_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let sy11 = mulhi_i32(y11, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x1, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy11 + sb, FIX6),
                     fix_to_u8_sat(sy11 + sg, FIX6),
                     fix_to_u8_sat(sy11 + sr, FIX6),
@@ -514,8 +498,8 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
     let gp = weights[6];
     let bn = weights[7];
 
-    let wg_width = width.div_ceil(2);
-    let wg_height = height.div_ceil(2);
+    let wg_width = width / 2;
+    let wg_height = height / 2;
 
     unsafe {
         let y_group = src_buffers.0.as_ptr();
@@ -523,9 +507,6 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
         let dst_group = dst_buffer.as_mut_ptr();
 
         for y in 0..wg_height {
-            let y0 = 2 * y;
-            let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
-
             for x in 0..wg_width {
                 let (cb, cr) = unpack_ui8x2_i32(uv_group.add(wg_index(x, y, 2, uv_stride)));
 
@@ -533,17 +514,12 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
                 let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
                 let sb = mulhi_i32(cb, bcbm) - bn;
 
-                let x0 = 2 * x;
-                let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) = unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)));
 
                 let sy00 = mulhi_i32(y00, xxym);
 
                 pack_rgb(
-                    dst_group.add(wg_index(x0, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy00 + sr, FIX6),
                     fix_to_u8_sat(sy00 + sg, FIX6),
                     fix_to_u8_sat(sy00 + sb, FIX6),
@@ -551,22 +527,18 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
 
                 let sy10 = mulhi_i32(y10, xxym);
                 pack_rgb(
-                    dst_group.add(wg_index(x1, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy10 + sr, FIX6),
                     fix_to_u8_sat(sy10 + sg, FIX6),
                     fix_to_u8_sat(sy10 + sb, FIX6),
                 );
 
-                let (y01, y11) = if y1 == y0 {
-                    (y00, y10)
-                } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
-                };
+                let (y01, y11) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
 
                 let sy01 = mulhi_i32(y01, xxym);
                 pack_rgb(
-                    dst_group.add(wg_index(x0, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy01 + sr, FIX6),
                     fix_to_u8_sat(sy01 + sg, FIX6),
                     fix_to_u8_sat(sy01 + sb, FIX6),
@@ -574,7 +546,7 @@ pub fn nv12_to_rgb<const COLORIMETRY: usize>(
 
                 let sy11 = mulhi_i32(y11, xxym);
                 pack_rgb(
-                    dst_group.add(wg_index(x1, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy11 + sr, FIX6),
                     fix_to_u8_sat(sy11 + sg, FIX6),
                     fix_to_u8_sat(sy11 + sb, FIX6),
@@ -606,8 +578,8 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
     let gp = weights[6];
     let bn = weights[7];
 
-    let wg_width = width.div_ceil(2);
-    let wg_height = height.div_ceil(2);
+    let wg_width = width / 2;
+    let wg_height = height / 2;
 
     unsafe {
         let y_group = src_buffers.0.as_ptr();
@@ -616,9 +588,6 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
         let dst_group = dst_buffer.as_mut_ptr();
 
         for y in 0..wg_height {
-            let y0 = 2 * y;
-            let y1 = if y0 + 1 < height { y0 + 1 } else { y0 };
-
             for x in 0..wg_width {
                 let cb = i32::from(*u_group.add(wg_index(x, y, 1, u_stride)));
                 let cr = i32::from(*v_group.add(wg_index(x, y, 1, v_stride)));
@@ -627,17 +596,12 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
                 let sg = -mulhi_i32(cb, gcbm) - mulhi_i32(cr, gcrm) + gp;
                 let sb = mulhi_i32(cb, bcbm) - bn;
 
-                let x0 = 2 * x;
-                let x1 = if x0 + 1 < width { x0 + 1 } else { x0 };
-                let (y00, mut y10) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y0, 1, y_stride)));
-                if x1 == x0 {
-                    y10 = y00;
-                }
+                let (y00, y10) = unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y, 1, y_stride)));
 
                 let sy00 = mulhi_i32(y00, xxym);
 
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x0, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy00 + sb, FIX6),
                     fix_to_u8_sat(sy00 + sg, FIX6),
                     fix_to_u8_sat(sy00 + sr, FIX6),
@@ -645,22 +609,18 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let sy10 = mulhi_i32(y10, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x1, y0, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy10 + sb, FIX6),
                     fix_to_u8_sat(sy10 + sg, FIX6),
                     fix_to_u8_sat(sy10 + sr, FIX6),
                 );
 
-                let (y01, y11) = if y1 == y0 {
-                    (y00, y10)
-                } else {
-                    let (y01, y11) = unpack_ui8x2_i32(y_group.add(wg_index(x0, y1, 1, y_stride)));
-                    if x1 == x0 { (y01, y10) } else { (y01, y11) }
-                };
+                let (y01, y11) =
+                    unpack_ui8x2_i32(y_group.add(wg_index(2 * x, 2 * y + 1, 1, y_stride)));
 
                 let sy01 = mulhi_i32(y01, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x0, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy01 + sb, FIX6),
                     fix_to_u8_sat(sy01 + sg, FIX6),
                     fix_to_u8_sat(sy01 + sr, FIX6),
@@ -668,7 +628,7 @@ pub fn i420_to_bgra<const COLORIMETRY: usize, const REVERSED: bool>(
 
                 let sy11 = mulhi_i32(y11, xxym);
                 pack_ui8x3::<REVERSED>(
-                    dst_group.add(wg_index(x1, y1, DEPTH, dst_stride)),
+                    dst_group.add(wg_index(2 * x + 1, 2 * y + 1, DEPTH, dst_stride)),
                     fix_to_u8_sat(sy11 + sb, FIX6),
                     fix_to_u8_sat(sy11 + sg, FIX6),
                     fix_to_u8_sat(sy11 + sr, FIX6),
@@ -1042,14 +1002,13 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     // Check subsampling limits
     let w = width as usize;
     let h = height as usize;
-    let ch = h.div_ceil(2);
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
-    let uv_stride = 2 * w.div_ceil(2);
 
     // Compute actual strides
     let src_strides = (
         compute_stride(src_strides[0], w),
-        compute_stride(src_strides[1], uv_stride),
+        compute_stride(src_strides[1], w),
     );
     let dst_stride = compute_stride(dst_strides[0], rgb_stride);
 
@@ -1058,7 +1017,7 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     let src_buffers = (src_buffers[0], src_buffers[1]);
     let dst_buffer = &mut *dst_buffers[0];
     if out_of_bounds(src_buffers.0.len(), src_strides.0, h - 1, w)
-        || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, uv_stride)
+        || out_of_bounds(src_buffers.1.len(), src_strides.1, ch - 1, w)
         || out_of_bounds(dst_buffer.len(), dst_stride, h - 1, rgb_stride)
     {
         return false;
@@ -1106,8 +1065,8 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     // Check subsampling limits
     let w = width as usize;
     let h = height as usize;
-    let cw = w.div_ceil(2);
-    let ch = h.div_ceil(2);
+    let cw = w / 2;
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
 
     // Compute actual strides
@@ -1273,8 +1232,8 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     let w = width as usize;
     let h = height as usize;
-    let cw = w.div_ceil(2);
-    let ch = h.div_ceil(2);
+    let cw = w / 2;
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
 
     // Compute actual strides
@@ -1336,15 +1295,14 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     let w = width as usize;
     let h = height as usize;
-    let ch = h.div_ceil(2);
+    let ch = h / 2;
     let rgb_stride = DEPTH * w;
-    let uv_stride = 2 * w.div_ceil(2);
 
     // Compute actual strides
     let src_stride = compute_stride(src_strides[0], rgb_stride);
     let dst_strides = (
         compute_stride(dst_strides[0], w),
-        compute_stride(dst_strides[1], uv_stride),
+        compute_stride(dst_strides[1], w),
     );
 
     // Ensure there is sufficient data in the buffers according
@@ -1355,7 +1313,7 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
 
     if out_of_bounds(src_buffer.len(), src_stride, h - 1, rgb_stride)
         || out_of_bounds(y_plane.len(), dst_strides.0, h - 1, w)
-        || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, uv_stride)
+        || out_of_bounds(uv_plane.len(), dst_strides.1, ch - 1, w)
     {
         return false;
     }
