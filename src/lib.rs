@@ -13,7 +13,6 @@
 // HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![warn(missing_docs)]
 #![deny(trivial_casts)]
@@ -71,8 +70,8 @@
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
+//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
+//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -91,10 +90,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         &[&src_data],
+//!         &[&*src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut dst_data],
+//!         &mut [&mut *dst_data],
 //!     );
 //! }
 //! ```
@@ -102,14 +101,15 @@
 //! Handle conversion errors:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+//! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
+//! use std::error;
 //!
-//! fn convert() -> Result<(), ErrorKind> {
+//! fn convert() -> Result<(), Box<dyn error::Error>> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!
-//!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
+//!     let src_data = Box::new([0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)]);
+//!     let mut dst_data = Box::new([0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2]);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -128,10 +128,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         None,
-//!         &[&src_data],
+//!         &[&*src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut dst_data],
+//!         &mut [&mut *dst_data],
 //!     )?;
 //!
 //!     Ok(())
@@ -141,9 +141,10 @@
 //! Compute how many bytes are needed to store and image of a given format and size:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+//! use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
+//! use std::error;
 //!
-//! fn compute_size() -> Result<(), ErrorKind> {
+//! fn compute_size() -> Result<(), Box<dyn error::Error>> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_PLANES: u32 = 1;
@@ -154,10 +155,10 @@
 //!         num_planes: NUM_PLANES,
 //!     };
 //!
-//!     let mut sizes = [0usize; NUM_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &format, None, &mut sizes)?;
+//!     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &format, None, sizes)?;
 //!
-//!     let buffer = vec![0u8; sizes[0]];
+//!     let buffer: Vec<_> = vec![0u8; sizes[0]];
 //!
 //!     // Do something with buffer
 //!     // --snip--
@@ -170,9 +171,10 @@
 //! necessarily contiguous:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+//! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
+//! use std::error;
 //!
-//! fn convert() -> Result<(), ErrorKind> {
+//! fn convert() -> Result<(), Box<dyn error::Error>> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 2;
@@ -184,11 +186,11 @@
 //!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
-//!     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &src_format, None, &mut src_sizes)?;
+//!     let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_sizes)?;
 //!
-//!     let src_y = vec![0u8; src_sizes[0]];
-//!     let src_uv = vec![0u8; src_sizes[1]];
+//!     let src_y: Vec<_> = vec![0u8; src_sizes[0]];
+//!     let src_uv: Vec<_> = vec![0u8; src_sizes[1]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -196,10 +198,10 @@
 //!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
-//!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
+//!     let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
 //!
-//!     let mut dst_rgba = vec![0u8; dst_sizes[0]];
+//!     let mut dst_rgba: Vec<_> = vec![0u8; dst_sizes[0]];
 //!
 //!     convert_image(
 //!         WIDTH,
@@ -219,9 +221,10 @@
 //! Provide image strides to convert data which is not tightly packed:
 //! ```
 //! use dcv_color_primitives as dcp;
-//! use dcp::{convert_image, get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+//! use dcp::{convert_image, get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
+//! use std::error;
 //!
-//! fn convert() -> Result<(), ErrorKind> {
+//! fn convert() -> Result<(), Box<dyn error::Error>> {
 //!     const WIDTH: u32 = 640;
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 1;
@@ -234,12 +237,12 @@
 //!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
-//!     let src_strides = [RGB_STRIDE];
+//!     let src_strides: &[usize] = &[RGB_STRIDE];
 //!
-//!     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(&src_strides), &mut src_sizes)?;
+//!     let src_sizes: &mut [usize] = &mut [0usize; NUM_SRC_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(src_strides), src_sizes)?;
 //!
-//!     let src_rgba = vec![0u8; src_sizes[0]];
+//!     let src_rgba: Vec<_> = vec![0u8; src_sizes[0]];
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
@@ -247,17 +250,17 @@
 //!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
-//!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
-//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
+//!     let dst_sizes: &mut [usize] = &mut [0usize; NUM_DST_PLANES as usize];
+//!     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_sizes)?;
 //!
-//!     let mut dst_y = vec![0u8; dst_sizes[0]];
-//!     let mut dst_uv = vec![0u8; dst_sizes[1]];
+//!     let mut dst_y: Vec<_> = vec![0u8; dst_sizes[0]];
+//!     let mut dst_uv: Vec<_> = vec![0u8; dst_sizes[1]];
 //!
 //!     convert_image(
 //!         WIDTH,
 //!         HEIGHT,
 //!         &src_format,
-//!         Some(&src_strides),
+//!         Some(src_strides),
 //!         &[&src_rgba[..]],
 //!         &dst_format,
 //!         None,
@@ -274,24 +277,16 @@ mod dispatcher;
 mod pixel_format;
 mod static_assert;
 
-use core::fmt;
-#[cfg(feature = "test_instruction_sets")]
-use core::sync::atomic::{AtomicI32, Ordering};
-use cpu_info::{AccelerationDescriptor, InstructionSet};
+use cpu_info::{CpuManufacturer, InstructionSet};
 use paste::paste;
+use std::error;
+use std::fmt;
+use std::sync::OnceLock;
+#[cfg(feature = "test_instruction_sets")]
+use std::sync::atomic::{AtomicI32, Ordering};
 
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
-
-#[cfg(not(feature = "std"))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
-
-#[cfg(not(feature = "std"))]
-#[unsafe(no_mangle)]
-extern "C" fn rust_eh_personality() {}
 
 /// An enumeration of errors.
 #[derive(Debug)]
@@ -320,6 +315,13 @@ impl fmt::Display for ErrorKind {
             ),
             ErrorKind::NotEnoughData => write!(f, "Not enough data provided"),
         }
+    }
+}
+
+impl error::Error for ErrorKind {
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    fn cause(&self) -> Option<&dyn error::Error> {
+        None
     }
 }
 
@@ -508,9 +510,8 @@ static TEST_SET: AtomicI32 = AtomicI32::new(-1);
 type DispatchTable = [Option<ConvertDispatcher>; dispatcher::TABLE_SIZE];
 
 struct Context {
+    manufacturer: CpuManufacturer,
     set: InstructionSet,
-    acceleration_desc: AccelerationDescriptor,
-    acceleration_len: usize,
     converters: DispatchTable,
     #[cfg(feature = "test_instruction_sets")]
     test_converters: [Option<DispatchTable>; 3],
@@ -518,16 +519,15 @@ struct Context {
 
 impl Context {
     pub fn global() -> &'static Context {
-        static INSTANCE: spin::Once<Context> = spin::Once::new();
-        INSTANCE.call_once(Context::new)
+        static INSTANCE: OnceLock<Context> = OnceLock::new();
+        INSTANCE.get_or_init(Context::new)
     }
 
     pub fn new() -> Self {
-        let (set, acceleration_desc, acceleration_len) = cpu_info::get();
+        let (manufacturer, set) = cpu_info::get();
         let mut context = Context {
+            manufacturer,
             set,
-            acceleration_desc,
-            acceleration_len,
             converters: [None; dispatcher::TABLE_SIZE],
             #[cfg(feature = "test_instruction_sets")]
             test_converters: [None; 3],
@@ -597,9 +597,13 @@ impl Context {
 /// use dcv_color_primitives as dcp;
 /// println!("{}", dcp::describe_acceleration());
 /// // => {cpu-manufacturer:Intel,instruction-set:Avx2}
-pub fn describe_acceleration() -> &'static str {
-    let context = Context::global();
-    core::str::from_utf8(&context.acceleration_desc[..context.acceleration_len]).unwrap_or_default()
+pub fn describe_acceleration() -> String {
+    let state = Context::global();
+
+    format!(
+        "{{cpu-manufacturer:{:?},instruction-set:{:?}}}",
+        state.manufacturer, state.set
+    )
 }
 
 /// Compute number of bytes required to store an image given its format, dimensions
@@ -619,9 +623,10 @@ pub fn describe_acceleration() -> &'static str {
 /// assuming *all planes contain data which is tightly packed*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
+/// use std::error;
 ///
-/// fn compute_size_packed() -> Result<(), ErrorKind> {
+/// fn compute_size_packed() -> Result<(), Box<dyn error::Error>> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -632,8 +637,8 @@ pub fn describe_acceleration() -> &'static str {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let mut sizes = [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, None, &mut sizes)?;
+///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, None, sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -643,9 +648,10 @@ pub fn describe_acceleration() -> &'static str {
 /// in which *all planes have custom strides*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat};
+/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat};
+/// use std::error;
 ///
-/// fn compute_size_custom_strides() -> Result<(), ErrorKind> {
+/// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -658,9 +664,9 @@ pub fn describe_acceleration() -> &'static str {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let strides = [ Y_STRIDE, UV_STRIDE, ];
-///     let mut sizes = [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides), &mut sizes)?;
+///     let strides: &[usize] = &[ Y_STRIDE, UV_STRIDE, ];
+///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, Some(strides), sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -671,9 +677,10 @@ pub fn describe_acceleration() -> &'static str {
 /// contain data which is tightly packed*:
 /// ```
 /// use dcv_color_primitives as dcp;
-/// use dcp::{get_buffers_size, ColorSpace, ErrorKind, ImageFormat, PixelFormat, STRIDE_AUTO};
+/// use dcp::{get_buffers_size, ColorSpace, ImageFormat, PixelFormat, STRIDE_AUTO};
+/// use std::error;
 ///
-/// fn compute_size_custom_strides() -> Result<(), ErrorKind> {
+/// fn compute_size_custom_strides() -> Result<(), Box<dyn error::Error>> {
 ///     const WIDTH: u32 = 640;
 ///     const HEIGHT: u32 = 480;
 ///     const NUM_PLANES: u32 = 2;
@@ -685,9 +692,9 @@ pub fn describe_acceleration() -> &'static str {
 ///         num_planes: NUM_PLANES,
 ///     };
 ///
-///     let strides = [ Y_STRIDE, STRIDE_AUTO, ];
-///     let mut sizes = [0usize; NUM_PLANES as usize];
-///     get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides), &mut sizes)?;
+///     let strides: &[usize] = &[ Y_STRIDE, STRIDE_AUTO, ];
+///     let sizes: &mut [usize] = &mut [0usize; NUM_PLANES as usize];
+///     get_buffers_size(WIDTH, HEIGHT, &format, Some(strides), sizes)?;
 ///
 ///     Ok(())
 /// }
@@ -979,11 +986,13 @@ pub fn initialize_with_instruction_set(instruction_set: &str) {
 pub mod c_api {
     #![allow(clippy::wildcard_imports)]
     use super::*; // We are importing everything
-    use core::cmp;
-    use core::ffi::c_char;
-    use core::mem::{MaybeUninit, transmute};
-    use core::slice;
     use pixel_format::{MAX_NUMBER_OF_PLANES, are_planes_compatible};
+    use std::cmp;
+    use std::ffi::CString;
+    use std::mem::{MaybeUninit, transmute};
+    use std::os::raw::c_char;
+    use std::ptr;
+    use std::slice;
 
     type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
 
@@ -1022,9 +1031,21 @@ pub mod c_api {
     }
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn dcp_describe_acceleration() -> *const c_char {
-        let context = Context::global();
-        context.acceleration_desc.as_ptr().cast()
+    pub extern "C" fn dcp_describe_acceleration() -> *mut c_char {
+        let acc = describe_acceleration();
+        if let Ok(s) = CString::new(acc) {
+            s.into_raw()
+        } else {
+            let p: *const c_char = ptr::null();
+            p.cast_mut()
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    pub unsafe extern "C" fn dcp_unref_string(string: *mut c_char) {
+        if !string.is_null() {
+            let _unused = CString::from_raw(string);
+        }
     }
 
     #[unsafe(no_mangle)]

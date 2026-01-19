@@ -29,7 +29,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-targets --features std -- -D warnings
+          args: --all-targets -- -D warnings
 
   build:
     name: Build (${{matrix.os}}, Rust ${{matrix.rust}})
@@ -64,13 +64,13 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --features std
+          args: --verbose
 
       - name: Test (instruction sets)
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --tests --features "test_instruction_sets" --features std
+          args: --verbose --tests --features "test_instruction_sets"
 
       # Generate assembly for automatic inspection
       - name: Emit ASM
@@ -125,12 +125,12 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - name: Sanitizer
-        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features std
+        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu
         env:
           RUSTFLAGS: -Zsanitizer=address
 
       - name: Sanitizer (instruction sets)
-        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets" --features std
+        run: cargo +nightly test --verbose --tests --target=x86_64-unknown-linux-gnu --features "test_instruction_sets"
         env:
           RUSTFLAGS: -Zsanitizer=address
 
@@ -151,7 +151,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Coverage
-        run: cargo +nightly llvm-cov test --features "test_instruction_sets" --features std --lcov --output-path lcov.info
+        run: cargo +nightly llvm-cov test --features "test_instruction_sets" --lcov --output-path lcov.info
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v5

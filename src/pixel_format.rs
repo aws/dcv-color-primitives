@@ -13,8 +13,6 @@
 // HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-use core::fmt;
-
 pub const MAX_NUMBER_OF_PLANES: usize = 4;
 
 /// An enumeration of supported pixel formats.
@@ -78,9 +76,9 @@ impl PixelFormat {
     }
 }
 
-impl fmt::Display for PixelFormat {
+impl std::fmt::Display for PixelFormat {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PixelFormat::Argb => write!(f, "argb"),
             PixelFormat::Bgra => write!(f, "bgra"),

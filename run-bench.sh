@@ -25,26 +25,16 @@ esac
 shift
 done
 
-EXEC=`cargo bench --features std --no-run 2>&1 | grep -o 'benches-[0-9a-f]*'`
+EXEC=`cargo bench --no-run 2>&1 | grep -oP benches-[0-9a-f]+`
 DIR=`pwd`
 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Drop file system cache
-    echo 3 | sudo tee /proc/sys/vm/drop_caches
-    sudo sync
+# Drop file system cache
+echo 3 | sudo tee /proc/sys/vm/drop_caches
+sudo sync
 
-    # Disable address space randomization
-    echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
-    TASKSET="taskset -c 0"
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS-specific optimizations
-    sudo purge
-    TASKSET=""
-else
-    # Other systems
-    TASKSET=""
-fi
+# Disable address space randomization
+echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
 
 sudo rm -Rf ${DIR}/target/criterion
 
-sudo DCP_USE_CYCLES=${use_cycles} nice -n -5 ${TASKSET} ${DIR}/target/release/deps/${EXEC} --bench -n ${filter} | grep -i "time:\|thrpt:"
+sudo DCP_USE_CYCLES=${use_cycles} nice -n -5 taskset -c 0 ${DIR}/target/release/deps/${EXEC} --bench -n ${filter} | grep -i "time:\|thrpt:"

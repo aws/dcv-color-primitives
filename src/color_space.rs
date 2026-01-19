@@ -14,8 +14,6 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-use core::fmt;
-
 /// An enumeration of supported color models.
 ///
 /// It includes:
@@ -42,9 +40,9 @@ pub enum ColorSpace {
     Bt709FR,
 }
 
-impl fmt::Display for ColorSpace {
+impl std::fmt::Display for ColorSpace {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ColorSpace::Rgb => write!(f, "rgb"),
             ColorSpace::Bt601 => write!(f, "bt-601"),

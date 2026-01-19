@@ -536,7 +536,7 @@ is_valid_format(const DcpImageFormat *format,
 static void
 unit_init(void)
 {
-    const char *desc;
+    char *desc;
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
@@ -547,6 +547,7 @@ unit_init(void)
     TEST_ASSERT_EQ((desc != NULL), 1);
 
     printf("%s\n", desc);
+    dcp_unref_string(desc);
 
     TEST_END();
 

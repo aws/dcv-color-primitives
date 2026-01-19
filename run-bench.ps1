@@ -14,13 +14,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-param([String]$filter="")
+param([String]$filter="") 
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 [Console]::TreatControlCAsInput = $true
 
 $pwd = pwd
-$exec = cargo bench --features std --no-run 2>&1 | select-string -Pattern 'benches\-[0-9a-f]+\.exe' | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }
+$exec = cargo bench --no-run 2>&1 | select-string -Pattern 'benches\-[0-9a-f]+\.exe' | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }
 
 $resultPath = 'target\criterion\*'
 if (Test-Path -Path $resultPath) {
