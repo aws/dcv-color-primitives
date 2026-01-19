@@ -1114,7 +1114,7 @@ pub mod c_api {
         }
 
         let src_strides = (!src_strides.is_null())
-            .then(|| slice::from_raw_parts(src_strides, src_format.num_planes as usize));
+            .then(|| slice::from_raw_parts(src_strides, MAX_NUMBER_OF_PLANES));
 
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) = get_buffers_size(width, height, src_format, src_strides, src_sizes)
@@ -1141,7 +1141,7 @@ pub mod c_api {
         };
 
         let dst_strides = (!dst_strides.is_null())
-            .then(|| slice::from_raw_parts(dst_strides, dst_format.num_planes as usize));
+            .then(|| slice::from_raw_parts(dst_strides, MAX_NUMBER_OF_PLANES));
 
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) = get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)

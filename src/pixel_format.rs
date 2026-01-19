@@ -208,9 +208,7 @@ pub fn get_buffers_size(
     let pixel_format = pixel_format as usize;
     let stride_spec = STRIDE_SPECS[pixel_format];
     for i in 0..MAX_NUMBER_OF_PLANES {
-        stride[i] = if i >= strides.len() {
-            stride[i - 1]
-        } else if strides[i] == STRIDE_AUTO {
+        stride[i] = if i >= strides.len() || strides[i] == STRIDE_AUTO {
             get_plane_mask(stride_spec, i) * get_plane_spec(width, stride_spec, i)
         } else {
             strides[i]
