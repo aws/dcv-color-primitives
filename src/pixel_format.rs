@@ -17,6 +17,7 @@ pub const MAX_NUMBER_OF_PLANES: usize = 4;
 
 /// An enumeration of supported pixel formats.
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
 pub enum PixelFormat {
     /// RGB with alpha channel first.
     ///
@@ -89,25 +90,6 @@ impl std::fmt::Display for PixelFormat {
             PixelFormat::I422 => write!(f, "i422"),
             PixelFormat::I420 => write!(f, "i420"),
             PixelFormat::Nv12 => write!(f, "nv12"),
-        }
-    }
-}
-
-impl TryFrom<i32> for PixelFormat {
-    type Error = ();
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(PixelFormat::Argb),
-            1 => Ok(PixelFormat::Bgra),
-            2 => Ok(PixelFormat::Bgr),
-            3 => Ok(PixelFormat::Rgba),
-            4 => Ok(PixelFormat::Rgb),
-            5 => Ok(PixelFormat::I444),
-            6 => Ok(PixelFormat::I422),
-            7 => Ok(PixelFormat::I420),
-            8 => Ok(PixelFormat::Nv12),
-            _ => Err(()),
         }
     }
 }
@@ -256,7 +238,6 @@ pub fn get_buffers_size(
 }
 
 #[cfg(not(feature = "test_instruction_sets"))]
-#[inline(always)]
 pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
     let last_plane = num_planes.wrapping_sub(1);
     let spec = PF_SPECS[pixel_format as usize];

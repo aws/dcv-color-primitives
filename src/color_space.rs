@@ -22,6 +22,7 @@
 /// * Range (headroom / footroom)
 /// * Primaries
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
 pub enum ColorSpace {
     /// Gamma-corrected R'G'B'.
     /// The gamma is the one defined in ITU-R Recommendation BT.709-6 page 3, item 1.2
@@ -49,21 +50,6 @@ impl std::fmt::Display for ColorSpace {
             ColorSpace::Bt709 => write!(f, "bt-709"),
             ColorSpace::Bt601FR => write!(f, "bt-601-fr"),
             ColorSpace::Bt709FR => write!(f, "bt-709-fr"),
-        }
-    }
-}
-
-impl TryFrom<i32> for ColorSpace {
-    type Error = ();
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(ColorSpace::Rgb),
-            1 => Ok(ColorSpace::Bt601),
-            2 => Ok(ColorSpace::Bt709),
-            3 => Ok(ColorSpace::Bt601FR),
-            4 => Ok(ColorSpace::Bt709FR),
-            _ => Err(()),
         }
     }
 }

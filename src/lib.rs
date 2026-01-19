@@ -363,6 +363,7 @@ impl error::Error for ErrorKind {
 /// The values reported in columns `w` and `h`, when specified, indicate that the described
 /// image should have width and height that are multiples of the specified values
 #[derive(Debug)]
+#[repr(C)]
 pub struct ImageFormat {
     /// Pixel format
     pub pixel_format: PixelFormat,
@@ -996,26 +997,6 @@ pub mod c_api {
 
     type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
 
-    // C enums are untrusted in the sense you can cast any value to an enum type
-    #[repr(C)]
-    pub struct ImageFormat {
-        pixel_format: i32,
-        color_space: i32,
-        num_planes: u32,
-    }
-
-    impl TryFrom<&ImageFormat> for crate::ImageFormat {
-        type Error = ();
-
-        fn try_from(format: &ImageFormat) -> core::result::Result<Self, Self::Error> {
-            Ok(crate::ImageFormat {
-                pixel_format: PixelFormat::try_from(format.pixel_format)?,
-                color_space: ColorSpace::try_from(format.color_space)?,
-                num_planes: format.num_planes,
-            })
-        }
-    }
-
     #[repr(C)]
     pub enum Result {
         Ok,
@@ -1049,7 +1030,6 @@ pub mod c_api {
     }
 
     #[unsafe(no_mangle)]
-    #[allow(clippy::cast_sign_loss)]
     pub unsafe extern "C" fn dcp_get_buffers_size(
         width: u32,
         height: u32,
@@ -1063,7 +1043,8 @@ pub mod c_api {
             return set_error(error, ErrorKind::InvalidValue);
         }
 
-        let format: &ImageFormat = &*format;
+        // C enums are untrusted in the sense you can cast any value to an enum type
+        let format = &*format;
         let pixel_format = format.pixel_format as u32;
         if !dispatcher::is_pixel_format_valid(pixel_format) {
             return set_error(error, ErrorKind::InvalidValue);
@@ -1084,23 +1065,13 @@ pub mod c_api {
         };
 
         let buffers_size = slice::from_raw_parts_mut(buffers_size, num_planes);
-        let format = crate::ImageFormat {
-            pixel_format: match PixelFormat::try_from(format.pixel_format) {
-                Ok(pf) => pf,
-                Err(()) => return set_error(error, ErrorKind::InvalidValue),
-            },
-            color_space: ColorSpace::try_from(format.color_space).unwrap_or(ColorSpace::Rgb),
-            num_planes: format.num_planes,
-        };
-
-        match get_buffers_size(width, height, &format, strides, buffers_size) {
+        match get_buffers_size(width, height, format, strides, buffers_size) {
             Ok(()) => self::Result::Ok,
             Err(error_kind) => set_error(error, error_kind),
         }
     }
 
     #[unsafe(no_mangle)]
-    #[allow(clippy::cast_sign_loss)]
     pub unsafe extern "C" fn dcp_convert_image(
         width: u32,
         height: u32,
@@ -1121,6 +1092,7 @@ pub mod c_api {
             return set_error(error, ErrorKind::InvalidValue);
         }
 
+        // C enums are untrusted in the sense you can cast any value to an enum type
         let src_format: &ImageFormat = &*src_format;
         let dst_format: &ImageFormat = &*dst_format;
         let src_pixel_format = src_format.pixel_format as u32;
@@ -1144,12 +1116,8 @@ pub mod c_api {
         let src_strides = (!src_strides.is_null())
             .then(|| slice::from_raw_parts(src_strides, src_format.num_planes as usize));
 
-        let Ok(src_format) = crate::ImageFormat::try_from(src_format) else {
-            return set_error(error, ErrorKind::InvalidValue);
-        };
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) =
-            get_buffers_size(width, height, &src_format, src_strides, src_sizes)
+        if let Err(error_kind) = get_buffers_size(width, height, src_format, src_strides, src_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1175,12 +1143,8 @@ pub mod c_api {
         let dst_strides = (!dst_strides.is_null())
             .then(|| slice::from_raw_parts(dst_strides, dst_format.num_planes as usize));
 
-        let Ok(dst_format) = crate::ImageFormat::try_from(dst_format) else {
-            return set_error(error, ErrorKind::InvalidValue);
-        };
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
-        if let Err(error_kind) =
-            get_buffers_size(width, height, &dst_format, dst_strides, dst_sizes)
+        if let Err(error_kind) = get_buffers_size(width, height, dst_format, dst_strides, dst_sizes)
         {
             return set_error(error, error_kind);
         }
@@ -1206,10 +1170,10 @@ pub mod c_api {
         match convert_image(
             width,
             height,
-            &src_format,
+            src_format,
             src_strides,
             &src_buffers[..],
-            &dst_format,
+            dst_format,
             dst_strides,
             &mut dst_buffers[..],
         ) {
