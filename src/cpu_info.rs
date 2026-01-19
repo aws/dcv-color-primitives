@@ -60,7 +60,7 @@ macro_rules! define_enum_with_max_len {
 
 macro_rules! manufacturer {
     ($manufacturer:ident) => {
-        pastey::paste! {
+        paste::paste! {
             (CpuManufacturer::$manufacturer, stringify!($manufacturer).as_bytes() )
         }
     };
@@ -68,7 +68,7 @@ macro_rules! manufacturer {
 
 macro_rules! instruction_set {
     ($instruction_set:ident) => {
-        pastey::paste! {
+        paste::paste! {
             (InstructionSet::$instruction_set, stringify!($instruction_set).as_bytes() )
         }
     };

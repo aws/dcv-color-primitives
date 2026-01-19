@@ -23,7 +23,7 @@ use crate::static_assert;
 #[macro_export]
 macro_rules! rgb_to_yuv_converter {
     ($src_pf:ident, $dst_pf:ident, $dst_cs:ident) => {
-        pastey::paste! {
+        paste::paste! {
             pub fn [<$src_pf:lower _ $dst_pf:lower _ $dst_cs:lower>](
                 width: u32,
                 height: u32,
@@ -53,7 +53,7 @@ macro_rules! rgb_to_yuv_converter {
 #[macro_export]
 macro_rules! yuv_to_rgb_converter {
     ($src_pf:ident, $src_cs:ident, $dst_pf:ident) => {
-        pastey::paste! {
+        paste::paste! {
             pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
                 width: u32,
                 height: u32,
@@ -86,7 +86,7 @@ macro_rules! yuv_to_rgb_converter {
 #[macro_export]
 macro_rules! yuv_to_rgb_fallback_converter {
     ($src_pf:ident, $src_cs:ident, $dst_pf:ident) => {
-        pastey::paste! {
+        paste::paste! {
             pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
                 width: u32,
                 height: u32,

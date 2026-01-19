@@ -278,7 +278,7 @@ use core::fmt;
 #[cfg(feature = "test_instruction_sets")]
 use core::sync::atomic::{AtomicI32, Ordering};
 use cpu_info::{AccelerationDescriptor, InstructionSet};
-use pastey::paste;
+use paste::paste;
 
 pub use color_space::ColorSpace;
 pub use pixel_format::{PixelFormat, STRIDE_AUTO};
