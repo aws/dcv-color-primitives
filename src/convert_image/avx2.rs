@@ -1457,7 +1457,6 @@ unsafe fn rgb_to_bgra_avx2(
 
 // Internal module functions
 #[inline(never)]
-#[allow(clippy::too_many_lines)]
 fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
     width: u32,
     height: u32,
@@ -1829,11 +1828,7 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_width = if DEPTH == 3 {
-        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
-    } else {
-        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
-    };
+    let vector_width = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 && vector_height > 0 {
         unsafe {
@@ -1933,11 +1928,7 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     }
 
     // Process vector part and scalar one
-    let vector_width = if DEPTH == 3 {
-        (DEPTH * RGB_TO_YUV_WAVES) * (w / (DEPTH * RGB_TO_YUV_WAVES))
-    } else {
-        lower_multiple_of_pot(w, RGB_TO_YUV_WAVES)
-    };
+    let vector_width = lower_multiple_of_pot(w, RGB_TO_YUV_WAVES);
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 {
         unsafe {
