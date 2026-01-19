@@ -40,18 +40,17 @@
  *
  * # Examples
  *
- * Convert an image from bgra to nv12 (two planes) format, with Bt601 color space:
+ * Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
  *
  * |[<!-- language="C" -->
  * static const uint32_t WIDTH = 640;
  * static const uint32_t HEIGHT = 480;
  *
  * static uint8_t src_image[4 * (size_t)WIDTH * (size_t)HEIGHT] = { 0 };
- * static uint8_t dst_y_plane[(size_t)WIDTH * (size_t)HEIGHT] = { 0 };
- * static uint8_t dst_uv_plane[(size_t)WIDTH * (size_t)HEIGHT / 2] = { 0 };
+ * static uint8_t dst_image[3 * (size_t)WIDTH * (size_t)HEIGHT / 2] = { 0 };
  *
  * static uint8_t *src_buffers[] = { src_image };
- * static uint8_t *dst_buffers[] = { dst_y_plane, dst_uv_plane };
+ * static uint8_t *dst_buffers[] = { dst_image };
  *
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
@@ -62,7 +61,7 @@
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     2,
+ *     1,
  * };
  *
  * dcp_convert_image(WIDTH, HEIGHT,
@@ -78,11 +77,10 @@
  * static const uint32_t HEIGHT = 480;
  *
  * static uint8_t src_image[4 * (size_t)WIDTH * (size_t)HEIGHT] = { 0 };
- * static uint8_t dst_y_plane[(size_t)WIDTH * (size_t)HEIGHT] = { 0 };
- * static uint8_t dst_uv_plane[(size_t)WIDTH * (size_t)HEIGHT / 2] = { 0 };
+ * static uint8_t dst_image[3 * (size_t)WIDTH * (size_t)HEIGHT / 2] = { 0 };
  *
  * static uint8_t *src_buffers[] = { src_image };
- * static uint8_t *dst_buffers[] = { dst_y_plane, dst_uv_plane };
+ * static uint8_t *dst_buffers[] = { dst_image };
  *
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
@@ -93,7 +91,7 @@
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     2,
+ *     1,
  * };
  *
  * DcpResult result;
@@ -381,9 +379,9 @@ typedef enum {
  * DCP_PIXEL_FORMAT_RGBA | 4:4:4       |     |     | 1       | rgba:4 |        |
  * DCP_PIXEL_FORMAT_RGB  | 4:4:4       |     |     | 1       | rgb:3  |        |
  * DCP_PIXEL_FORMAT_I444 | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
- * DCP_PIXEL_FORMAT_I422 | 4:2:2       |  2  |     | 3       | y:1    | u:1/2  | v:1/2
+ * DCP_PIXEL_FORMAT_I422 | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
  * DCP_PIXEL_FORMAT_I420 | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
- * DCP_PIXEL_FORMAT_NV12 | 4:2:0       |  2  |  2  | 2       | y:1    | uv:1/2 |
+ * DCP_PIXEL_FORMAT_NV12 | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
  *
  * The values reported in columns `w` and `h`, when specified, indicate that the described
  * image should have width and height that are multiples of the specified values

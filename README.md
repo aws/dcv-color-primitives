@@ -17,7 +17,7 @@ DCV Color Primitives is a library to perform image color model conversion.
 * Support ARM (aarch64)[**]
 * Support WebAssembly[*]
 
-[*]: Supplemental cpu extension sets not yet supported.
+[*]: Supplemental cpu extension sets not yet supported.  
 [**]: Neon cpu extension sets supported for rgb and rgb to yuv conversions
 
 ## Image format conversion
@@ -124,7 +124,7 @@ wasm-pack test --node
 
 ### Image conversion
 
-Convert an image from bgra to nv12 (two planes) format containing yuv in BT601:
+Convert an image from bgra to nv12 (single plane) format containing yuv in BT601:
 
 ```rust
 use dcv_color_primitives as dcp;
@@ -135,8 +135,7 @@ fn main() {
     const HEIGHT: u32 = 480;
 
     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
-    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
+    let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -147,7 +146,7 @@ fn main() {
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
+        num_planes: 1,
     };
 
     convert_image(
@@ -158,7 +157,7 @@ fn main() {
         &[&src_data],
         &dst_format,
         None,
-        &mut [&mut y_data, &mut uv_data],
+        &mut [&mut dst_data],
     );
 }
 ```
@@ -186,19 +185,18 @@ fn main() {
     const HEIGHT: u32 = 480;
 
     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
-    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
+    let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
+        color_space: ColorSpace::Bt709,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
+        num_planes: 1,
     };
 
     let status = convert_image(
@@ -209,7 +207,7 @@ fn main() {
         &[&src_data],
         &dst_format,
         None,
-        &mut [&mut y_data, &mut uv_data],
+        &mut [&mut dst_data],
     );
 
     match status {
@@ -229,19 +227,18 @@ fn main() -> Result<(), ErrorKind> {
     const HEIGHT: u32 = 480;
 
     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-    let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
-    let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
+    let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
-        color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
+        color_space: ColorSpace::Bt709,
         num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
+        num_planes: 1,
     };
 
     convert_image(
@@ -252,7 +249,7 @@ fn main() -> Result<(), ErrorKind> {
         &[&src_data],
         &dst_format,
         None,
-        &mut [&mut y_data, &mut uv_data],
+        &mut [&mut dst_data],
     )?;
 
     Ok(())
@@ -327,17 +324,17 @@ fn main() -> Result<(), ErrorKind> {
     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
     get_buffers_size(WIDTH, HEIGHT, &dst_format, None, &mut dst_sizes)?;
 
-    let mut dst_data = vec![0u8; dst_sizes[0]];
+    let mut dst_rgba = vec![0u8; dst_sizes[0]];
 
     convert_image(
         WIDTH,
         HEIGHT,
         &src_format,
         None,
-        &[&src_y, &src_uv],
+        &[&src_y[..], &src_uv[..]],
         &dst_format,
         None,
-        &mut [&mut dst_data],
+        &mut [&mut dst_rgba[..]],
     )?;
 
     Ok(())
@@ -357,7 +354,7 @@ fn main() -> Result<(), ErrorKind> {
     const HEIGHT: u32 = 480;
     const NUM_SRC_PLANES: u32 = 1;
     const NUM_DST_PLANES: u32 = 2;
-    const RGB_STRIDE: usize = 4 * (3 * (WIDTH as usize)).div_ceil(4);
+    const RGB_STRIDE: usize = 4 * (((3 * (WIDTH as usize)) + 3) / 4);
 
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgr,
@@ -370,7 +367,7 @@ fn main() -> Result<(), ErrorKind> {
     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
     get_buffers_size(WIDTH, HEIGHT, &src_format, Some(&src_strides), &mut src_sizes)?;
 
-    let src_data = vec![0u8; src_sizes[0]];
+    let src_rgba = vec![0u8; src_sizes[0]];
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
@@ -389,10 +386,10 @@ fn main() -> Result<(), ErrorKind> {
         HEIGHT,
         &src_format,
         Some(&src_strides),
-        &[&src_data],
+        &[&src_rgba[..]],
         &dst_format,
         None,
-        &mut [&mut dst_y, &mut dst_uv],
+        &mut [&mut dst_y[..], &mut dst_uv[..]],
     )?;
 
     Ok(())

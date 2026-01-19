@@ -27,16 +27,20 @@ macro_rules! rgb_to_yuv_converter {
             pub fn [<$src_pf:lower _ $dst_pf:lower _ $dst_cs:lower>](
                 width: u32,
                 height: u32,
+                last_src_plane: u32,
                 src_strides: &[usize],
                 src_buffers: &[&[u8]],
+                last_dst_plane: u32,
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
                 [<rgb _ $dst_pf:lower>]::<{ Sampler::$src_pf as usize }, { crate::pixel_format::PixelFormat::depth(crate::pixel_format::PixelFormat::$src_pf) }, { Colorimetry::$dst_cs as usize }>(
                     width,
                     height,
+                    last_src_plane as usize,
                     src_strides,
                     src_buffers,
+                    last_dst_plane as usize,
                     dst_strides,
                     dst_buffers,
                 )
@@ -53,8 +57,10 @@ macro_rules! yuv_to_rgb_converter {
             pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
                 width: u32,
                 height: u32,
+                last_src_plane: u32,
                 src_strides: &[usize],
                 src_buffers: &[&[u8]],
+                last_dst_plane: u32,
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
@@ -64,8 +70,10 @@ macro_rules! yuv_to_rgb_converter {
                     { crate::pixel_format::PixelFormat::reversed(crate::pixel_format::PixelFormat::$dst_pf) }>(
                     width,
                     height,
+                    last_src_plane as usize,
                     src_strides,
                     src_buffers,
+                    last_dst_plane as usize,
                     dst_strides,
                     dst_buffers,
                 )
@@ -82,16 +90,20 @@ macro_rules! yuv_to_rgb_fallback_converter {
             pub fn [<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>] (
                 width: u32,
                 height: u32,
+                last_src_plane: u32,
                 src_strides: &[usize],
                 src_buffers: &[&[u8]],
+                last_dst_plane: u32,
                 dst_strides: &[usize],
                 dst_buffers: &mut [&mut [u8]],
             ) -> bool {
                 x86::[<$src_pf:lower _ $src_cs:lower _ $dst_pf:lower>](
                     width,
                     height,
+                    last_src_plane,
                     src_strides,
                     src_buffers,
+                    last_dst_plane,
                     dst_strides,
                     dst_buffers,
                 )

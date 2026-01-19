@@ -62,7 +62,7 @@
 //!
 //! # Examples
 //!
-//! Convert an image from bgra to nv12 (two planes) format, with Bt601 color space:
+//! Convert an image from bgra to nv12 (single plane) format, with Bt601 color space:
 //! ```
 //! use dcv_color_primitives as dcp;
 //! use dcp::{convert_image, ColorSpace, ImageFormat, PixelFormat};
@@ -72,8 +72,7 @@
 //!     const HEIGHT: u32 = 480;
 //!
 //!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
+//!     let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -84,7 +83,7 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 2,
+//!         num_planes: 1,
 //!     };
 //!
 //!     convert_image(
@@ -95,7 +94,7 @@
 //!         &[&src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut y_data, &mut uv_data],
+//!         &mut [&mut dst_data],
 //!     );
 //! }
 //! ```
@@ -110,8 +109,7 @@
 //!     const HEIGHT: u32 = 480;
 //!
 //!     let src_data = vec![0u8; 4 * (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut y_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize)];
-//!     let mut uv_data = vec![0u8; (WIDTH as usize) * (HEIGHT as usize) / 2];
+//!     let mut dst_data = vec![0u8; 3 * (WIDTH as usize) * (HEIGHT as usize) / 2];
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
@@ -122,7 +120,7 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 2,
+//!         num_planes: 1,
 //!     };
 //!
 //!     convert_image(
@@ -133,7 +131,7 @@
 //!         &[&src_data],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut y_data, &mut uv_data],
+//!         &mut [&mut dst_data],
 //!     )?;
 //!
 //!     Ok(())
@@ -228,7 +226,7 @@
 //!     const HEIGHT: u32 = 480;
 //!     const NUM_SRC_PLANES: u32 = 1;
 //!     const NUM_DST_PLANES: u32 = 2;
-//!     const RGB_STRIDE: usize = 4 * (3 * (WIDTH as usize)).div_ceil(4);
+//!     const RGB_STRIDE: usize = 4 * (((3 * (WIDTH as usize)) + 3) / 4);
 //!
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgr,
@@ -260,10 +258,10 @@
 //!         HEIGHT,
 //!         &src_format,
 //!         Some(&src_strides),
-//!         &[&src_rgba],
+//!         &[&src_rgba[..]],
 //!         &dst_format,
 //!         None,
-//!         &mut [&mut dst_y, &mut dst_uv],
+//!         &mut [&mut dst_y[..], &mut dst_uv[..]],
 //!     )?;
 //!
 //!     Ok(())
@@ -356,9 +354,9 @@ impl fmt::Display for ErrorKind {
 /// `PixelFormat::Rgba` | 4:4:4       |     |     | 1       | rgba:4 |        |
 /// `PixelFormat::Rgb`  | 4:4:4       |     |     | 1       | rgb:3  |        |
 /// `PixelFormat::I444` | 4:4:4       |     |     | 3       | y:1    | u:1    | v:1
-/// `PixelFormat::I422` | 4:2:2       |  2  |     | 3       | y:1    | u:1/2  | v:1/2
+/// `PixelFormat::I422` | 4:2:2       |  2  |     | 1, 3    | y:1    | u:1/2  | v:1/2
 /// `PixelFormat::I420` | 4:2:0       |  2  |  2  | 3       | y:1    | u:1/4  | v:1/4
-/// `PixelFormat::Nv12` | 4:2:0       |  2  |  2  | 2       | y:1    | uv:1/2 |
+/// `PixelFormat::Nv12` | 4:2:0       |  2  |  2  | 1, 2    | y:1    | uv:1/2 |
 ///
 /// The values reported in columns `w` and `h`, when specified, indicate that the described
 /// image should have width and height that are multiples of the specified values
@@ -372,7 +370,8 @@ pub struct ImageFormat {
     pub num_planes: u32,
 }
 
-type ConvertDispatcher = fn(u32, u32, &[usize], &[&[u8]], &[usize], &mut [&mut [u8]]) -> bool;
+type ConvertDispatcher =
+    fn(u32, u32, u32, &[usize], &[&[u8]], u32, &[usize], &mut [&mut [u8]]) -> bool;
 
 macro_rules! rgb_to_yuv {
     ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident, $dst_cs:ident) => {
@@ -950,8 +949,10 @@ pub fn convert_image(
             if image_converter(
                 width,
                 height,
+                last_src_plane,
                 src_strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
                 src_buffers,
+                last_dst_plane,
                 dst_strides.unwrap_or(&pixel_format::DEFAULT_STRIDES),
                 dst_buffers,
             ) {

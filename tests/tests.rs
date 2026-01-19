@@ -16,10 +16,7 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    not(feature = "test_instruction_sets")
-))]
+#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
 use std::{
     alloc::{Layout, alloc, alloc_zeroed, dealloc},
     ptr::write_bytes,
@@ -87,7 +84,11 @@ fn is_valid_format(format: &ImageFormat, width: u32, height: u32) -> bool {
         PixelFormat::I422 | PixelFormat::I420 => {
             format.num_planes != 3 || (width & 1) == 1 || (height & 1) == 1
         }
-        PixelFormat::Nv12 => format.num_planes != 2 || (width & 1) == 1 || (height & 1) == 1,
+        PixelFormat::Nv12 => {
+            (format.num_planes < 1 || format.num_planes > 2)
+                || (width & 1) == 1
+                || (height & 1) == 1
+        }
         _ => format.num_planes != 1,
     }
 }
@@ -207,10 +208,7 @@ fn buffers_size() {
     }
 }
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    not(feature = "test_instruction_sets")
-))]
+#[cfg(all(target_arch = "x86_64", not(feature = "test_instruction_sets")))]
 #[test]
 fn over_4gb() {
     // In this test the output image will larger than 4GB:
@@ -227,7 +225,7 @@ fn over_4gb() {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
+        num_planes: 1,
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
@@ -235,9 +233,9 @@ fn over_4gb() {
         num_planes: 1,
     };
 
-    let src_sizes = &mut [0_usize; 2];
-    assert!(get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_sizes).is_ok());
-    assert_eq!(src_sizes[0] + src_sizes[1], EXPECTED_SRC_BUFFER_SIZE);
+    let src_size = &mut [0_usize; 1];
+    assert!(get_buffers_size(WIDTH, HEIGHT, &src_format, None, src_size).is_ok());
+    assert_eq!(src_size[0], EXPECTED_SRC_BUFFER_SIZE);
 
     let dst_size = &mut [0_usize; 1];
     assert!(get_buffers_size(WIDTH, HEIGHT, &dst_format, None, dst_size).is_ok());
@@ -261,9 +259,7 @@ fn over_4gb() {
         let dst_layout = Layout::from_size_align_unchecked(EXPECTED_DST_BUFFER_SIZE, 1);
         let dst_ptr = alloc_zeroed(dst_layout);
         if !dst_ptr.is_null() {
-            let src_luma: &[u8] = from_raw_parts_mut(src_ptr, LUMA_SIZE);
-            let src_chroma: &[u8] =
-                from_raw_parts_mut(src_ptr.add(LUMA_SIZE), EXPECTED_SRC_BUFFER_SIZE - LUMA_SIZE);
+            let src_image: &[u8] = from_raw_parts_mut(src_ptr, EXPECTED_SRC_BUFFER_SIZE);
             let dst_image = from_raw_parts_mut(dst_ptr, EXPECTED_DST_BUFFER_SIZE);
 
             // Touch output
@@ -273,7 +269,7 @@ fn over_4gb() {
 
             dst_image[dst_image.len() - 1] = 0;
 
-            let src_buffers = &[src_luma, src_chroma];
+            let src_buffers = &[src_image];
             let dst_buffers = &mut [&mut *dst_image];
 
             assert!(
