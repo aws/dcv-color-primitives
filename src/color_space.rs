@@ -58,6 +58,7 @@ impl fmt::Display for ColorSpace {
 impl TryFrom<i32> for ColorSpace {
     type Error = ();
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(ColorSpace::Rgb),
