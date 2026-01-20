@@ -921,32 +921,96 @@ fn yuv_to_rgb_size_format_mode_stride(
     image_size: (usize, usize),
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
-    pad: (usize, usize, usize),
+    pad: (usize, usize, usize, usize),
 ) {
-    let (y_pad, u_pad, dst_pad) = pad;
+    let (y_pad, u_pad, v_pad, dst_pad) = pad;
     let w = image_size.0;
     let h = image_size.1;
     let cw = w.div_ceil(2);
-    let ch = h.div_ceil(2);
+    let ch = if let PixelFormat::I444 = src_format.pixel_format {
+        h
+    } else {
+        h.div_ceil(2)
+    };
 
     let y_stride = w + y_pad;
-    let u_stride = 2 * cw + u_pad;
     let y_size = y_stride * h;
-    let src_size = y_size + u_stride * ch;
+    let (u_stride, v_stride, src_size) = match src_format.pixel_format {
+        PixelFormat::Nv12 => {
+            let u_stride = 2 * cw + u_pad;
+            (u_stride, u_stride, y_size + u_stride * ch)
+        }
+        PixelFormat::I420 => {
+            let u_stride = cw + u_pad;
+            let v_stride = cw + v_pad;
+            let u_size = u_stride * ch;
+            (u_stride, v_stride, y_size + u_size + v_stride * ch)
+        }
+        _ => {
+            // PixelFormat::I444
+            let u_stride = w + u_pad;
+            let v_stride = w + v_pad;
+            let u_size = u_stride * ch;
+            (u_stride, v_stride, y_size + u_size + v_stride * ch)
+        }
+    };
 
     let color_space_index = get_color_space_index(src_format.color_space);
 
     let mut src_image = vec![0_u8; src_size];
     if w > 0 && h > 0 {
         fill_planar_luma(&mut src_image, Y_SRC[color_space_index], cw, h, y_stride);
-        fill_biplanar_chroma(
-            &mut src_image[y_size..],
-            U_SRC[color_space_index],
-            V_SRC[color_space_index],
-            cw,
-            ch,
-            u_stride,
-        );
+        match src_format.pixel_format {
+            PixelFormat::Nv12 => {
+                fill_biplanar_chroma(
+                    &mut src_image[y_size..],
+                    U_SRC[color_space_index],
+                    V_SRC[color_space_index],
+                    cw,
+                    ch,
+                    u_stride,
+                );
+            }
+            PixelFormat::I420 => {
+                let u_size = u_stride * ch;
+                fill_planar_chroma(
+                    &mut src_image[y_size..y_size + u_size],
+                    U_SRC[color_space_index],
+                    cw,
+                    ch,
+                    u_stride,
+                    0,
+                );
+                fill_planar_chroma(
+                    &mut src_image[y_size + u_size..],
+                    V_SRC[color_space_index],
+                    cw,
+                    ch,
+                    v_stride,
+                    0,
+                );
+            }
+            _ => {
+                // PixelFormat::I444
+                let u_size = u_stride * ch;
+                fill_planar_chroma(
+                    &mut src_image[y_size..y_size + u_size],
+                    U_SRC[color_space_index],
+                    w,
+                    ch,
+                    u_stride,
+                    1,
+                );
+                fill_planar_chroma(
+                    &mut src_image[y_size + u_size..],
+                    V_SRC[color_space_index],
+                    w,
+                    ch,
+                    v_stride,
+                    1,
+                );
+            }
+        }
     }
 
     let dst_stride = w * 3 + dst_pad;
@@ -958,21 +1022,32 @@ fn yuv_to_rgb_size_format_mode_stride(
         dst_stride
     };
 
-    let (first, last) = src_image.split_at(y_size);
-    let src_strides = [
-        if y_pad == 0 { STRIDE_AUTO } else { y_stride },
-        if u_pad == 0 { STRIDE_AUTO } else { u_stride },
-    ];
-    let src_buffers = [first, last];
-
-    let mut expected_row = vec![0_i32; 3 * w];
-    for (x, pixel) in expected_row.chunks_exact_mut(3).enumerate() {
-        let index = (x >> 1) & 7;
-
-        pixel[0] = if (index & 1) == 0 { 0 } else { 255 };
-        pixel[1] = if ((index >> 1) & 1) == 0 { 0 } else { 255 };
-        pixel[2] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
-    }
+    let y_size = y_stride * h;
+    let (src_strides, src_buffers): (Vec<usize>, Vec<&[u8]>) =
+        if let PixelFormat::Nv12 = src_format.pixel_format {
+            let (first, last) = src_image.split_at(y_size);
+            (
+                vec![
+                    if y_pad == 0 { STRIDE_AUTO } else { y_stride },
+                    if u_pad == 0 { STRIDE_AUTO } else { u_stride },
+                ],
+                vec![first, last],
+            )
+        } else {
+            let u_size = u_stride * ch;
+            (
+                vec![
+                    if y_pad == 0 { STRIDE_AUTO } else { y_stride },
+                    if u_pad == 0 { STRIDE_AUTO } else { u_stride },
+                    if v_pad == 0 { STRIDE_AUTO } else { v_stride },
+                ],
+                vec![
+                    &src_image[..y_size],
+                    &src_image[y_size..y_size + u_size],
+                    &src_image[y_size + u_size..],
+                ],
+            )
+        };
 
     assert!(
         convert_image(
@@ -993,6 +1068,15 @@ fn yuv_to_rgb_size_format_mode_stride(
     }
 
     let pack_stride = w * 3;
+    let mut expected_row = vec![0_i32; pack_stride];
+    for (x, pixel) in expected_row.chunks_exact_mut(3).enumerate() {
+        let index = (x >> 1) & 7;
+
+        pixel[0] = if (index & 1) == 0 { 0 } else { 255 };
+        pixel[1] = if ((index >> 1) & 1) == 0 { 0 } else { 255 };
+        pixel[2] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
+    }
+
     let dst_stride = pack_stride + dst_pad;
     for row in dst_image.chunks_exact(dst_stride).take(h) {
         let (pixels, pad) = row.split_at(pack_stride);
@@ -1015,19 +1099,30 @@ fn yuv_to_rgb_size_format_mode(
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
 ) {
-    for (y_pad, uv_pad, dst_pad) in
-        iproduct!(0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD)
-    {
-        yuv_to_rgb_size_format_mode_stride(
-            image_size,
-            src_format,
-            dst_format,
-            (y_pad, uv_pad, dst_pad),
-        );
+    if src_format.num_planes == 2 {
+        for (y_pad, uv_pad, dst_pad) in
+            iproduct!(0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD)
+        {
+            yuv_to_rgb_size_format_mode_stride(
+                image_size,
+                src_format,
+                dst_format,
+                (y_pad, uv_pad, uv_pad, dst_pad),
+            );
+        }
+    } else {
+        for pad in iproduct!(
+            0..YUV_RGB_MAX_PAD,
+            0..YUV_RGB_MAX_PAD,
+            0..YUV_RGB_MAX_PAD,
+            0..YUV_RGB_MAX_PAD
+        ) {
+            yuv_to_rgb_size_format_mode_stride(image_size, src_format, dst_format, pad);
+        }
     }
 }
 
-fn yuv_to_rgb_ok() {
+fn yuv_to_rgb_ok(pixel_format: PixelFormat) {
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Rgb,
         color_space: ColorSpace::Rgb,
@@ -1036,9 +1131,13 @@ fn yuv_to_rgb_ok() {
 
     for color_space in SUPPORTED_COLOR_SPACES {
         let src_format = ImageFormat {
-            pixel_format: PixelFormat::Nv12,
+            pixel_format,
             color_space: *color_space,
-            num_planes: 2,
+            num_planes: if let PixelFormat::Nv12 = pixel_format {
+                2
+            } else {
+                3
+            },
         };
 
         for (width, height) in iproduct!(0..=YUV_RGB_MAX_WIDTH, 0..=YUV_RGB_MAX_HEIGHT) {
@@ -1169,7 +1268,17 @@ mod conversions {
 
     #[test]
     fn nv12_to_rgb() {
-        yuv_to_rgb_ok();
+        yuv_to_rgb_ok(PixelFormat::Nv12);
+    }
+
+    #[test]
+    fn i420_to_rgb() {
+        yuv_to_rgb_ok(PixelFormat::I420);
+    }
+
+    #[test]
+    fn i444_to_rgb() {
+        yuv_to_rgb_ok(PixelFormat::I444);
     }
 
     #[test]
@@ -1214,7 +1323,9 @@ mod conversions {
             yuv_to_bgra_ok(PixelFormat::I420, 3);
             yuv_to_bgra_ok(PixelFormat::I444, 3);
             yuv_to_bgra_ok(PixelFormat::Nv12, 2);
-            yuv_to_rgb_ok();
+            yuv_to_rgb_ok(PixelFormat::Nv12);
+            yuv_to_rgb_ok(PixelFormat::I420);
+            yuv_to_rgb_ok(PixelFormat::I444);
         }
     }
 }

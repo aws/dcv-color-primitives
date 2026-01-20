@@ -229,7 +229,7 @@ unsafe fn rgb_to_y_and_avg_uv_8x<const SAMPLER: usize>(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_i444_8x<const SAMPLER: usize>(
+unsafe fn rgb_to_yuv_8x<const SAMPLER: usize>(
     rgb: *const u8,
     y: *mut u8,
     u: *mut u8,
@@ -274,25 +274,7 @@ unsafe fn rgb_to_i444_8x<const SAMPLER: usize>(
 }
 
 #[inline(always)]
-unsafe fn rgb_to_nv12_8x<const SAMPLER: usize>(
-    rgb_top: *const u8,
-    rgb_bot: *const u8,
-    y_top: *mut u8,
-    y_bot: *mut u8,
-    uv: *mut u8,
-    weights: &Weights,
-) {
-    let (lo, hi) = rgb_to_y_and_avg_uv_8x::<SAMPLER>(rgb_top, rgb_bot, y_top, y_bot, weights);
-
-    let u_and_v = vcombine_s16(vzip1_s16(lo, hi), vzip2_s16(lo, hi));
-    let u_and_v = vaddq_s16(u_and_v, vdupq_n_s16(UV_BIAS));
-    let u_and_v = vqmovn_u16(vreinterpretq_u16_s16(u_and_v));
-
-    vst1_u8(uv.cast(), u_and_v);
-}
-
-#[inline(always)]
-unsafe fn rgb_to_i420_8x<const SAMPLER: usize>(
+unsafe fn rgb_to_subsampled_yuv_8x<const SAMPLER: usize, const BIPLANAR: bool>(
     rgb_top: *const u8,
     rgb_bot: *const u8,
     y_top: *mut u8,
@@ -303,59 +285,36 @@ unsafe fn rgb_to_i420_8x<const SAMPLER: usize>(
 ) {
     let (lo, hi) = rgb_to_y_and_avg_uv_8x::<SAMPLER>(rgb_top, rgb_bot, y_top, y_bot, weights);
 
-    let u_then_v = vcombine_s16(lo, hi);
-    let u_then_v = vaddq_s16(u_then_v, vdupq_n_s16(UV_BIAS));
-    let u_then_v = vreinterpret_u32_u8(vqmovn_u16(vreinterpretq_u16_s16(u_then_v)));
+    if BIPLANAR {
+        let u_and_v = vcombine_s16(vzip1_s16(lo, hi), vzip2_s16(lo, hi));
+        let u_and_v = vaddq_s16(u_and_v, vdupq_n_s16(UV_BIAS));
+        let u_and_v = vqmovn_u16(vreinterpretq_u16_s16(u_and_v));
 
-    vst1_lane_u32(u.cast(), u_then_v, 0);
-    vst1_lane_u32(v.cast(), u_then_v, 1);
-}
+        vst1_u8(u.cast(), u_and_v);
+    } else {
+        let u_then_v = vcombine_s16(lo, hi);
+        let u_then_v = vaddq_s16(u_then_v, vdupq_n_s16(UV_BIAS));
+        let u_then_v = vreinterpret_u32_u8(vqmovn_u16(vreinterpretq_u16_s16(u_then_v)));
 
-#[inline]
-#[target_feature(enable = "neon")]
-unsafe fn rgb_to_nv12_neon<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
-    width: usize,
-    height: usize,
-    src_stride: usize,
-    src_buffer: &[u8],
-    dst_strides: (usize, usize),
-    dst_buffers: &mut (&mut [u8], &mut [u8]),
-) {
-    const DST_DEPTH: usize = RGB_TO_YUV_WAVES;
-
-    let (y_stride, uv_stride) = dst_strides;
-
-    let src_group = src_buffer.as_ptr();
-    let y_group = dst_buffers.0.as_mut_ptr();
-    let uv_group = dst_buffers.1.as_mut_ptr();
-
-    let src_depth = DEPTH * RGB_TO_YUV_WAVES;
-    let wg_width = width / RGB_TO_YUV_WAVES;
-    let wg_height = height / 2;
-
-    for y in 0..wg_height {
-        for x in 0..wg_width {
-            rgb_to_nv12_8x::<SAMPLER>(
-                src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
-                src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
-                y_group.add(wg_index(x, 2 * y, DST_DEPTH, y_stride)),
-                y_group.add(wg_index(x, 2 * y + 1, DST_DEPTH, y_stride)),
-                uv_group.add(wg_index(x, y, DST_DEPTH, uv_stride)),
-                &FORWARD_WEIGHTS[COLORIMETRY],
-            );
-        }
+        vst1_lane_u32(u.cast(), u_then_v, 0);
+        vst1_lane_u32(v.cast(), u_then_v, 1);
     }
 }
 
 #[inline]
 #[target_feature(enable = "neon")]
-unsafe fn rgb_to_i420_neon<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_subsampled_yuv_neon<
+    const SAMPLER: usize,
+    const DEPTH: usize,
+    const COLORIMETRY: usize,
+    const BIPLANAR: bool,
+>(
     width: usize,
     height: usize,
     src_stride: usize,
     src_buffer: &[u8],
     dst_strides: (usize, usize, usize),
-    dst_buffers: &mut (&mut [u8], &mut [u8], &mut [u8]),
+    dst_buffers: (&mut [u8], &mut [u8], &mut [u8]),
 ) {
     let (y_stride, u_stride, v_stride) = dst_strides;
 
@@ -370,13 +329,23 @@ unsafe fn rgb_to_i420_neon<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..wg_height {
         for x in 0..wg_width {
-            rgb_to_i420_8x::<SAMPLER>(
+            let (u_data, v_data) = if BIPLANAR {
+                let u_data = u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride));
+                (u_data, u_data)
+            } else {
+                (
+                    u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
+                    v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
+                )
+            };
+
+            rgb_to_subsampled_yuv_8x::<SAMPLER, BIPLANAR>(
                 src_group.add(wg_index(x, 2 * y, src_depth, src_stride)),
                 src_group.add(wg_index(x, 2 * y + 1, src_depth, src_stride)),
                 y_group.add(wg_index(x, 2 * y, RGB_TO_YUV_WAVES, y_stride)),
                 y_group.add(wg_index(x, 2 * y + 1, RGB_TO_YUV_WAVES, y_stride)),
-                u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, u_stride)),
-                v_group.add(wg_index(x, y, RGB_TO_YUV_WAVES / 2, v_stride)),
+                u_data,
+                v_data,
                 &FORWARD_WEIGHTS[COLORIMETRY],
             );
         }
@@ -385,7 +354,7 @@ unsafe fn rgb_to_i420_neon<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
 #[inline]
 #[target_feature(enable = "neon")]
-unsafe fn rgb_to_i444_neon<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
+unsafe fn rgb_to_yuv_neon<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -405,7 +374,7 @@ unsafe fn rgb_to_i444_neon<const SAMPLER: usize, const DEPTH: usize, const COLOR
 
     for y in 0..height {
         for x in 0..wg_width {
-            rgb_to_i444_8x::<SAMPLER>(
+            rgb_to_yuv_8x::<SAMPLER>(
                 src_group.add(wg_index(x, y, rgb_depth, src_stride)),
                 y_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, y_stride)),
                 u_group.add(wg_index(x, y, RGB_TO_YUV_WAVES, u_stride)),
@@ -474,13 +443,13 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 && vector_height > 0 {
         unsafe {
-            rgb_to_nv12_neon::<SAMPLER, DEPTH, COLORIMETRY>(
+            rgb_to_subsampled_yuv_neon::<SAMPLER, DEPTH, COLORIMETRY, true>(
                 vector_width,
                 vector_height,
                 src_stride,
                 src_buffer,
-                dst_strides,
-                &mut (y_plane, uv_plane),
+                (dst_strides.0, dst_strides.1, 0),
+                (y_plane, uv_plane, &mut []),
             );
         }
     }
@@ -490,27 +459,28 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let x = vector_width;
         let sx = x * DEPTH;
 
-        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, true>(
             scalar_width,
             h,
             src_stride,
             &src_buffer[sx..],
-            dst_strides,
-            &mut (&mut y_plane[x..], &mut uv_plane[x..]),
+            (dst_strides.0, dst_strides.1, 0),
+            (&mut y_plane[x..], &mut uv_plane[x..], &mut []),
         );
     }
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, true>(
             w,
             scalar_height,
             src_stride,
             &src_buffer[src_stride * vector_height..],
-            dst_strides,
-            &mut (
+            (dst_strides.0, dst_strides.1, 0),
+            (
                 &mut y_plane[dst_strides.0 * vector_height..],
                 &mut uv_plane[dst_strides.1 * (vector_height >> 1)..],
+                &mut [],
             ),
         );
     }
@@ -578,13 +548,13 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let vector_height = lower_multiple_of_pot(h, 2);
     if vector_width > 0 {
         unsafe {
-            rgb_to_i420_neon::<SAMPLER, DEPTH, COLORIMETRY>(
+            rgb_to_subsampled_yuv_neon::<SAMPLER, DEPTH, COLORIMETRY, false>(
                 vector_width,
                 vector_height,
                 src_stride,
                 src_buffer,
                 dst_strides,
-                &mut (y_plane, u_plane, v_plane),
+                (y_plane, u_plane, v_plane),
             );
         }
     }
@@ -595,25 +565,25 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let cx = x / 2;
         let sx = x * DEPTH;
 
-        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, false>(
             scalar_width,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
-            &mut (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
+            (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
         );
     }
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, false>(
             w,
             scalar_height,
             src_stride,
             &src_buffer[src_stride * vector_height..],
             dst_strides,
-            &mut (
+            (
                 &mut y_plane[dst_strides.0 * vector_height..],
                 &mut u_plane[dst_strides.1 * (vector_height >> 1)..],
                 &mut v_plane[dst_strides.2 * (vector_height >> 1)..],
@@ -678,7 +648,7 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            rgb_to_i444_neon::<SAMPLER, DEPTH, COLORIMETRY>(
+            rgb_to_yuv_neon::<SAMPLER, DEPTH, COLORIMETRY>(
                 vector_part,
                 h,
                 src_stride,
@@ -693,13 +663,13 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let x = vector_part;
         let sx = x * DEPTH;
 
-        x86::rgb_to_i444::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
-            &mut (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
+            (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
         );
     }
 
@@ -738,7 +708,7 @@ unsafe fn bgr_to_rgb_neon(
 
 #[inline]
 #[target_feature(enable = "neon")]
-unsafe fn bgra_to_rgb_neon(
+unsafe fn rgba_to_rgb_neon<const REVERSED: bool>(
     width: usize,
     height: usize,
     src_stride: usize,
@@ -758,7 +728,11 @@ unsafe fn bgra_to_rgb_neon(
 
         for _ in (0..width).step_by(LANE_COUNT) {
             let src = vld4q_u8(src_group.add(src_offset).cast());
-            let rgb = uint8x16x3_t(src.2, src.1, src.0);
+            let rgb = if REVERSED {
+                uint8x16x3_t(src.2, src.1, src.0) // BGRA -> RGB
+            } else {
+                uint8x16x3_t(src.1, src.2, src.3) // ARGB -> RGB
+            };
             vst3q_u8(dst_group.add(dst_offset).cast(), rgb);
 
             src_offset += SRC_DEPTH * LANE_COUNT;
@@ -835,20 +809,28 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
 yuv_to_rgb_fallback_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_fallback_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_fallback_converter!(I420, Bt601, Rgba);
 yuv_to_rgb_fallback_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_fallback_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_fallback_converter!(I420, Bt601FR, Rgba);
 yuv_to_rgb_fallback_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_fallback_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_fallback_converter!(I420, Bt709, Rgba);
 yuv_to_rgb_fallback_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_fallback_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_fallback_converter!(I420, Bt709FR, Rgba);
 yuv_to_rgb_fallback_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_fallback_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_fallback_converter!(I444, Bt601, Rgba);
 yuv_to_rgb_fallback_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_fallback_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_fallback_converter!(I444, Bt601FR, Rgba);
 yuv_to_rgb_fallback_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_fallback_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_fallback_converter!(I444, Bt709, Rgba);
 yuv_to_rgb_fallback_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_fallback_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_fallback_converter!(I444, Bt709FR, Rgba);
 yuv_to_rgb_fallback_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_fallback_converter!(Nv12, Bt601, Rgb);
@@ -924,7 +906,7 @@ pub fn bgr_rgb(
         let sx = x * DEPTH;
         let dx = x * DEPTH;
 
-        x86::bgr_to_rgb(
+        x86::bgr_to_rgb_swar(
             scalar_part,
             h,
             src_stride,
@@ -937,7 +919,7 @@ pub fn bgr_rgb(
     true
 }
 
-pub fn bgra_rgb(
+fn rgba_to_rgb<const REVERSED: bool>(
     width: u32,
     height: u32,
     src_strides: &[usize],
@@ -984,7 +966,7 @@ pub fn bgra_rgb(
     let scalar_part = w - vector_part;
     if vector_part > 0 {
         unsafe {
-            bgra_to_rgb_neon(
+            rgba_to_rgb_neon::<REVERSED>(
                 vector_part,
                 h,
                 src_stride,
@@ -1000,7 +982,7 @@ pub fn bgra_rgb(
         let sx = x * SRC_DEPTH;
         let dx = x * DST_DEPTH;
 
-        x86::bgra_to_rgb(
+        x86::rgba_to_rgb_swar::<REVERSED>(
             scalar_part,
             h,
             src_stride,
@@ -1011,6 +993,42 @@ pub fn bgra_rgb(
     }
 
     true
+}
+
+pub fn bgra_rgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    rgba_to_rgb::<true>(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn argb_rgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    rgba_to_rgb::<false>(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+    )
 }
 
 pub fn rgb_bgra(
@@ -1076,7 +1094,7 @@ pub fn rgb_bgra(
         let sx = x * SRC_DEPTH;
         let dx = x * DST_DEPTH;
 
-        x86::rgb_to_bgra(
+        x86::rgb_to_bgra_swar(
             scalar_part,
             h,
             src_stride,

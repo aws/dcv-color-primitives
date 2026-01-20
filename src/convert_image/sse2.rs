@@ -963,11 +963,11 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
 
     if DEPTH == 3 {
         // Needed _mm_shuffle_epi8 is from SSSE3, fallback to scalar path
-        x86::nv12_to_rgb::<COLORIMETRY>(
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, true>(
             w,
             h,
-            src_strides,
-            (src_buffers.0, src_buffers.1),
+            (src_strides.0, src_strides.1, 0),
+            (src_buffers.0, src_buffers.1, &[]),
             dst_stride,
             dst_buffer,
         );
@@ -996,11 +996,11 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         let x = vector_width;
         let dx = x * DEPTH;
 
-        x86::nv12_to_bgra::<COLORIMETRY, REVERSED>(
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, true>(
             scalar_width,
             h,
-            src_strides,
-            (&src_buffers.0[x..], &src_buffers.1[x..]),
+            (src_strides.0, src_strides.1, 0),
+            (&src_buffers.0[x..], &src_buffers.1[x..], &[]),
             dst_stride,
             &mut dst_buffer[dx..],
         );
@@ -1008,13 +1008,14 @@ fn nv12_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::nv12_to_bgra::<COLORIMETRY, REVERSED>(
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, true>(
             w,
             scalar_height,
-            src_strides,
+            (src_strides.0, src_strides.1, 0),
             (
                 &src_buffers.0[src_strides.0 * vector_height..],
                 &src_buffers.1[src_strides.1 * (vector_height >> 1)..],
+                &[],
             ),
             dst_stride,
             &mut dst_buffer[dst_stride * vector_height..],
@@ -1074,6 +1075,20 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         return false;
     }
 
+    if DEPTH == 3 {
+        // Needed _mm_shuffle_epi8 is from SSSE3, fallback to scalar path
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, false>(
+            w,
+            h,
+            src_strides,
+            src_buffers,
+            dst_stride,
+            dst_buffer,
+        );
+
+        return true;
+    }
+
     // Process vector part and scalar one
     let vector_width = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES);
     let vector_height = lower_multiple_of_pot(h, 2);
@@ -1096,7 +1111,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         let cx = x / 2;
         let dx = x * DEPTH;
 
-        x86::i420_to_bgra::<COLORIMETRY, REVERSED>(
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, false>(
             scalar_width,
             h,
             src_strides,
@@ -1112,7 +1127,7 @@ fn i420_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::i420_to_bgra::<COLORIMETRY, REVERSED>(
+        x86::subsampled_yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED, false>(
             w,
             scalar_height,
             src_strides,
@@ -1176,6 +1191,20 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         return false;
     }
 
+    if DEPTH == 3 {
+        // Needed _mm_shuffle_epi8 is from SSSE3, fallback to scalar path
+        x86::yuv_to_rgb_swar::<COLORIMETRY, DEPTH, false>(
+            w,
+            h,
+            src_strides,
+            src_buffers,
+            dst_stride,
+            dst_buffer,
+        );
+
+        return true;
+    }
+
     // Process vector part and scalar one
     let vector_part = lower_multiple_of_pot(w, YUV_TO_RGB_WAVES / 2);
     let scalar_part = w - vector_part;
@@ -1196,7 +1225,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
         let x = vector_part;
         let dx = x * DEPTH;
 
-        x86::i444_to_bgra::<COLORIMETRY, REVERSED>(
+        x86::yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED>(
             scalar_part,
             h,
             src_strides,
@@ -1287,27 +1316,28 @@ fn rgb_nv12<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let x = vector_width;
         let sx = x * DEPTH;
 
-        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, true>(
             scalar_width,
             h,
             src_stride,
             &src_buffer[sx..],
-            dst_strides,
-            &mut (&mut y_plane[x..], &mut uv_plane[x..]),
+            (dst_strides.0, dst_strides.1, 0),
+            (&mut y_plane[x..], &mut uv_plane[x..], &mut []),
         );
     }
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::rgb_to_nv12::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, true>(
             w,
             scalar_height,
             src_stride,
             &src_buffer[src_stride * vector_height..],
-            dst_strides,
-            &mut (
+            (dst_strides.0, dst_strides.1, 0),
+            (
                 &mut y_plane[dst_strides.0 * vector_height..],
                 &mut uv_plane[dst_strides.1 * (vector_height >> 1)..],
+                &mut [],
             ),
         );
     }
@@ -1392,25 +1422,25 @@ fn rgb_i420<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let cx = x / 2;
         let sx = x * DEPTH;
 
-        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, false>(
             scalar_width,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
-            &mut (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
+            (&mut y_plane[x..], &mut u_plane[cx..], &mut v_plane[cx..]),
         );
     }
 
     let scalar_height = h - vector_height;
     if scalar_height > 0 {
-        x86::rgb_to_i420::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_subsampled_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY, false>(
             w,
             scalar_height,
             src_stride,
             &src_buffer[src_stride * vector_height..],
             dst_strides,
-            &mut (
+            (
                 &mut y_plane[dst_strides.0 * vector_height..],
                 &mut u_plane[dst_strides.1 * (vector_height >> 1)..],
                 &mut v_plane[dst_strides.2 * (vector_height >> 1)..],
@@ -1494,13 +1524,13 @@ fn rgb_i444<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
         let x = vector_part;
         let sx = x * DEPTH;
 
-        x86::rgb_to_i444::<SAMPLER, DEPTH, COLORIMETRY>(
+        x86::rgb_to_yuv_swar::<SAMPLER, DEPTH, COLORIMETRY>(
             scalar_part,
             h,
             src_stride,
             &src_buffer[sx..],
             dst_strides,
-            &mut (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
+            (&mut y_plane[x..], &mut u_plane[x..], &mut v_plane[x..]),
         );
     }
 
@@ -1544,20 +1574,28 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
+yuv_to_rgb_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_converter!(I420, Bt601, Rgba);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
+yuv_to_rgb_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_converter!(I420, Bt709, Rgba);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
+yuv_to_rgb_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_converter!(I444, Bt601, Rgba);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
+yuv_to_rgb_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_converter!(I444, Bt709, Rgba);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
@@ -1599,6 +1637,24 @@ pub fn bgra_rgb(
     dst_buffers: &mut [&mut [u8]],
 ) -> bool {
     x86::bgra_rgb(
+        width,
+        height,
+        src_strides,
+        src_buffers,
+        dst_strides,
+        dst_buffers,
+    )
+}
+
+pub fn argb_rgb(
+    width: u32,
+    height: u32,
+    src_strides: &[usize],
+    src_buffers: &[&[u8]],
+    dst_strides: &[usize],
+    dst_buffers: &mut [&mut [u8]],
+) -> bool {
+    x86::argb_rgb(
         width,
         height,
         src_strides,
@@ -1671,7 +1727,7 @@ pub fn rgb_bgra(
         let sx = x * SRC_DEPTH;
         let dx = x * DST_DEPTH;
 
-        x86::rgb_to_bgra(
+        x86::rgb_to_bgra_swar(
             scalar_part,
             h,
             src_stride,

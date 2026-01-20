@@ -46,11 +46,11 @@
 //!
 //! | Source pixel format  | Destination pixel formats  |
 //! | -------------------- | -------------------------- |
-//! | ARGB                 | I420, I444, NV12           |
+//! | ARGB                 | I420, I444, NV12, RGB      |
 //! | BGR                  | I420, I444, NV12, RGB      |
 //! | BGRA                 | I420, I444, NV12, RGB      |
-//! | I420                 | BGRA, RGBA                 |
-//! | I444                 | BGRA, RGBA                 |
+//! | I420                 | BGRA, RGB, RGBA            |
+//! | I444                 | BGRA, RGB, RGBA            |
 //! | NV12                 | BGRA, RGB, RGBA            |
 //! | RGB                  | BGRA                       |
 //!
@@ -430,6 +430,7 @@ macro_rules! rgb_to_rgb {
 
 macro_rules! set_dispatch_table {
     ($conv:expr, $set:ident) => {
+        rgb_to_rgb!($conv, $set, Argb, Rgb);
         rgb_to_rgb!($conv, $set, Bgr, Rgb);
         rgb_to_rgb!($conv, $set, Bgra, Rgb);
         rgb_to_rgb!($conv, $set, Rgb, Bgra);
@@ -470,20 +471,28 @@ macro_rules! set_dispatch_table {
         rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709);
         rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709FR);
         yuv_to_rgb!($conv, $set, I420, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt601, Rgb);
         yuv_to_rgb!($conv, $set, I420, Bt601, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt601FR, Rgb);
         yuv_to_rgb!($conv, $set, I420, Bt601FR, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709, Rgb);
         yuv_to_rgb!($conv, $set, I420, Bt709, Rgba);
         yuv_to_rgb!($conv, $set, I420, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, I420, Bt709FR, Rgb);
         yuv_to_rgb!($conv, $set, I420, Bt709FR, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt601, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601, Rgb);
         yuv_to_rgb!($conv, $set, I444, Bt601, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt601FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt601FR, Rgb);
         yuv_to_rgb!($conv, $set, I444, Bt601FR, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt709, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709, Rgb);
         yuv_to_rgb!($conv, $set, I444, Bt709, Rgba);
         yuv_to_rgb!($conv, $set, I444, Bt709FR, Bgra);
+        yuv_to_rgb!($conv, $set, I444, Bt709FR, Rgb);
         yuv_to_rgb!($conv, $set, I444, Bt709FR, Rgba);
         yuv_to_rgb!($conv, $set, Nv12, Bt601, Bgra);
         yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgb);
@@ -763,6 +772,7 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Argb`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Argb`             | `PixelFormat::Nv12` [`1`]
+///   `PixelFormat::Argb`             | `PixelFormat::Rgb`  [`6`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I420` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgra`             | `PixelFormat::Nv12` [`1`]
@@ -771,8 +781,8 @@ pub fn get_buffers_size(
 ///   `PixelFormat::Bgr`              | `PixelFormat::I444` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::Nv12` [`1`]
 ///   `PixelFormat::Bgr`              | `PixelFormat::Rgb`  [`5`]
-///   `PixelFormat::I420`             | `PixelFormat::Bgra`, `PixelFormat::Rgba` [`2`]
-///   `PixelFormat::I444`             | `PixelFormat::Bgra`, `PixelFormat::Rgba` [`2`]
+///   `PixelFormat::I420`             | `PixelFormat::Bgra`, `PixelFormat::Rgb`, `PixelFormat::Rgba` [`2`]
+///   `PixelFormat::I444`             | `PixelFormat::Bgra`, `PixelFormat::Rgb`, `PixelFormat::Rgba` [`2`]
 ///   `PixelFormat::Nv12`             | `PixelFormat::Bgra`, `PixelFormat::Rgb`, `PixelFormat::Rgba` [`2`]
 ///   `PixelFormat::Rgb`              | `PixelFormat::Bgra` [`3`]
 ///
@@ -862,6 +872,9 @@ pub fn get_buffers_size(
 /// # Algorithm 5
 /// Conversion from BGR to RGB
 ///
+/// # Algorithm 6
+/// Conversion from ARGB to RGB
+///
 /// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`InvalidOperation`]: ./enum.ErrorKind.html#variant.InvalidOperation
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
@@ -869,6 +882,9 @@ pub fn get_buffers_size(
 /// [`1`]: ./fn.convert_image.html#algorithm-1
 /// [`2`]: ./fn.convert_image.html#algorithm-2
 /// [`3`]: ./fn.convert_image.html#algorithm-3
+/// [`4`]: ./fn.convert_image.html#algorithm-4
+/// [`5`]: ./fn.convert_image.html#algorithm-5
+/// [`6`]: ./fn.convert_image.html#algorithm-6
 pub fn convert_image(
     width: u32,
     height: u32,
