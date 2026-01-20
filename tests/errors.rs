@@ -42,6 +42,7 @@ const WIDTH_YUV: u32 = 33;
 const HEIGHT_YUV: u32 = 3;
 
 const PIXEL_FORMAT_I444: u32 = PixelFormat::I444 as u32;
+const PIXEL_FORMAT_I420: u32 = PixelFormat::I420 as u32;
 const COLOR_SPACE_RGB: u32 = ColorSpace::Rgb as u32;
 const PIXEL_FORMAT_ARGB: u32 = PixelFormat::Argb as u32;
 const PIXEL_FORMAT_BGRA: u32 = PixelFormat::Bgra as u32;
@@ -444,7 +445,9 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
             expected,
             !(dst_pf == PIXEL_FORMAT_BGRA
                 || dst_pf == PIXEL_FORMAT_RGBA
-                || (src_pf == PIXEL_FORMAT_NV12 && dst_pf == PIXEL_FORMAT_RGB)),
+                || (src_pf == PIXEL_FORMAT_NV12 && dst_pf == PIXEL_FORMAT_RGB)
+                || (src_pf == PIXEL_FORMAT_I420 && dst_pf == PIXEL_FORMAT_RGB)
+                || (src_pf == PIXEL_FORMAT_I444 && dst_pf == PIXEL_FORMAT_RGB)),
             ErrorKind::InvalidOperation
         );
         set_expected!(

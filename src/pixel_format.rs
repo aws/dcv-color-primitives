@@ -98,6 +98,7 @@ impl fmt::Display for PixelFormat {
 impl TryFrom<i32> for PixelFormat {
     type Error = ();
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(PixelFormat::Argb),
@@ -132,10 +133,6 @@ pub fn get_buffers_size(
     strides: &[usize],
     buffers_size: &mut [usize],
 ) -> bool {
-    if strides.len() > MAX_NUMBER_OF_PLANES || buffers_size.len() > MAX_NUMBER_OF_PLANES {
-        return false;
-    }
-
     let min_plane_len = match pixel_format {
         PixelFormat::Argb
         | PixelFormat::Bgra
