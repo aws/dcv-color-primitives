@@ -324,6 +324,10 @@ fn fill_biplanar_chroma(
     height: usize,
     stride: usize,
 ) {
+    if stride == 0 {
+        return;
+    }
+
     for row in plane.chunks_exact_mut(stride).take(height) {
         for (pos, uv_val) in row.chunks_exact_mut(2).enumerate().take(width) {
             let index = pos & 0x7;
@@ -341,6 +345,10 @@ fn fill_planar_chroma(
     stride: usize,
     shift: usize,
 ) {
+    if stride == 0 {
+        return;
+    }
+
     for row in plane.chunks_exact_mut(stride).take(height) {
         for (pos, val) in row.iter_mut().enumerate().take(width) {
             *val = src[(pos >> shift) & 0x7];
@@ -349,6 +357,10 @@ fn fill_planar_chroma(
 }
 
 fn fill_planar_luma(plane: &mut [u8], src: [u8; 8], width: usize, height: usize, stride: usize) {
+    if stride == 0 {
+        return;
+    }
+
     for row in plane.chunks_exact_mut(stride).take(height) {
         for (pos, luma) in row.chunks_mut(2).enumerate().take(width) {
             luma.fill(src[pos & 7]);
@@ -459,11 +471,15 @@ fn get_depth(pixel_format: PixelFormat) -> usize {
 }
 
 fn check_plane(plane: &[u8], reference: &PlaneRef, width: usize, stride: usize) {
+    if stride == 0 {
+        return;
+    }
+
     let PlaneRef::Full(reference) = reference else {
         return;
     };
 
-    for (row, exp) in plane.chunks(stride).zip(reference.iter()) {
+    for (row, exp) in plane.chunks_exact(stride).zip(reference.iter()) {
         let (payload, pad) = row.split_at(width);
         assert!(payload.iter().zip(exp).all(|(&x, &y)| x == y));
         assert!(pad.iter().all(|&x| x == 0));
@@ -471,11 +487,15 @@ fn check_plane(plane: &[u8], reference: &PlaneRef, width: usize, stride: usize) 
 }
 
 fn check_subsampled_plane(plane: &[u8], reference: &PlaneRef, width: usize, stride: usize) {
+    if stride == 0 {
+        return;
+    }
+
     let PlaneRef::SubSampled(reference) = reference else {
         return;
     };
 
-    for (row, exp) in plane.chunks(stride).zip(reference.iter()) {
+    for (row, exp) in plane.chunks_exact(stride).zip(reference.iter()) {
         let (payload, pad) = row.split_at(width);
         assert!(payload.iter().zip(exp).all(|(&x, &y)| x == y));
         assert!(pad.iter().all(|&x| x == 0));
@@ -608,13 +628,13 @@ fn rgb_to_yuv_size_mode_pad(
             };
 
             for (uv_row, (u_exp, v_exp)) in dst_image[y_size..]
-                .chunks(u_stride)
+                .chunks_exact(u_stride)
                 .zip(u_ref.iter().zip(v_ref.iter()))
             {
                 let (payload, pad) = uv_row.split_at(2 * cw);
                 assert!(
                     payload
-                        .chunks(2)
+                        .chunks_exact(2)
                         .zip(u_exp.iter().zip(v_exp))
                         .all(|(uv, (&u, &v))| uv[0] == u && uv[1] == v)
                 );
@@ -1069,12 +1089,19 @@ fn yuv_to_rgb_size_format_mode_stride(
 
     let pack_stride = w * 3;
     let mut expected_row = vec![0_i32; pack_stride];
+
+    let (r_offset, g_offset, b_offset) = if let PixelFormat::Rgb = dst_format.pixel_format {
+        (0, 1, 2)
+    } else {
+        (2, 1, 0)
+    };
+
     for (x, pixel) in expected_row.chunks_exact_mut(3).enumerate() {
         let index = (x >> 1) & 7;
 
-        pixel[0] = if (index & 1) == 0 { 0 } else { 255 };
-        pixel[1] = if ((index >> 1) & 1) == 0 { 0 } else { 255 };
-        pixel[2] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
+        pixel[r_offset] = if (index & 1) == 0 { 0 } else { 255 };
+        pixel[g_offset] = if ((index >> 1) & 1) == 0 { 0 } else { 255 };
+        pixel[b_offset] = if ((index >> 2) & 1) == 0 { 0 } else { 255 };
     }
 
     let dst_stride = pack_stride + dst_pad;
@@ -1122,9 +1149,9 @@ fn yuv_to_rgb_size_format_mode(
     }
 }
 
-fn yuv_to_rgb_ok(pixel_format: PixelFormat) {
+fn yuv_to_rgb_ok(pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
     let dst_format = ImageFormat {
-        pixel_format: PixelFormat::Rgb,
+        pixel_format: dst_pixel_format,
         color_space: ColorSpace::Rgb,
         num_planes: 1,
     };
@@ -1226,8 +1253,14 @@ fn rgb_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
                 let output_index = y * dst_stride + x * dst_depth;
 
                 assert_eq!(dst_image[output_index], src_image[input_index + r_offset]);
-                assert_eq!(dst_image[output_index + 1], src_image[input_index + g_offset]);
-                assert_eq!(dst_image[output_index + 2], src_image[input_index + b_offset]);
+                assert_eq!(
+                    dst_image[output_index + 1],
+                    src_image[input_index + g_offset]
+                );
+                assert_eq!(
+                    dst_image[output_index + 2],
+                    src_image[input_index + b_offset]
+                );
                 if dst_depth == 4 {
                     assert_eq!(dst_image[output_index + a_offset], 255);
                 }
@@ -1274,17 +1307,32 @@ mod conversions {
 
     #[test]
     fn nv12_to_rgb() {
-        yuv_to_rgb_ok(PixelFormat::Nv12);
+        yuv_to_rgb_ok(PixelFormat::Nv12, PixelFormat::Rgb);
     }
 
     #[test]
     fn i420_to_rgb() {
-        yuv_to_rgb_ok(PixelFormat::I420);
+        yuv_to_rgb_ok(PixelFormat::I420, PixelFormat::Rgb);
     }
 
     #[test]
     fn i444_to_rgb() {
-        yuv_to_rgb_ok(PixelFormat::I444);
+        yuv_to_rgb_ok(PixelFormat::I444, PixelFormat::Rgb);
+    }
+
+    #[test]
+    fn nv12_to_bgr() {
+        yuv_to_rgb_ok(PixelFormat::Nv12, PixelFormat::Bgr);
+    }
+
+    #[test]
+    fn i420_to_bgr() {
+        yuv_to_rgb_ok(PixelFormat::I420, PixelFormat::Bgr);
+    }
+
+    #[test]
+    fn i444_to_bgr() {
+        yuv_to_rgb_ok(PixelFormat::I444, PixelFormat::Bgr);
     }
 
     #[test]
@@ -1335,9 +1383,12 @@ mod conversions {
             yuv_to_bgra_ok(PixelFormat::I420, 3);
             yuv_to_bgra_ok(PixelFormat::I444, 3);
             yuv_to_bgra_ok(PixelFormat::Nv12, 2);
-            yuv_to_rgb_ok(PixelFormat::Nv12);
-            yuv_to_rgb_ok(PixelFormat::I420);
-            yuv_to_rgb_ok(PixelFormat::I444);
+            yuv_to_rgb_ok(PixelFormat::Nv12, PixelFormat::Rgb);
+            yuv_to_rgb_ok(PixelFormat::I420, PixelFormat::Rgb);
+            yuv_to_rgb_ok(PixelFormat::I444, PixelFormat::Rgb);
+            yuv_to_rgb_ok(PixelFormat::Nv12, PixelFormat::Bgr);
+            yuv_to_rgb_ok(PixelFormat::I420, PixelFormat::Bgr);
+            yuv_to_rgb_ok(PixelFormat::I444, PixelFormat::Bgr);
         }
     }
 }

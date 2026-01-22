@@ -230,9 +230,9 @@ unsafe fn pack_i16x3_16x<const REVERSED: bool>(
     blue: __m256i,
 ) {
     let blue_red = if REVERSED {
-        _mm256_packus_epi16(red, blue)
-    } else {
         _mm256_packus_epi16(blue, red)
+    } else {
+        _mm256_packus_epi16(red, blue)
     };
     let green_white = _mm256_packus_epi16(
         green,
@@ -260,14 +260,24 @@ unsafe fn pack_i16x3_16x<const REVERSED: bool>(
 
 /// Truncate and deinterleave 3 short samples into 3 uchar samples (16-wide)
 #[inline(always)]
-unsafe fn pack_rgb_16x(image: *mut u8, red: __m256i, green: __m256i, blue: __m256i) {
+unsafe fn pack_rgb_16x<const REVERSED: bool>(
+    image: *mut u8,
+    red: __m256i,
+    green: __m256i,
+    blue: __m256i,
+) {
     let compress_mask = _mm256_setr_epi8(
         0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, -128, -128, -128, -128, 0, 1, 2, 4, 5, 6, 8, 9, 10,
         12, 13, 14, -128, -128, -128, -128,
     );
 
     // bFbEbDbC bBbAb9b8 rFrErDrC rBrAr9r8 b7b6b5b4 b3b2b1b0 r7r6r5r4 r3r2r1r0
-    let a2 = _mm256_packus_epi16(red, blue);
+    let a2 = if REVERSED {
+        _mm256_packus_epi16(blue, red)
+    } else {
+        _mm256_packus_epi16(red, blue)
+    };
+
     // gFgEgDgC gBgAg9g8 gFgEgDgC gBgAg9g8 g7g6g5g4 g3g2g1g0 g7g6g5g4 g3g2g1g0
     let a0 = _mm256_packus_epi16(green, green);
 
@@ -476,6 +486,7 @@ const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 
 #[inline]
 #[target_feature(enable = "avx2")]
+#[allow(clippy::needless_pass_by_value)]
 unsafe fn rgb_to_subsampled_yuv_avx2<
     const SAMPLER: usize,
     const DEPTH: usize,
@@ -546,6 +557,7 @@ unsafe fn rgb_to_subsampled_yuv_avx2<
 
 #[inline]
 #[target_feature(enable = "avx2")]
+#[allow(clippy::needless_pass_by_value)]
 unsafe fn rgb_to_yuv_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
@@ -599,6 +611,7 @@ unsafe fn rgb_to_yuv_avx2<const SAMPLER: usize, const DEPTH: usize, const COLORI
 
 #[inline]
 #[target_feature(enable = "avx2")]
+#[allow(clippy::too_many_lines)]
 unsafe fn subsampled_yuv_to_rgb_avx2<
     const COLORIMETRY: usize,
     const DEPTH: usize,
@@ -674,7 +687,7 @@ unsafe fn subsampled_yuv_to_rgb_avx2<
                     fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y00), FIX6),
                 );
             } else {
-                pack_rgb_16x(
+                pack_rgb_16x::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y, dst_depth, dst_stride)),
                     fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y00), FIX6),
                     fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y00), FIX6),
@@ -698,7 +711,7 @@ unsafe fn subsampled_yuv_to_rgb_avx2<
                     fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y10), FIX6),
                 );
             } else {
-                pack_rgb_16x(
+                pack_rgb_16x::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y, dst_depth, dst_stride)),
                     fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y10), FIX6),
                     fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y10), FIX6),
@@ -728,7 +741,7 @@ unsafe fn subsampled_yuv_to_rgb_avx2<
                     fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y01), FIX6),
                 );
             } else {
-                pack_rgb_16x(
+                pack_rgb_16x::<REVERSED>(
                     dst_group.add(wg_index(2 * x, 2 * y + 1, dst_depth, dst_stride)),
                     fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y01), FIX6),
                     fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y01), FIX6),
@@ -752,7 +765,7 @@ unsafe fn subsampled_yuv_to_rgb_avx2<
                     fix_to_i16_16x!(_mm256_add_epi16(sb_hi, y11), FIX6),
                 );
             } else {
-                pack_rgb_16x(
+                pack_rgb_16x::<REVERSED>(
                     dst_group.add(wg_index(2 * x + 1, 2 * y + 1, dst_depth, dst_stride)),
                     fix_to_i16_16x!(_mm256_add_epi16(sr_hi, y11), FIX6),
                     fix_to_i16_16x!(_mm256_add_epi16(sg_hi, y11), FIX6),
@@ -849,7 +862,7 @@ unsafe fn yuv_to_rgb_avx2<const COLORIMETRY: usize, const DEPTH: usize, const RE
                     fix_to_i16_16x!(_mm256_add_epi16(sb_lo, y_lo), FIX6),
                 );
             } else {
-                pack_rgb_16x(
+                pack_rgb_16x::<REVERSED>(
                     dst_group.add(wg_index(x, y, dst_depth, dst_stride)),
                     fix_to_i16_16x!(_mm256_add_epi16(sr_lo, y_lo), FIX6),
                     fix_to_i16_16x!(_mm256_add_epi16(sg_lo, y_lo), FIX6),
@@ -997,6 +1010,7 @@ unsafe fn bgr_to_rgb_avx2(
 
 #[inline]
 #[target_feature(enable = "avx2")]
+#[allow(clippy::too_many_lines)]
 unsafe fn rgba_to_rgb_avx2<const REVERSED: bool>(
     width: usize,
     height: usize,
@@ -1854,39 +1868,51 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
+yuv_to_rgb_converter!(I420, Bt601, Bgr);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
 yuv_to_rgb_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_converter!(I420, Bt601, Rgba);
+yuv_to_rgb_converter!(I420, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I420, Bt709, Bgr);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
 yuv_to_rgb_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_converter!(I420, Bt709, Rgba);
+yuv_to_rgb_converter!(I420, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt601, Bgr);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
 yuv_to_rgb_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_converter!(I444, Bt601, Rgba);
+yuv_to_rgb_converter!(I444, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt709, Bgr);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
 yuv_to_rgb_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_converter!(I444, Bt709, Rgba);
+yuv_to_rgb_converter!(I444, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);

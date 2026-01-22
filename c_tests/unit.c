@@ -1452,7 +1452,8 @@ unit_convert_image_yuv_to_rgb_errors(void)
 
                         SET_EXPECTED(!(dst_pixel_format == DCP_PIXEL_FORMAT_BGRA ||
                                        dst_pixel_format == DCP_PIXEL_FORMAT_RGBA ||
-                                       dst_pixel_format == DCP_PIXEL_FORMAT_RGB), DCP_ERROR_KIND_INVALID_OPERATION);
+                                       dst_pixel_format == DCP_PIXEL_FORMAT_RGB ||
+                                       dst_pixel_format == DCP_PIXEL_FORMAT_BGR), DCP_ERROR_KIND_INVALID_OPERATION);
                         SET_EXPECTED(dst_color_space != DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_OPERATION);
 
                         status.result = dcp_convert_image(width, height,

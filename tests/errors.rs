@@ -445,9 +445,12 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
             expected,
             !(dst_pf == PIXEL_FORMAT_BGRA
                 || dst_pf == PIXEL_FORMAT_RGBA
-                || (src_pf == PIXEL_FORMAT_NV12 && dst_pf == PIXEL_FORMAT_RGB)
-                || (src_pf == PIXEL_FORMAT_I420 && dst_pf == PIXEL_FORMAT_RGB)
-                || (src_pf == PIXEL_FORMAT_I444 && dst_pf == PIXEL_FORMAT_RGB)),
+                || (src_pf == PIXEL_FORMAT_NV12
+                    && (dst_pf == PIXEL_FORMAT_RGB || dst_pf == PIXEL_FORMAT_BGR))
+                || (src_pf == PIXEL_FORMAT_I420
+                    && (dst_pf == PIXEL_FORMAT_RGB || dst_pf == PIXEL_FORMAT_BGR))
+                || (src_pf == PIXEL_FORMAT_I444
+                    && (dst_pf == PIXEL_FORMAT_RGB || dst_pf == PIXEL_FORMAT_BGR))),
             ErrorKind::InvalidOperation
         );
         set_expected!(
