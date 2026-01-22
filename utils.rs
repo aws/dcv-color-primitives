@@ -1,96 +1,26 @@
+// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this
+// software and associated documentation files (the "Software"), to deal in the Software
+// without restriction, including without limitation the rights to use, copy, modify,
+// merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+// INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+// SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 pub const FIX16: i32 = 16;
-pub const FIX18: i32 = 18;
 
 pub const FIX16_MULT: i32 = 1 << FIX16;
 pub const FIX16_MULT_F64: f64 = FIX16_MULT as f64;
 pub const UV_SHIFT: i32 = (128 << FIX16) + (1 << (FIX16 - 1)) - 1;
-pub const UV_SHIFT_18: i32 = (128 << FIX18) + (1 << (FIX18 - 1)) - 1;
 pub const FULL_RANGE: f64 = 255.0;
 
 pub type Coefficients = ((i32, i32, i32), (i32, i32), i32, i32);
-
-pub const RGB_SRC: [[[i32; 4]; 8]; 8] = [
-    [
-        [161, 24, 44, 58],
-        [35, 95, 51, 205],
-        [177, 30, 252, 158],
-        [248, 94, 62, 28],
-        [247, 51, 135, 38],
-        [98, 147, 200, 127],
-        [68, 103, 20, 124],
-        [233, 227, 165, 0],
-    ],
-    [
-        [251, 19, 32, 170],
-        [235, 183, 25, 77],
-        [146, 81, 218, 161],
-        [25, 124, 96, 56],
-        [22, 127, 167, 179],
-        [247, 34, 40, 53],
-        [164, 193, 159, 24],
-        [96, 158, 17, 223],
-    ],
-    [
-        [240, 123, 14, 108],
-        [0, 105, 52, 116],
-        [194, 219, 244, 47],
-        [216, 254, 153, 84],
-        [116, 77, 133, 68],
-        [190, 96, 190, 133],
-        [118, 4, 170, 115],
-        [218, 145, 23, 50],
-    ],
-    [
-        [202, 120, 126, 231],
-        [42, 28, 137, 40],
-        [136, 227, 210, 177],
-        [254, 140, 238, 88],
-        [90, 195, 170, 67],
-        [125, 242, 148, 88],
-        [1, 91, 190, 245],
-        [31, 100, 190, 225],
-    ],
-    [
-        [207, 49, 249, 131],
-        [48, 120, 34, 82],
-        [43, 145, 253, 141],
-        [83, 205, 105, 44],
-        [16, 9, 157, 22],
-        [253, 131, 178, 148],
-        [142, 236, 98, 6],
-        [246, 190, 15, 213],
-    ],
-    [
-        [72, 207, 6, 168],
-        [220, 39, 6, 219],
-        [244, 14, 252, 45],
-        [159, 106, 17, 184],
-        [222, 72, 230, 39],
-        [6, 185, 30, 35],
-        [101, 223, 30, 14],
-        [40, 71, 16, 244],
-    ],
-    [
-        [124, 121, 46, 190],
-        [244, 206, 61, 169],
-        [43, 130, 87, 247],
-        [170, 10, 238, 229],
-        [12, 168, 14, 220],
-        [96, 60, 226, 235],
-        [206, 93, 122, 117],
-        [126, 168, 203, 39],
-    ],
-    [
-        [181, 88, 248, 45],
-        [65, 24, 208, 166],
-        [24, 21, 151, 85],
-        [60, 86, 9, 153],
-        [225, 80, 156, 159],
-        [210, 181, 6, 214],
-        [17, 142, 255, 163],
-        [189, 137, 72, 87],
-    ],
-];
 
 fn max_y_error((xr, xg, xb): (i32, i32, i32), (ar, ag, ab): (f64, f64, f64), y_min: i32) -> f64 {
     let shift = (y_min << FIX16) + (1 << (FIX16 - 1));
