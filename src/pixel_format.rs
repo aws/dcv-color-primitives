@@ -74,7 +74,7 @@ impl PixelFormat {
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) const fn reversed(pixel_format: PixelFormat) -> bool {
-        matches!(pixel_format, PixelFormat::Rgba)
+        matches!(pixel_format, PixelFormat::Bgra | PixelFormat::Bgr)
     }
 }
 

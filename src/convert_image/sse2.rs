@@ -216,9 +216,9 @@ unsafe fn pack_i16x3_8x<const REVERSED: bool>(
     blue: __m128i,
 ) {
     let x = if REVERSED {
-        _mm_packus_epi16(red, blue)
-    } else {
         _mm_packus_epi16(blue, red)
+    } else {
+        _mm_packus_epi16(red, blue)
     };
 
     let y = _mm_packus_epi16(green, _mm_srli_epi16(_mm_cmpeq_epi32(zero!(), zero!()), 8));
@@ -1193,7 +1193,7 @@ fn i444_rgb<const COLORIMETRY: usize, const DEPTH: usize, const REVERSED: bool>(
 
     if DEPTH == 3 {
         // Needed _mm_shuffle_epi8 is from SSSE3, fallback to scalar path
-        x86::yuv_to_rgb_swar::<COLORIMETRY, DEPTH, false>(
+        x86::yuv_to_rgb_swar::<COLORIMETRY, DEPTH, REVERSED>(
             w,
             h,
             src_strides,
@@ -1573,39 +1573,51 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
+yuv_to_rgb_converter!(I420, Bt601, Bgr);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
 yuv_to_rgb_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_converter!(I420, Bt601, Rgba);
+yuv_to_rgb_converter!(I420, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I420, Bt709, Bgr);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
 yuv_to_rgb_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_converter!(I420, Bt709, Rgba);
+yuv_to_rgb_converter!(I420, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt601, Bgr);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
 yuv_to_rgb_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_converter!(I444, Bt601, Rgba);
+yuv_to_rgb_converter!(I444, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt709, Bgr);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
 yuv_to_rgb_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_converter!(I444, Bt709, Rgba);
+yuv_to_rgb_converter!(I444, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);

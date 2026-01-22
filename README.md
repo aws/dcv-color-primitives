@@ -29,9 +29,9 @@ The library is currenty able to convert the following pixel formats:
 | ARGB                 | I420, I444, NV12, RGB      |
 | BGR                  | I420, I444, NV12, RGB      |
 | BGRA                 | I420, I444, NV12, RGB      |
-| I420                 | BGRA, RGB, RGBA            |
-| I444                 | BGRA, RGB, RGBA            |
-| NV12                 | BGRA, RGB, RGBA            |
+| I420                 | BGR, BGRA, RGB, RGBA       |
+| I444                 | BGR, BGRA, RGB, RGBA       |
+| NV12                 | BGR, BGRA, RGB, RGBA       |
 | RGB                  | BGRA                       |
 
 ### Color models

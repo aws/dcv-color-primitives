@@ -139,6 +139,20 @@ unsafe fn pack_i32x2(image: *mut u8, x: i32, y: i32, write_y: bool) {
 /// Last component is set to `DEFAULT_ALPHA`
 unsafe fn pack_ui8x3<const REVERSED: bool>(image: *mut u8, x: u8, y: u8, z: u8) {
     if REVERSED {
+        *image = x;
+        *image.add(2) = z;
+    } else {
+        *image = z;
+        *image.add(2) = x;
+    }
+
+    *image.add(1) = y;
+    *image.add(3) = DEFAULT_ALPHA;
+}
+
+/// Truncate and interleave 3 int
+unsafe fn pack_rgb<const REVERSED: bool>(image: *mut u8, x: u8, y: u8, z: u8) {
+    if REVERSED {
         *image = z;
         *image.add(2) = x;
     } else {
@@ -147,18 +161,11 @@ unsafe fn pack_ui8x3<const REVERSED: bool>(image: *mut u8, x: u8, y: u8, z: u8) 
     }
 
     *image.add(1) = y;
-    *image.add(3) = DEFAULT_ALPHA;
-}
-
-/// Truncate and interleave 3 int
-unsafe fn pack_rgb(image: *mut u8, x: u8, y: u8, z: u8) {
-    *image = x;
-    *image.add(1) = y;
-    *image.add(2) = z;
 }
 
 // Called by sse2 and avx2 (process remainder)
 #[inline(never)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn rgb_to_subsampled_yuv_swar<
     const SAMPLER: usize,
     const DEPTH: usize,
@@ -253,6 +260,7 @@ pub fn rgb_to_subsampled_yuv_swar<
 }
 
 #[inline(never)]
+#[allow(clippy::needless_pass_by_value)]
 pub fn rgb_to_yuv_swar<const SAMPLER: usize, const DEPTH: usize, const COLORIMETRY: usize>(
     width: usize,
     height: usize,
@@ -303,6 +311,7 @@ pub fn rgb_to_yuv_swar<const SAMPLER: usize, const DEPTH: usize, const COLORIMET
 }
 
 #[inline(never)]
+#[allow(clippy::too_many_lines)]
 pub fn subsampled_yuv_to_rgb_swar<
     const COLORIMETRY: usize,
     const DEPTH: usize,
@@ -385,7 +394,7 @@ pub fn subsampled_yuv_to_rgb_swar<
                         fix_to_u8_sat(sy00 + sr, FIX6),
                     );
                 } else {
-                    pack_rgb(
+                    pack_rgb::<REVERSED>(
                         dst_group.add(wg_index(x0, y0, DEPTH, dst_stride)),
                         fix_to_u8_sat(sy00 + sr, FIX6),
                         fix_to_u8_sat(sy00 + sg, FIX6),
@@ -402,7 +411,7 @@ pub fn subsampled_yuv_to_rgb_swar<
                         fix_to_u8_sat(sy10 + sr, FIX6),
                     );
                 } else {
-                    pack_rgb(
+                    pack_rgb::<REVERSED>(
                         dst_group.add(wg_index(x1, y0, DEPTH, dst_stride)),
                         fix_to_u8_sat(sy10 + sr, FIX6),
                         fix_to_u8_sat(sy10 + sg, FIX6),
@@ -425,7 +434,7 @@ pub fn subsampled_yuv_to_rgb_swar<
                         fix_to_u8_sat(sy01 + sr, FIX6),
                     );
                 } else {
-                    pack_rgb(
+                    pack_rgb::<REVERSED>(
                         dst_group.add(wg_index(x0, y1, DEPTH, dst_stride)),
                         fix_to_u8_sat(sy01 + sr, FIX6),
                         fix_to_u8_sat(sy01 + sg, FIX6),
@@ -442,7 +451,7 @@ pub fn subsampled_yuv_to_rgb_swar<
                         fix_to_u8_sat(sy11 + sr, FIX6),
                     );
                 } else {
-                    pack_rgb(
+                    pack_rgb::<REVERSED>(
                         dst_group.add(wg_index(x1, y1, DEPTH, dst_stride)),
                         fix_to_u8_sat(sy11 + sr, FIX6),
                         fix_to_u8_sat(sy11 + sg, FIX6),
@@ -500,7 +509,7 @@ pub fn yuv_to_rgb_swar<const COLORIMETRY: usize, const DEPTH: usize, const REVER
                         fix_to_u8_sat(sl + sr, FIX6),
                     );
                 } else {
-                    pack_rgb(
+                    pack_rgb::<REVERSED>(
                         dst_group.add(wg_index(x, y, DEPTH, dst_stride)),
                         fix_to_u8_sat(sl + sr, FIX6),
                         fix_to_u8_sat(sl + sg, FIX6),
@@ -1221,39 +1230,51 @@ rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
+yuv_to_rgb_converter!(I420, Bt601, Bgr);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
 yuv_to_rgb_converter!(I420, Bt601, Rgb);
 yuv_to_rgb_converter!(I420, Bt601, Rgba);
+yuv_to_rgb_converter!(I420, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I420, Bt709, Bgr);
 yuv_to_rgb_converter!(I420, Bt709, Bgra);
 yuv_to_rgb_converter!(I420, Bt709, Rgb);
 yuv_to_rgb_converter!(I420, Bt709, Rgba);
+yuv_to_rgb_converter!(I420, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt601, Bgr);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
 yuv_to_rgb_converter!(I444, Bt601, Rgb);
 yuv_to_rgb_converter!(I444, Bt601, Rgba);
+yuv_to_rgb_converter!(I444, Bt601FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt601FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt601FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt709, Bgr);
 yuv_to_rgb_converter!(I444, Bt709, Bgra);
 yuv_to_rgb_converter!(I444, Bt709, Rgb);
 yuv_to_rgb_converter!(I444, Bt709, Rgba);
+yuv_to_rgb_converter!(I444, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt601FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt601FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt709FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);
