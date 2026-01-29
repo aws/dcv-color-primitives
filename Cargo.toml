@@ -1,8 +1,8 @@
 [package]
 name = "dcv-color-primitives"
-version = "0.7.1"
+version = "1.0.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 description = "a library to perform image color model conversion"
 license = "MIT-0"
 repository = "https://github.com/aws/dcv-color-primitives"
