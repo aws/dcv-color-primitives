@@ -1,3 +1,16 @@
+News in 1.0.0
+-------------
+* Added no_std support
+* Added YUV to BGR conversions (NV12, I420, I444)
+* Added ARGB, I444, and I420 to RGB conversions
+* Removed size restrictions on YUV format conversions
+* Removed multiple plane choice for NV12 format
+* Replaced paste with pastey dependency
+* Fixed C bindings automatic stride calculation
+* Protected C bindings from invalid struct data
+* Updated minimum Rust version to 1.87
+* Updated C bindings tests to support new conversions
+
 News in 0.7.1
 * Fixed C bindings for convert_image
 * Updated rust edition to 2024, version to 1.85 and all deps to latest available
