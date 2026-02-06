@@ -788,9 +788,9 @@ pub fn get_buffers_size(
 ///
 /// If the destination image color space is Bt709, the following formula is applied:
 /// ```text
-/// y  =  0.213 * r + 0.715 * g + 0.072 * b + 16
-/// cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
-/// cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
+/// y  =  0.183 * r + 0.614 * g + 0.062 * b + 16
+/// cb = -0.101 * r - 0.339 * g + 0.439 * b + 128
+/// cr =  0.439 * r - 0.399 * g - 0.040 * b + 128
 /// ```
 ///
 /// If the destination image color space is `Bt601FR`, the following formula is applied:
