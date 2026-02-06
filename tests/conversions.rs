@@ -751,7 +751,7 @@ fn rgb_to_yuv_size_mode(
 ) {
     const MAX_PAD: usize = 2;
 
-    if dst_format.num_planes == 2 {
+    if matches!(dst_format.pixel_format, PixelFormat::Nv12) {
         for (src_pad, y_pad, uv_pad) in iproduct!(0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD) {
             rgb_to_yuv_size_mode_pad(
                 image_size,
@@ -762,7 +762,6 @@ fn rgb_to_yuv_size_mode(
             );
         }
     } else {
-        assert_eq!(dst_format.num_planes, 3);
         for pad in iproduct!(0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD, 0..MAX_PAD) {
             rgb_to_yuv_size_mode_pad(image_size, src_format, dst_format, pad, plane_ref);
         }
@@ -783,7 +782,6 @@ fn rgb_to_yuv_size(
             &ImageFormat {
                 pixel_format: *pixel_format,
                 color_space: ColorSpace::Rgb,
-                num_planes: 1,
             },
             dst_image_format,
             plane_ref,
@@ -791,12 +789,11 @@ fn rgb_to_yuv_size(
     }
 }
 
-fn rgb_to_yuv_ok(pixel_format: PixelFormat, num_planes: u32) {
+fn rgb_to_yuv_ok(pixel_format: PixelFormat) {
     for color_space in SUPPORTED_COLOR_SPACES {
         let format = ImageFormat {
             pixel_format,
             color_space: *color_space,
-            num_planes,
         };
 
         for (width, height) in iproduct!(0..=MAX_PLANE_WIDTH, 0..=MAX_PLANE_HEIGHT) {
@@ -981,7 +978,7 @@ fn yuv_to_bgra_size_format_mode(
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
 ) {
-    if src_format.num_planes == 2 {
+    if matches!(src_format.pixel_format, PixelFormat::Nv12) {
         for (y_pad, uv_pad, dst_pad) in
             iproduct!(0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD)
         {
@@ -993,7 +990,6 @@ fn yuv_to_bgra_size_format_mode(
             );
         }
     } else {
-        assert_eq!(src_format.num_planes, 3);
         for pad in iproduct!(
             0..YUV_RGB_MAX_PAD,
             0..YUV_RGB_MAX_PAD,
@@ -1005,19 +1001,17 @@ fn yuv_to_bgra_size_format_mode(
     }
 }
 
-fn yuv_to_bgra_ok(pixel_format: PixelFormat, num_planes: u32) {
+fn yuv_to_bgra_ok(pixel_format: PixelFormat) {
     const SUPPORTED_FORMATS: &[PixelFormat] = &[PixelFormat::Bgra, PixelFormat::Rgba];
 
     for (color_space, format) in iproduct!(SUPPORTED_COLOR_SPACES, SUPPORTED_FORMATS) {
         let src_format = ImageFormat {
             pixel_format,
             color_space: *color_space,
-            num_planes,
         };
         let dst_format = ImageFormat {
             pixel_format: *format,
             color_space: ColorSpace::Rgb,
-            num_planes: 1,
         };
 
         for (width, height) in iproduct!(0..=YUV_RGB_MAX_WIDTH, 0..=YUV_RGB_MAX_HEIGHT) {
@@ -1215,7 +1209,7 @@ fn yuv_to_rgb_size_format_mode(
     src_format: &ImageFormat,
     dst_format: &ImageFormat,
 ) {
-    if src_format.num_planes == 2 {
+    if matches!(src_format.pixel_format, PixelFormat::Nv12) {
         for (y_pad, uv_pad, dst_pad) in
             iproduct!(0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD, 0..YUV_RGB_MAX_PAD)
         {
@@ -1242,18 +1236,12 @@ fn yuv_to_rgb_ok(pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
     let dst_format = ImageFormat {
         pixel_format: dst_pixel_format,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
 
     for color_space in SUPPORTED_COLOR_SPACES {
         let src_format = ImageFormat {
             pixel_format,
             color_space: *color_space,
-            num_planes: if let PixelFormat::Nv12 = pixel_format {
-                2
-            } else {
-                3
-            },
         };
 
         for (width, height) in iproduct!(0..=YUV_RGB_MAX_WIDTH, 0..=YUV_RGB_MAX_HEIGHT) {
@@ -1273,12 +1261,10 @@ fn rgb_ok(src_pixel_format: PixelFormat, dst_pixel_format: PixelFormat) {
     let src_format = ImageFormat {
         pixel_format: src_pixel_format,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
     let dst_format = ImageFormat {
         pixel_format: dst_pixel_format,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
     let mut rng = rand::rng();
 
@@ -1366,32 +1352,32 @@ mod conversions {
 
     #[test]
     fn nv12_to_rgbx() {
-        yuv_to_bgra_ok(PixelFormat::Nv12, 2);
+        yuv_to_bgra_ok(PixelFormat::Nv12);
     }
 
     #[test]
     fn i420_to_rgbx() {
-        yuv_to_bgra_ok(PixelFormat::I420, 3);
+        yuv_to_bgra_ok(PixelFormat::I420);
     }
 
     #[test]
     fn i444_to_rgbx() {
-        yuv_to_bgra_ok(PixelFormat::I444, 3);
+        yuv_to_bgra_ok(PixelFormat::I444);
     }
 
     #[test]
     fn rgb_to_nv12() {
-        rgb_to_yuv_ok(PixelFormat::Nv12, 2);
+        rgb_to_yuv_ok(PixelFormat::Nv12);
     }
 
     #[test]
     fn rgb_to_i420() {
-        rgb_to_yuv_ok(PixelFormat::I420, 3);
+        rgb_to_yuv_ok(PixelFormat::I420);
     }
 
     #[test]
     fn rgb_to_i444() {
-        rgb_to_yuv_ok(PixelFormat::I444, 3);
+        rgb_to_yuv_ok(PixelFormat::I444);
     }
 
     #[test]
@@ -1466,12 +1452,12 @@ mod conversions {
             rgb_ok(PixelFormat::Bgra, PixelFormat::Rgb);
             rgb_ok(PixelFormat::Rgb, PixelFormat::Bgra);
             rgb_ok(PixelFormat::Argb, PixelFormat::Rgb);
-            rgb_to_yuv_ok(PixelFormat::I420, 3);
-            rgb_to_yuv_ok(PixelFormat::I444, 3);
-            rgb_to_yuv_ok(PixelFormat::Nv12, 2);
-            yuv_to_bgra_ok(PixelFormat::I420, 3);
-            yuv_to_bgra_ok(PixelFormat::I444, 3);
-            yuv_to_bgra_ok(PixelFormat::Nv12, 2);
+            rgb_to_yuv_ok(PixelFormat::I420);
+            rgb_to_yuv_ok(PixelFormat::I444);
+            rgb_to_yuv_ok(PixelFormat::Nv12);
+            yuv_to_bgra_ok(PixelFormat::I420);
+            yuv_to_bgra_ok(PixelFormat::I444);
+            yuv_to_bgra_ok(PixelFormat::Nv12);
             yuv_to_rgb_ok(PixelFormat::Nv12, PixelFormat::Rgb);
             yuv_to_rgb_ok(PixelFormat::I420, PixelFormat::Rgb);
             yuv_to_rgb_ok(PixelFormat::I444, PixelFormat::Rgb);

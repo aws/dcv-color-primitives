@@ -166,19 +166,3 @@ pub fn get_image_index(pixel_format: u32, color_space: u32, pixel_format_mode: b
 pub fn get_index(src_index: u32, dst_index: u32) -> usize {
     (src_index * COLUMNS + dst_index) as usize
 }
-
-#[cfg(not(feature = "test_instruction_sets"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-#[inline(never)]
-pub fn is_pixel_format_valid(pixel_format: u32) -> bool {
-    pixel_format.wrapping_sub(LO_RGB_PIXEL_FORMAT)
-        <= HI_YUV_PIXEL_FORMAT.wrapping_sub(LO_RGB_PIXEL_FORMAT)
-}
-
-#[cfg(not(feature = "test_instruction_sets"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-#[inline(never)]
-pub fn is_color_space_valid(color_space: u32) -> bool {
-    color_space.wrapping_sub(LO_RGB_COLOR_SPACE)
-        <= HI_YUV_COLOR_SPACE.wrapping_sub(LO_RGB_COLOR_SPACE)
-}

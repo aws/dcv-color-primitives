@@ -378,11 +378,6 @@ fn convert_from(
         PixelFormat::Rgb | PixelFormat::I444 => 0,
         _ => 1,
     };
-    let num_planes = match to_format {
-        PixelFormat::Rgb => 1,
-        PixelFormat::Nv12 => 2,
-        _ => 3,
-    };
     let color_space = match to_format {
         PixelFormat::Rgb => ColorSpace::Rgb,
         _ => ColorSpace::Bt601FR,
@@ -413,12 +408,10 @@ fn convert_from(
     let src_format = ImageFormat {
         pixel_format: from_format,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
     let dst_format = ImageFormat {
         pixel_format: to_format,
         color_space,
-        num_planes,
     };
 
     perf.start();
@@ -457,11 +450,6 @@ fn convert_to(
         PixelFormat::Rgb | PixelFormat::I444 => 0,
         _ => 1,
     };
-    let num_planes = match from_format {
-        PixelFormat::Rgb => 1,
-        PixelFormat::Nv12 => 2,
-        _ => 3,
-    };
     let color_space = match from_format {
         PixelFormat::Rgb => ColorSpace::Rgb,
         _ => ColorSpace::Bt601FR,
@@ -495,12 +483,10 @@ fn convert_to(
     let src_format = ImageFormat {
         pixel_format: from_format,
         color_space,
-        num_planes,
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
 
     perf.start();

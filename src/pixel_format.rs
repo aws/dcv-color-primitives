@@ -122,10 +122,6 @@ pub const DEFAULT_STRIDES: [usize; MAX_NUMBER_OF_PLANES] = [STRIDE_AUTO; MAX_NUM
 
 const PF_PLANES: [u32; 9] = [1, 1, 1, 1, 1, 3, 3, 3, 2];
 
-pub fn is_compatible(pixel_format: u32, num_planes: u32) -> bool {
-    num_planes == PF_PLANES[pixel_format as usize]
-}
-
 pub fn get_buffers_size(
     pixel_format: PixelFormat,
     width: u32,
@@ -193,8 +189,7 @@ pub fn get_buffers_size(
     true
 }
 
-#[cfg(not(feature = "test_instruction_sets"))]
 #[inline(always)]
-pub fn are_planes_compatible(pixel_format: u32, num_planes: u32) -> bool {
-    num_planes == PF_PLANES[pixel_format as usize]
+pub fn get_num_planes(pixel_format: PixelFormat) -> u32 {
+    PF_PLANES[pixel_format as usize]
 }

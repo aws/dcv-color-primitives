@@ -26,11 +26,8 @@ use std::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
-use dcp::{
-    ColorSpace, ErrorKind, ImageFormat, PixelFormat, describe_acceleration, get_buffers_size,
-};
+use dcp::{ColorSpace, ImageFormat, PixelFormat, describe_acceleration, get_buffers_size};
 use dcv_color_primitives as dcp;
-use itertools::iproduct;
 
 const MAX_NUMBER_OF_PLANES: u32 = 3;
 
@@ -70,26 +67,6 @@ const NUM_LOG2_DEN_PER_PLANE: [[usize; (2 * MAX_NUMBER_OF_PLANES) as usize]; 9] 
     [1, 0, 1, 1, 0, 0],
 ];
 
-macro_rules! set_expected {
-    ($var:ident, $pred:expr, $status:path) => {
-        if $var.is_ok() && $pred {
-            $var = Err($status);
-        }
-    };
-}
-
-fn is_valid_format(format: &ImageFormat) -> bool {
-    match format.pixel_format {
-        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => format.num_planes == 3,
-        PixelFormat::Nv12 => format.num_planes == 2,
-        _ => format.num_planes == 1,
-    }
-}
-
-fn check_err(result: ErrorKind, err: ErrorKind) {
-    assert_eq!(result as u32, err as u32);
-}
-
 #[test]
 fn bootstrap() {
     println!("{}", describe_acceleration());
@@ -101,120 +78,94 @@ fn buffers_size() {
     const HEIGHT: u32 = 257;
     let buffers_size = &mut [0_usize; MAX_NUMBER_OF_PLANES as usize];
 
-    for (num_planes, pixel_format) in iproduct!(0..=MAX_NUMBER_OF_PLANES + 1, PIXEL_FORMATS) {
+    for pixel_format in PIXEL_FORMATS {
         let pf = *pixel_format as u32;
         let format = ImageFormat {
             pixel_format: *pixel_format,
             color_space: ColorSpace::Rgb,
-            num_planes,
         };
 
-        let mut expected = Ok(());
-        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
-
-        let status = get_buffers_size(1, HEIGHT, &format, None, buffers_size);
-        match status {
-            Ok(()) => assert!(expected.is_ok()),
-            Err(err) => check_err(err, expected.err().unwrap()),
-        }
-
-        let mut expected = Ok(());
-        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
-
-        let status = get_buffers_size(WIDTH, 1, &format, None, buffers_size);
-        match status {
-            Ok(()) => assert!(expected.is_ok()),
-            Err(err) => check_err(err, expected.err().unwrap()),
-        }
+        assert!(get_buffers_size(1, HEIGHT, &format, None, buffers_size).is_ok());
+        assert!(get_buffers_size(WIDTH, 1, &format, None, buffers_size).is_ok());
 
         // Test size is valid
-        let mut expected = Ok(());
-        set_expected!(expected, !is_valid_format(&format), ErrorKind::InvalidValue);
-
         let status = get_buffers_size(WIDTH, HEIGHT, &format, None, buffers_size);
-        assert_eq!(expected.is_ok(), status.is_ok());
+        assert!(status.is_ok());
 
-        match status {
-            Ok(()) => {
-                let pf = pf as usize;
-                let num_planes = num_planes as usize;
-                let width = WIDTH as usize;
-                let height = HEIGHT as usize;
-                let area = width * height;
+        let pf = pf as usize;
+        let width = WIDTH as usize;
+        let height = HEIGHT as usize;
+        let area = width * height;
 
-                if num_planes == 1 {
-                    assert_eq!(
-                        buffers_size[0],
-                        (area * NUM_LOG2_DEN[pf][0]) >> NUM_LOG2_DEN[pf][1]
-                    );
-                } else {
-                    let mut strides = Vec::new();
+        match pixel_format {
+            PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 | PixelFormat::Nv12 => {
+                let num_planes = match pixel_format {
+                    PixelFormat::Nv12 => 2,
+                    _ => 3,
+                };
+                let mut strides = Vec::new();
 
-                    for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
-                        let (stride, size) = match pixel_format {
-                            PixelFormat::Nv12 if i > 0 => {
-                                let stride =
-                                    2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
-                                let height =
-                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
-                                (stride, stride * height)
-                            }
-                            PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
-                                let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
-                                let height =
-                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
-                                (stride, stride * height)
-                            }
-                            _ => {
-                                let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
-                                let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
-                                ((width * mul) >> shf, (area * mul) >> shf)
-                            }
-                        };
+                for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
+                    let (stride, size) = match pixel_format {
+                        PixelFormat::Nv12 if i > 0 => {
+                            let stride = 2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                            let height = height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                            (stride, stride * height)
+                        }
+                        PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
+                            let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                            let height = height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                            (stride, stride * height)
+                        }
+                        _ => {
+                            let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
+                            let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
+                            ((width * mul) >> shf, (area * mul) >> shf)
+                        }
+                    };
 
-                        assert_eq!(*buffer_size, size);
+                    assert_eq!(*buffer_size, size);
 
-                        strides.push(stride);
-                    }
-
-                    assert!(
-                        get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides[..]), buffers_size)
-                            .is_ok()
-                    );
-
-                    for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
-                        let size = match pixel_format {
-                            PixelFormat::Nv12 if i > 0 => {
-                                let stride =
-                                    2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
-                                let height =
-                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
-                                stride * height
-                            }
-                            PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
-                                let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
-                                let height =
-                                    height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
-                                stride * height
-                            }
-                            _ => {
-                                let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
-                                let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
-                                (area * mul) >> shf
-                            }
-                        };
-
-                        assert_eq!(*buffer_size, size);
-                    }
+                    strides.push(stride);
                 }
 
-                // empty buffer vector should return not enough data
                 assert!(
-                    get_buffers_size(WIDTH, HEIGHT, &format, None, &mut buffers_size[..0]).is_err()
+                    get_buffers_size(WIDTH, HEIGHT, &format, Some(&strides[..]), buffers_size)
+                        .is_ok()
+                );
+
+                for (i, buffer_size) in buffers_size.iter().enumerate().take(num_planes) {
+                    let size = match pixel_format {
+                        PixelFormat::Nv12 if i > 0 => {
+                            let stride = 2 * width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                            let height = height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                            stride * height
+                        }
+                        PixelFormat::I420 | PixelFormat::I422 if i > 0 => {
+                            let stride = width.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i]);
+                            let height = height.div_ceil(1 + NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1]);
+                            stride * height
+                        }
+                        _ => {
+                            let mul = NUM_LOG2_DEN_PER_PLANE[pf][2 * i];
+                            let shf = NUM_LOG2_DEN_PER_PLANE[pf][2 * i + 1];
+                            (area * mul) >> shf
+                        }
+                    };
+
+                    assert_eq!(*buffer_size, size);
+                }
+            }
+            _ => {
+                assert_eq!(
+                    buffers_size[0],
+                    (area * NUM_LOG2_DEN[pf][0]) >> NUM_LOG2_DEN[pf][1]
                 );
             }
-            Err(err) => check_err(err, expected.err().unwrap()),
         }
+
+        // empty buffer vector should return not enough data
+        assert!(get_buffers_size(WIDTH, HEIGHT, &format, None, &mut buffers_size[..0]).is_err());
     }
 }
 
@@ -238,12 +189,10 @@ fn over_4gb() {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
     };
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
 
     let src_sizes = &mut [0_usize; 2];

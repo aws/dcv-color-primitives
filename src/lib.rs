@@ -78,13 +78,11 @@
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
 //!         color_space: ColorSpace::Rgb,
-//!         num_planes: 1,
 //!     };
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 2,
 //!     };
 //!
 //!     convert_image(
@@ -116,13 +114,11 @@
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
 //!         color_space: ColorSpace::Bt709,
-//!         num_planes: 1,
 //!     };
 //!
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt601,
-//!         num_planes: 2,
 //!     };
 //!
 //!     convert_image(
@@ -153,7 +149,6 @@
 //!     let format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
 //!         color_space: ColorSpace::Rgb,
-//!         num_planes: NUM_PLANES,
 //!     };
 //!
 //!     let mut sizes = [0usize; NUM_PLANES as usize];
@@ -183,7 +178,6 @@
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt709,
-//!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
 //!     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
@@ -195,7 +189,6 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgra,
 //!         color_space: ColorSpace::Rgb,
-//!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
 //!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
@@ -233,7 +226,6 @@
 //!     let src_format = ImageFormat {
 //!         pixel_format: PixelFormat::Bgr,
 //!         color_space: ColorSpace::Rgb,
-//!         num_planes: NUM_SRC_PLANES,
 //!     };
 //!
 //!     let src_strides = [RGB_STRIDE];
@@ -246,7 +238,6 @@
 //!     let dst_format = ImageFormat {
 //!         pixel_format: PixelFormat::Nv12,
 //!         color_space: ColorSpace::Bt709,
-//!         num_planes: NUM_DST_PLANES,
 //!     };
 //!
 //!     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
@@ -318,8 +309,7 @@ impl fmt::Display for ErrorKind {
 /// Describes how the image data is laid out in memory and its color space.
 ///
 /// # Note
-/// Not all combinations of pixel format, color space and number of planes
-/// describe a valid image format.
+/// Not all combinations of pixel format and color space describe a valid image format.
 ///
 /// Each pixel format has one or more compatible color spaces:
 ///
@@ -335,8 +325,7 @@ impl fmt::Display for ErrorKind {
 /// `PixelFormat::I420` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 /// `PixelFormat::Nv12` | `ColorSpace::Bt601(FR)`, `ColorSpace::Bt709(FR)`
 ///
-/// Some pixel formats might impose additional restrictions on the accepted number of
-/// planes:
+/// The number of planes is determined by the pixel format:
 ///
 /// pixel format        | subsampling | #planes | #1     | #2     | #3
 /// --------------------|:-----------:|:-------:|:------:|:------:|:-------:
@@ -355,8 +344,6 @@ pub struct ImageFormat {
     pub pixel_format: PixelFormat,
     /// Color space
     pub color_space: ColorSpace,
-    /// Number of planes
-    pub num_planes: u32,
 }
 
 type ConvertDispatcher = fn(u32, u32, &[usize], &[&[u8]], &[usize], &mut [&mut [u8]]) -> bool;
@@ -638,7 +625,6 @@ pub fn describe_acceleration() -> &'static str {
 ///     let format = ImageFormat {
 ///         pixel_format: PixelFormat::Nv12,
 ///         color_space: ColorSpace::Bt601,
-///         num_planes: NUM_PLANES,
 ///     };
 ///
 ///     let mut sizes = [0usize; NUM_PLANES as usize];
@@ -664,7 +650,6 @@ pub fn describe_acceleration() -> &'static str {
 ///     let format = ImageFormat {
 ///         pixel_format: PixelFormat::Nv12,
 ///         color_space: ColorSpace::Bt601,
-///         num_planes: NUM_PLANES,
 ///     };
 ///
 ///     let strides = [ Y_STRIDE, UV_STRIDE, ];
@@ -691,7 +676,6 @@ pub fn describe_acceleration() -> &'static str {
 ///     let format = ImageFormat {
 ///         pixel_format: PixelFormat::Nv12,
 ///         color_space: ColorSpace::Bt601,
-///         num_planes: NUM_PLANES,
 ///     };
 ///
 ///     let strides = [ Y_STRIDE, STRIDE_AUTO, ];
@@ -707,16 +691,12 @@ pub fn describe_acceleration() -> &'static str {
 ///
 /// # Errors
 ///
-/// * [`InvalidValue`] if the image format has a number of planes which is not compatible
-///   with its pixel format
-///
 /// * [`NotEnoughData`] if the strides array is not `None` and its length is less than the
 ///   image format number of planes
 ///
 /// * [`NotEnoughData`] if the buffers size array is not `None` and its length is less than the
 ///   image format number of planes
 ///
-/// [`InvalidValue`]: ./enum.ErrorKind.html#variant.InvalidValue
 /// [`NotEnoughData`]: ./enum.ErrorKind.html#variant.NotEnoughData
 /// [`STRIDE_AUTO`]: ./constant.STRIDE_AUTO.html
 pub fn get_buffers_size(
@@ -726,11 +706,6 @@ pub fn get_buffers_size(
     strides: Option<&[usize]>,
     buffers_size: &mut [usize],
 ) -> Result<(), ErrorKind> {
-    let pixel_format = format.pixel_format as u32;
-    if !pixel_format::is_compatible(pixel_format, format.num_planes) {
-        return Err(ErrorKind::InvalidValue);
-    }
-
     if pixel_format::get_buffers_size(
         format.pixel_format,
         width,
@@ -761,8 +736,8 @@ pub fn get_buffers_size(
 ///
 /// # Errors
 ///
-/// * [`InvalidValue`] if source or destination image formats have a number of planes
-///   which is not compatible with their pixel formats
+/// * [`InvalidValue`] if source or destination pixel formats
+///   are not compatible with the color spaces
 ///
 /// * [`InvalidOperation`] if there is no available method to convert the image with the
 ///   source pixel format to the image with the destination pixel format.
@@ -913,14 +888,6 @@ pub fn convert_image(
         return Err(ErrorKind::InvalidValue);
     }
 
-    if !pixel_format::is_compatible(src_pixel_format, src_format.num_planes) {
-        return Err(ErrorKind::InvalidValue);
-    }
-
-    if !pixel_format::is_compatible(dst_pixel_format, dst_format.num_planes) {
-        return Err(ErrorKind::InvalidValue);
-    }
-
     // Cross-correlate modes.
     let src_index = dispatcher::get_image_index(src_pixel_format, src_color_space, src_pf_mode);
     let dst_index = dispatcher::get_image_index(dst_pixel_format, dst_color_space, dst_pf_mode);
@@ -982,7 +949,7 @@ pub mod c_api {
     use core::ffi::c_char;
     use core::mem::{MaybeUninit, transmute};
     use core::slice;
-    use pixel_format::{MAX_NUMBER_OF_PLANES, are_planes_compatible};
+    use pixel_format::{MAX_NUMBER_OF_PLANES, get_num_planes};
 
     type PlaneArray<'a> = [MaybeUninit<&'a [u8]>; MAX_NUMBER_OF_PLANES];
 
@@ -1001,7 +968,6 @@ pub mod c_api {
     pub struct ImageFormat {
         pixel_format: i32,
         color_space: i32,
-        num_planes: u32,
     }
 
     impl TryFrom<&ImageFormat> for crate::ImageFormat {
@@ -1011,7 +977,6 @@ pub mod c_api {
             Ok(crate::ImageFormat {
                 pixel_format: PixelFormat::try_from(format.pixel_format)?,
                 color_space: ColorSpace::try_from(format.color_space)?,
-                num_planes: format.num_planes,
             })
         }
     }
@@ -1052,17 +1017,14 @@ pub mod c_api {
         }
 
         let format: &ImageFormat = &*format;
-        let pixel_format = format.pixel_format as u32;
-        if !dispatcher::is_pixel_format_valid(pixel_format) {
-            return set_error(error, ErrorKind::InvalidValue);
-        }
-
-        // We assume there is enough data in the buffers
-        // If the assumption will not hold undefined behaviour occurs (like in C)
-        let num_planes = format.num_planes as usize;
-        if !are_planes_compatible(pixel_format, format.num_planes) {
-            return set_error(error, ErrorKind::InvalidValue);
-        }
+        let format = crate::ImageFormat {
+            pixel_format: match PixelFormat::try_from(format.pixel_format) {
+                Ok(pf) => pf,
+                Err(()) => return set_error(error, ErrorKind::InvalidValue),
+            },
+            color_space: ColorSpace::try_from(format.color_space).unwrap_or(ColorSpace::Rgb),
+        };
+        let num_planes = get_num_planes(format.pixel_format) as usize;
 
         // Convert nullable type to Option
         let strides = if strides.is_null() {
@@ -1072,14 +1034,6 @@ pub mod c_api {
         };
 
         let buffers_size = slice::from_raw_parts_mut(buffers_size, num_planes);
-        let format = crate::ImageFormat {
-            pixel_format: match PixelFormat::try_from(format.pixel_format) {
-                Ok(pf) => pf,
-                Err(()) => return set_error(error, ErrorKind::InvalidValue),
-            },
-            color_space: ColorSpace::try_from(format.color_space).unwrap_or(ColorSpace::Rgb),
-            num_planes: format.num_planes,
-        };
 
         match get_buffers_size(width, height, &format, strides, buffers_size) {
             Ok(()) => self::Result::Ok,
@@ -1110,31 +1064,18 @@ pub mod c_api {
         }
 
         let src_format: &ImageFormat = &*src_format;
-        let dst_format: &ImageFormat = &*dst_format;
-        let src_pixel_format = src_format.pixel_format as u32;
-        let dst_pixel_format = dst_format.pixel_format as u32;
-        if !dispatcher::is_pixel_format_valid(src_pixel_format)
-            || !dispatcher::is_pixel_format_valid(dst_pixel_format)
-            || !dispatcher::is_color_space_valid(src_format.color_space as u32)
-            || !dispatcher::is_color_space_valid(dst_format.color_space as u32)
-        {
-            return set_error(error, ErrorKind::InvalidValue);
-        }
-
-        // We assume there is enough data in the buffers
-        // If the assumption will not hold undefined behaviour occurs (like in C)
-        if !are_planes_compatible(src_pixel_format, src_format.num_planes)
-            || !are_planes_compatible(dst_pixel_format, dst_format.num_planes)
-        {
-            return set_error(error, ErrorKind::InvalidValue);
-        }
-
-        let src_strides = (!src_strides.is_null())
-            .then(|| slice::from_raw_parts(src_strides, src_format.num_planes as usize));
-
         let Ok(src_format) = crate::ImageFormat::try_from(src_format) else {
             return set_error(error, ErrorKind::InvalidValue);
         };
+
+        let dst_format: &ImageFormat = &*dst_format;
+        let Ok(dst_format) = crate::ImageFormat::try_from(dst_format) else {
+            return set_error(error, ErrorKind::InvalidValue);
+        };
+
+        let src_num_planes = get_num_planes(src_format.pixel_format) as usize;
+        let src_strides =
+            (!src_strides.is_null()).then(|| slice::from_raw_parts(src_strides, src_num_planes));
         let src_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) =
             get_buffers_size(width, height, &src_format, src_strides, src_sizes)
@@ -1143,7 +1084,6 @@ pub mod c_api {
         }
 
         let src_buffers = {
-            let src_num_planes = src_format.num_planes as usize;
             let num_planes = cmp::min(src_num_planes, MAX_NUMBER_OF_PLANES);
             let mut src_buf: PlaneArray =
                 [MaybeUninit::uninit().assume_init(); MAX_NUMBER_OF_PLANES];
@@ -1160,12 +1100,9 @@ pub mod c_api {
             transmute::<PlaneArray, [&[u8]; MAX_NUMBER_OF_PLANES]>(src_buf)
         };
 
-        let dst_strides = (!dst_strides.is_null())
-            .then(|| slice::from_raw_parts(dst_strides, dst_format.num_planes as usize));
-
-        let Ok(dst_format) = crate::ImageFormat::try_from(dst_format) else {
-            return set_error(error, ErrorKind::InvalidValue);
-        };
+        let dst_num_planes = get_num_planes(dst_format.pixel_format) as usize;
+        let dst_strides =
+            (!dst_strides.is_null()).then(|| slice::from_raw_parts(dst_strides, dst_num_planes));
         let dst_sizes = &mut [0usize; MAX_NUMBER_OF_PLANES];
         if let Err(error_kind) =
             get_buffers_size(width, height, &dst_format, dst_strides, dst_sizes)
@@ -1174,7 +1111,6 @@ pub mod c_api {
         }
 
         let mut dst_buffers = {
-            let dst_num_planes = dst_format.num_planes as usize;
             let num_planes = cmp::min(dst_num_planes, MAX_NUMBER_OF_PLANES);
             let mut dst_buf: PlaneArray =
                 [MaybeUninit::uninit().assume_init(); MAX_NUMBER_OF_PLANES];
