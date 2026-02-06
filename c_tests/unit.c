@@ -506,14 +506,14 @@ static const uint8_t cr_to_rgb_input[4][8] = {
 };
 
 static int32_t
-is_valid_format(const DcpImageFormat *format)
+get_num_planes(DcpPixelFormat format)
 {
-    if (format->pixel_format == DCP_PIXEL_FORMAT_I444 || format->pixel_format == DCP_PIXEL_FORMAT_I422 || format->pixel_format == DCP_PIXEL_FORMAT_I420) {
-        return format->num_planes == 3;
-    } else if (format->pixel_format == DCP_PIXEL_FORMAT_NV12) {
-        return format->num_planes == 2;
+    if (format == DCP_PIXEL_FORMAT_I444 || format == DCP_PIXEL_FORMAT_I422 || format == DCP_PIXEL_FORMAT_I420) {
+        return 3;
+    } else if (format == DCP_PIXEL_FORMAT_NV12) {
+        return 2;
     } else {
-        return format->num_planes == 1;
+        return 1;
     }
 }
 
@@ -545,8 +545,7 @@ unit_init(void)
 }
 
 static void
-convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
-                                          uint32_t       width,
+convert_image_rgb_to_yuv_size_mode_stride(uint32_t       width,
                                           uint32_t       height,
                                           DcpColorSpace  color_space,
                                           DcpPixelFormat src_pixel_format,
@@ -562,13 +561,11 @@ convert_image_rgb_to_yuv_size_mode_stride(uint32_t       num_planes,
     DcpStatus status = dcp_status();
     DcpImageFormat src_format = {
         src_pixel_format,
-        DCP_COLOR_SPACE_RGB,
-        1
+        DCP_COLOR_SPACE_RGB
     };
     DcpImageFormat dst_format = {
         dst_pixel_format,
-        color_space,
-        num_planes
+        color_space
     };
 
     size_t luma_stride;
@@ -807,7 +804,7 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       width,
                 TEST_BEGIN("Y=%zu,C=%zu", luma_stride, chroma_stride);
 
                 for (src_stride = 0; src_stride <= max_fill_bytes; src_stride++) {
-                    convert_image_rgb_to_yuv_size_mode_stride(2, width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, chroma_stride, chroma_stride);
+                    convert_image_rgb_to_yuv_size_mode_stride(width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, chroma_stride, chroma_stride);
                 }
 
                 TEST_END();
@@ -828,7 +825,7 @@ convert_image_rgb_to_yuv_size_mode(uint32_t       width,
                     TEST_BEGIN("Y=%zu,U=%zu,V=%zu", luma_stride, u_stride, v_stride);
 
                     for (src_stride = 0; src_stride <= max_fill_bytes; src_stride++) {
-                        convert_image_rgb_to_yuv_size_mode_stride(3, width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, u_stride, v_stride);
+                        convert_image_rgb_to_yuv_size_mode_stride(width, height, color_space, src_pixel_format, dst_pixel_format, src_stride, luma_stride, u_stride, v_stride);
                     }
 
                     TEST_END();
@@ -890,8 +887,7 @@ unit_convert_image_rgb_to_yuv(DcpPixelFormat dst_pixel_format)
 }
 
 static void
-convert_image_yuv_to_rgb_size_mode_stride(uint32_t       num_planes,
-                                          uint32_t       width,
+convert_image_yuv_to_rgb_size_mode_stride(uint32_t       width,
                                           uint32_t       height,
                                           DcpColorSpace  color_space,
                                           size_t         luma_fill_bytes,
@@ -955,14 +951,12 @@ convert_image_yuv_to_rgb_size_mode_stride(uint32_t       num_planes,
 
     DcpImageFormat src_format = {
         format,
-        color_space,
-        num_planes
+        color_space
     };
 
     DcpImageFormat dst_format = {
         dst_pixel_format,
-        DCP_COLOR_SPACE_RGB,
-        1
+        DCP_COLOR_SPACE_RGB
     };
 
     DcpStatus status = dcp_status();
@@ -1122,8 +1116,7 @@ convert_image_yuv_to_rgb_size_format(DcpPixelFormat format,
                 TEST_BEGIN("Y=%zu,C=%zu", luma_fill_bytes, chroma_fill_bytes);
 
                 for (dst_fill_bytes = 0; dst_fill_bytes <= max_fill_bytes; dst_fill_bytes++) {
-                    convert_image_yuv_to_rgb_size_mode_stride(2,
-                                                              width,
+                    convert_image_yuv_to_rgb_size_mode_stride(width,
                                                               height,
                                                               color_space,
                                                               luma_fill_bytes,
@@ -1137,7 +1130,7 @@ convert_image_yuv_to_rgb_size_format(DcpPixelFormat format,
                 TEST_END();
             }
         }
-    } else { /* num_planes = 3 */
+    } else {
         size_t luma_fill_bytes;
 
         for (luma_fill_bytes = 0; luma_fill_bytes <= max_fill_bytes; luma_fill_bytes++) {
@@ -1152,8 +1145,7 @@ convert_image_yuv_to_rgb_size_format(DcpPixelFormat format,
                     TEST_BEGIN("Y=%zu,U=%zu,V=%zu", luma_fill_bytes, u_chroma_fill_bytes, v_chroma_fill_bytes);
 
                     for (dst_fill_bytes = 0; dst_fill_bytes <= max_fill_bytes; dst_fill_bytes++) {
-                        convert_image_yuv_to_rgb_size_mode_stride(3,
-                                                                  width,
+                        convert_image_yuv_to_rgb_size_mode_stride(width,
                                                                   height,
                                                                   color_space,
                                                                   luma_fill_bytes,
@@ -1240,102 +1232,94 @@ unit_convert_image_rgb_to_yuv_errors(void)
     /* Allocate and initialize output */
     test_output = alloc_new(&alloc, out_size);
 
-    uint32_t num_planes;
-    for (num_planes = 0; num_planes <= 3; num_planes++) { /* Only 2 is a valid value */
-        int32_t src_pixel_format;
+    int32_t src_pixel_format;
 
-        for (src_pixel_format = 0; src_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; src_pixel_format++) {
-            int32_t src_color_space;
+    for (src_pixel_format = 0; src_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; src_pixel_format++) {
+        int32_t src_color_space;
 
-            for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
-                int32_t dst_color_space;
+        for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
+            int32_t dst_color_space;
 
-                for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
-                    int32_t corrupt;
+            for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
+                int32_t corrupt;
 
-                    for (corrupt = 0; corrupt < 4; corrupt++) {
-                        uint8_t *src_buffer;
-                        size_t dst_strides[2];
-                        uint8_t *dst_buffers[2];
-                        int32_t src_pf_rgb;
-                        int32_t src_cs_rgb;
+                for (corrupt = 0; corrupt < 4; corrupt++) {
+                    uint8_t *src_buffer;
+                    size_t dst_strides[2];
+                    uint8_t *dst_buffers[2];
+                    int32_t src_pf_rgb;
+                    int32_t src_cs_rgb;
 
-                        DcpImageFormat src_format = {
-                            src_pixel_format,
-                            src_color_space,
-                            1
-                        };
+                    DcpImageFormat src_format = {
+                        src_pixel_format,
+                        src_color_space
+                    };
 
-                        DcpImageFormat dst_format = {
-                            DCP_PIXEL_FORMAT_NV12,
-                            dst_color_space,
-                            num_planes
-                        };
+                    DcpImageFormat dst_format = {
+                        DCP_PIXEL_FORMAT_NV12,
+                        dst_color_space
+                    };
 
-                        DcpStatus status = dcp_status();
-                        DcpStatus expected = dcp_status();
+                    DcpStatus status = dcp_status();
+                    DcpStatus expected = dcp_status();
 
-                        TEST_BEGIN("num_planes=%d,src_pf=%d,src_cs=%d,dst_cs=%d,corrupt=%d", num_planes, src_pixel_format, src_color_space, dst_color_space, corrupt);
+                    TEST_BEGIN("src_pf=%d,src_cs=%d,dst_cs=%d,corrupt=%d", src_pixel_format, src_color_space, dst_color_space, corrupt);
 
-                        /* Compute strides */
-                        src_buffer = (corrupt & 2) ? NULL : test_input;
-                        /* 2 or error value, do not care */
-                        dst_strides[0] = width;
-                        dst_strides[1] = 2 * chroma_width;
-                        dst_buffers[0] = test_output;
-                        dst_buffers[1] = (corrupt & 1) ? NULL : &test_output[width * height];
+                    /* Compute strides */
+                    src_buffer = (corrupt & 2) ? NULL : test_input;
+                    /* 2 or error value, do not care */
+                    dst_strides[0] = width;
+                    dst_strides[1] = 2 * chroma_width;
+                    dst_buffers[0] = test_output;
+                    dst_buffers[1] = (corrupt & 1) ? NULL : &test_output[width * height];
 
-                        /* Test image convert */
-                        status.result = dcp_convert_image(width, height,
-                                                          NULL, &src_stride, (const uint8_t * const *)&src_buffer,
-                                                          &dst_format, dst_strides, dst_buffers, &status.error);
+                    /* Test image convert */
+                    status.result = dcp_convert_image(width, height,
+                                                      NULL, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                      &dst_format, dst_strides, dst_buffers, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
-                                                          NULL, dst_strides, dst_buffers, &status.error);
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                      NULL, dst_strides, dst_buffers, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          NULL, &src_stride, (const uint8_t * const *)&src_buffer,
-                                                          NULL, dst_strides, dst_buffers, &status.error);
+                    status.result = dcp_convert_image(width, height,
+                                                      NULL, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                      NULL, dst_strides, dst_buffers, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        src_pf_rgb = src_pixel_format < DCP_PIXEL_FORMAT_I444;
-                        src_cs_rgb = src_color_space == DCP_COLOR_SPACE_RGB;
-                        expected = dcp_status();
+                    src_pf_rgb = src_pixel_format < DCP_PIXEL_FORMAT_I444;
+                    src_cs_rgb = src_color_space == DCP_COLOR_SPACE_RGB;
+                    expected = dcp_status();
 
-                        SET_EXPECTED(src_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(src_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(!src_pf_rgb && src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(src_pf_rgb && !src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(!src_pf_rgb && src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(src_pf_rgb && !src_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(dst_color_space <= DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(dst_color_space <= DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(is_valid_format(&src_format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(is_valid_format(&dst_format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED((src_pixel_format != DCP_PIXEL_FORMAT_ARGB &&
+                                  src_pixel_format != DCP_PIXEL_FORMAT_BGRA &&
+                                  src_pixel_format != DCP_PIXEL_FORMAT_BGR), DCP_ERROR_KIND_INVALID_OPERATION);
 
-                        SET_EXPECTED((src_pixel_format != DCP_PIXEL_FORMAT_ARGB &&
-                                      src_pixel_format != DCP_PIXEL_FORMAT_BGRA &&
-                                      src_pixel_format != DCP_PIXEL_FORMAT_BGR), DCP_ERROR_KIND_INVALID_OPERATION);
+                    SET_EXPECTED(src_color_space != DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_OPERATION);
 
-                        SET_EXPECTED(src_color_space != DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_OPERATION);
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
+                                                      &dst_format, dst_strides, dst_buffers, &status.error);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          &src_format, &src_stride, (const uint8_t * const *)&src_buffer,
-                                                          &dst_format, dst_strides, dst_buffers, &status.error);
+                    TEST_ASSERT(expected.result, expected.error);
 
-                        TEST_ASSERT(expected.result, expected.error);
-
-                        TEST_END();
-                    }
+                    TEST_END();
                 }
             }
         }
@@ -1368,102 +1352,94 @@ unit_convert_image_yuv_to_rgb_errors(void)
     /* Allocate and initialize output */
     test_output = alloc_new(&alloc, out_size);
 
-    uint32_t num_planes;
-    for (num_planes = 0; num_planes <= 3; num_planes++) { /* Only 2 is valid value */
-        int32_t dst_pixel_format;
+    int32_t dst_pixel_format;
 
-        for (dst_pixel_format = 0; dst_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; dst_pixel_format++) {
-            int32_t dst_color_space;
+    for (dst_pixel_format = 0; dst_pixel_format <= DCP_PIXEL_FORMAT_NV12 + 1; dst_pixel_format++) {
+        int32_t dst_color_space;
 
-            for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
-                int32_t src_color_space;
+        for (dst_color_space = 0; dst_color_space <= DCP_COLOR_SPACE_BT709FR + 1; dst_color_space++) {
+            int32_t src_color_space;
 
-                for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
-                    int32_t corrupt;
+            for (src_color_space = 0; src_color_space <= DCP_COLOR_SPACE_BT709FR + 1; src_color_space++) {
+                int32_t corrupt;
 
-                    for (corrupt = 0; corrupt < 4; corrupt++) {
-                        size_t src_strides[2];
-                        uint8_t *src_buffers[2];
-                        uint8_t *dst_buffer;
-                        int32_t dst_pf_rgb;
-                        int32_t dst_cs_rgb;
+                for (corrupt = 0; corrupt < 4; corrupt++) {
+                    size_t src_strides[2];
+                    uint8_t *src_buffers[2];
+                    uint8_t *dst_buffer;
+                    int32_t dst_pf_rgb;
+                    int32_t dst_cs_rgb;
 
-                        DcpImageFormat src_format = {
-                            DCP_PIXEL_FORMAT_NV12,
-                            src_color_space,
-                            num_planes
-                        };
+                    DcpImageFormat src_format = {
+                        DCP_PIXEL_FORMAT_NV12,
+                        src_color_space
+                    };
 
-                        DcpImageFormat dst_format = {
-                            dst_pixel_format,
-                            dst_color_space,
-                            1
-                        };
+                    DcpImageFormat dst_format = {
+                        dst_pixel_format,
+                        dst_color_space
+                    };
 
-                        DcpStatus status;
-                        DcpStatus expected;
+                    DcpStatus status;
+                    DcpStatus expected;
 
-                        TEST_BEGIN("num_planes=%d,src_cs=%d,dst_pf=%d,dst_cs=%d,corrupt=%d", num_planes, src_color_space, dst_pixel_format, dst_color_space, corrupt);
+                    TEST_BEGIN("src_cs=%d,dst_pf=%d,dst_cs=%d,corrupt=%d", src_color_space, dst_pixel_format, dst_color_space, corrupt);
 
-                        /* Compute strides */
-                        dst_buffer = (corrupt & 2) ? NULL : test_output;
-                        /* 2 or error value, do not care */
-                        src_strides[0] = width;
-                        src_strides[1] = 2 * chroma_width;
-                        src_buffers[0] = test_input;
-                        src_buffers[1] = (corrupt & 1) ? NULL : &test_input[width * height];
+                    /* Compute strides */
+                    dst_buffer = (corrupt & 2) ? NULL : test_output;
+                    /* 2 or error value, do not care */
+                    src_strides[0] = width;
+                    src_strides[1] = 2 * chroma_width;
+                    src_buffers[0] = test_input;
+                    src_buffers[1] = (corrupt & 1) ? NULL : &test_input[width * height];
 
-                        /* Test image convert */
-                        status.result = dcp_convert_image(width, height,
-                                                          NULL, src_strides, (const uint8_t * const *)src_buffers,
-                                                          &dst_format, &dst_stride, &dst_buffer, &status.error);
+                    /* Test image convert */
+                    status.result = dcp_convert_image(width, height,
+                                                      NULL, src_strides, (const uint8_t * const *)src_buffers,
+                                                      &dst_format, &dst_stride, &dst_buffer, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          &src_format, src_strides, (const uint8_t * const *)src_buffers,
-                                                          NULL, &dst_stride, &dst_buffer, &status.error);
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, src_strides, (const uint8_t * const *)src_buffers,
+                                                      NULL, &dst_stride, &dst_buffer, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          NULL, src_strides, (const uint8_t * const *)src_buffers,
-                                                          NULL, &dst_stride, &dst_buffer, &status.error);
+                    status.result = dcp_convert_image(width, height,
+                                                      NULL, src_strides, (const uint8_t * const *)src_buffers,
+                                                      NULL, &dst_stride, &dst_buffer, &status.error);
 
-                        TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
+                    TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        dst_pf_rgb = dst_pixel_format < DCP_PIXEL_FORMAT_I444;
-                        dst_cs_rgb = dst_color_space == DCP_COLOR_SPACE_RGB;
-                        expected = dcp_status();
+                    dst_pf_rgb = dst_pixel_format < DCP_PIXEL_FORMAT_I444;
+                    dst_cs_rgb = dst_color_space == DCP_COLOR_SPACE_RGB;
+                    expected = dcp_status();
 
-                        SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(src_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(dst_pixel_format > DCP_PIXEL_FORMAT_NV12, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(dst_color_space > DCP_COLOR_SPACE_BT709FR, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(src_color_space <= DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(src_color_space <= DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(is_valid_format(&src_format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(is_valid_format(&dst_format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(!dst_pf_rgb && dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(dst_pf_rgb && !dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(!dst_pf_rgb && dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
-                        SET_EXPECTED(dst_pf_rgb && !dst_cs_rgb, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
 
-                        SET_EXPECTED(corrupt != 0, DCP_ERROR_KIND_INVALID_VALUE);
+                    SET_EXPECTED(!(dst_pixel_format == DCP_PIXEL_FORMAT_BGRA ||
+                                   dst_pixel_format == DCP_PIXEL_FORMAT_RGBA ||
+                                   dst_pixel_format == DCP_PIXEL_FORMAT_RGB ||
+                                   dst_pixel_format == DCP_PIXEL_FORMAT_BGR), DCP_ERROR_KIND_INVALID_OPERATION);
+                    SET_EXPECTED(dst_color_space != DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_OPERATION);
 
-                        SET_EXPECTED(!(dst_pixel_format == DCP_PIXEL_FORMAT_BGRA ||
-                                       dst_pixel_format == DCP_PIXEL_FORMAT_RGBA ||
-                                       dst_pixel_format == DCP_PIXEL_FORMAT_RGB ||
-                                       dst_pixel_format == DCP_PIXEL_FORMAT_BGR), DCP_ERROR_KIND_INVALID_OPERATION);
-                        SET_EXPECTED(dst_color_space != DCP_COLOR_SPACE_RGB, DCP_ERROR_KIND_INVALID_OPERATION);
+                    status.result = dcp_convert_image(width, height,
+                                                      &src_format, src_strides, (const uint8_t * const *)src_buffers,
+                                                      &dst_format, &dst_stride, &dst_buffer, &status.error);
 
-                        status.result = dcp_convert_image(width, height,
-                                                          &src_format, src_strides, (const uint8_t * const *)src_buffers,
-                                                          &dst_format, &dst_stride, &dst_buffer, &status.error);
+                    TEST_ASSERT(expected.result, expected.error);
 
-                        TEST_ASSERT(expected.result, expected.error);
-
-                        TEST_END();
-                    }
+                    TEST_END();
                 }
             }
         }
@@ -1475,7 +1451,7 @@ unit_convert_image_yuv_to_rgb_errors(void)
 }
 
 static void
-unit_get_buffers_plane(int32_t num_planes)
+unit_get_buffers_plane(void)
 {
     static const uint32_t valid_width = 4097;
     static const uint32_t valid_height = 257;
@@ -1491,8 +1467,7 @@ unit_get_buffers_plane(int32_t num_planes)
 
         DcpImageFormat format = {
             pf,
-            0xDEADBEEF,
-            num_planes
+            0xDEADBEEF
         };
 
         TEST_BEGIN("pixel_format=%d", pf);
@@ -1509,27 +1484,24 @@ unit_get_buffers_plane(int32_t num_planes)
         /* Invalid width */
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(is_valid_format(&format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(1, valid_height, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
 
         /* Invalid height */
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(is_valid_format(&format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(valid_width, 1, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
 
         /* Test size is valid */
         expected = dcp_status();
         SET_EXPECTED(!is_pf_valid, DCP_ERROR_KIND_INVALID_VALUE);
-        SET_EXPECTED(is_valid_format(&format) == 0, DCP_ERROR_KIND_INVALID_VALUE);
         status.result = dcp_get_buffers_size(valid_width, valid_height, &format, NULL, buffers_size, &status.error);
         TEST_ASSERT(expected.result, expected.error);
         if (expected.result == DCP_RESULT_OK) {
             int32_t i;
 
-            for (i = 0; i < num_planes; i++) {
+            for (i = 0; i < get_num_planes(format.pixel_format); i++) {
                 size_t size;
 
                 if (pf == DCP_PIXEL_FORMAT_NV12 && i > 0) {
@@ -1562,7 +1534,6 @@ static void
 unit_get_buffers_size(void)
 {
     DcpStatus status = dcp_status();
-    int32_t num_planes;
     Allocator alloc = { 0, };
 
     TEST_BEGIN_GROUP(__FUNCTION__);
@@ -1575,19 +1546,14 @@ unit_get_buffers_size(void)
     TEST_BEGIN("no_buffer");
     DcpImageFormat format = {
         DCP_PIXEL_FORMAT_ARGB,
-        0xDEADBEEF,
-        1
+        0xDEADBEEF
     };
 
     status.result = dcp_get_buffers_size(1, 1, &format, NULL, NULL, &status.error);
     TEST_ASSERT(DCP_RESULT_ERR, DCP_ERROR_KIND_INVALID_VALUE);
     TEST_END();
 
-    for (num_planes = -1; num_planes <= MAX_NUMBER_OF_PLANES + 1; num_planes++) {
-        TEST_BEGIN_GROUP("num_planes=%d", num_planes);
-        unit_get_buffers_plane(num_planes);
-        TEST_END_GROUP();
-    }
+    unit_get_buffers_plane();
 
     TEST_END_GROUP();
 }
@@ -1617,14 +1583,12 @@ unit_convert_image_over_4gb_limit(void)
 
     DcpImageFormat src_format = {
         DCP_PIXEL_FORMAT_ARGB,
-        DCP_COLOR_SPACE_RGB,
-        1
+        DCP_COLOR_SPACE_RGB
     };
 
     DcpImageFormat dst_format = {
         DCP_PIXEL_FORMAT_NV12,
-        DCP_COLOR_SPACE_BT601,
-        2
+        DCP_COLOR_SPACE_BT601
     };
 
     Allocator alloc = { 0, };
@@ -1718,14 +1682,12 @@ unit_image_convert_rgb_ok(DcpPixelFormat src_pixel_format,
 
     DcpImageFormat src_format = {
         src_pixel_format,
-        DCP_COLOR_SPACE_RGB,
-        1
+        DCP_COLOR_SPACE_RGB
     };
 
     DcpImageFormat dst_format = {
         dst_pixel_format,
-        DCP_COLOR_SPACE_RGB,
-        1
+        DCP_COLOR_SPACE_RGB
     };
 
     DcpStatus status = dcp_status();

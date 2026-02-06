@@ -56,13 +56,11 @@
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
  *     DCP_COLOR_SPACE_RGB,
- *     1,
  * };
  *
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     2,
  * };
  *
  * dcp_convert_image(WIDTH, HEIGHT,
@@ -87,13 +85,11 @@
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
  *     DCP_COLOR_SPACE_RGB,
- *     1,
  * };
  *
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     2,
  * };
  *
  * DcpResult result;
@@ -121,7 +117,6 @@
  * DcpImageFormat format = {
  *     DCP_PIXEL_FORMAT_BGRA,
  *     DCP_COLOR_SPACE_RGB,
- *     NUM_PLANES,
  * };
  *
  * static size_t sizes[NUM_PLANES] = { 0 };
@@ -150,13 +145,11 @@
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT709,
- *     NUM_SRC_PLANES,
  * };
  *
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_BGRA,
  *     DCP_COLOR_SPACE_RGB,
- *     NUM_DST_PLANES,
  * };
  *
  * static size_t src_sizes[NUM_SRC_PLANES] = { 0 };
@@ -201,13 +194,11 @@
  * DcpImageFormat src_format = {
  *     DCP_PIXEL_FORMAT_BGR,
  *     DCP_COLOR_SPACE_RGB,
- *     NUM_SRC_PLANES,
  * };
  *
  * DcpImageFormat dst_format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT709,
- *     NUM_DST_PLANES,
  * };
  *
  * static size_t src_strides[NUM_SRC_PLANES] = { RGB_STRIDE };
@@ -347,7 +338,6 @@ typedef enum {
  * DcpImageFormat:
  * @pixel_format: Pixel format
  * @color_space: Color space
- * @num_planes: Number of planes
  *
  * Describes how the image data is laid out in memory and its color space.
  *
@@ -365,8 +355,7 @@ typedef enum {
  * DCP_PIXEL_FORMAT_I420 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  * DCP_PIXEL_FORMAT_NV12 | DCP_COLOR_SPACE_BT601(FR), DCP_COLOR_SPACE_BT709(FR)
  *
- * Some pixel formats might impose additional restrictions on the accepted number of
- * planes:
+ * The number of planes is determined by the pixel format:
  *
  * pixel_format          | subsampling | #planes | #1     | #2     | #3
  * ----------------------|:-----------:|:-------:|:------:|:------:|:-------:
@@ -383,7 +372,6 @@ typedef enum {
 typedef struct {
     DcpPixelFormat pixel_format;
     DcpColorSpace color_space;
-    uint32_t num_planes;
 } DcpImageFormat;
 
 /**
@@ -432,9 +420,7 @@ const char *        dcp_describe_acceleration   (void);
  * - %DCP_ERROR_KIND_INVALID_VALUE if @format or @buffers_size is %NULL
  * - %DCP_ERROR_KIND_INVALID_VALUE if the image pixel format is not a #DcpPixelFormat
  *   that might by imposed by the image pixel format
- * - %DCP_ERROR_KIND_INVALID_VALUE if the image format has a number of planes which is not compatible
- *   with its pixel format
-
+ *
  * # Undefined behaviour
  *
  * - @strides is not %NULL and its length is less than the image format number of planes
@@ -453,7 +439,6 @@ const char *        dcp_describe_acceleration   (void);
  * DcpImageFormat format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     NUM_PLANES,
  * };
  *
  * static size_t sizes[NUM_PLANES] = { 0 };
@@ -477,7 +462,6 @@ const char *        dcp_describe_acceleration   (void);
  * DcpImageFormat format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     NUM_PLANES,
  * };
  *
  * static const size_t STRIDES[NUM_PLANES] = { Y_STRIDE, UV_STRIDE, };
@@ -502,7 +486,6 @@ const char *        dcp_describe_acceleration   (void);
  * DcpImageFormat format = {
  *     DCP_PIXEL_FORMAT_NV12,
  *     DCP_COLOR_SPACE_BT601,
- *     NUM_PLANES,
  * };
  *
  * static const size_t STRIDES[NUM_PLANES] = { Y_STRIDE, DCP_STRIDE_AUTO, };
@@ -552,8 +535,8 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image pixel format is not a #DcpPixelFormat
  * - %DCP_ERROR_KIND_INVALID_VALUE if the source or destination image color space is not a #DcpColorSpace
  *   that might by imposed by the source and destination image pixel formats
- * - %DCP_ERROR_KIND_INVALID_VALUE if source or destination image formats have a number of planes
- *   which is not compatible with their pixel formats
+ * - %DCP_ERROR_KIND_INVALID_VALUE if source or destination pixel formats
+ *   are not compatible with the color spaces
  * - %DCP_ERROR_KIND_INVALID_OPERATION if there is no available method to convert the image with the
  *   source pixel format to the image with the destination pixel format.
  *
@@ -604,9 +587,9 @@ DcpResult           dcp_get_buffers_size        (uint32_t              width,
  * If the destination image color space is Bt709, the following formula is applied:
  *
  * |[
- * y  =  0.213 * r + 0.715 * g + 0.072 * b + 16
- * cb = -0.117 * r - 0.394 * g + 0.511 * b + 128
- * cr =  0.511 * r - 0.464 * g - 0.047 * b + 128
+ * y  =  0.183 * r + 0.614 * g + 0.062 * b + 16
+ * cb = -0.101 * r - 0.339 * g + 0.439 * b + 128
+ * cr =  0.439 * r - 0.399 * g - 0.040 * b + 128
  * ]|
  *
  * If the destination image color space is Bt601FR, the following formula is applied:

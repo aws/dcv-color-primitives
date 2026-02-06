@@ -173,13 +173,11 @@ fn main() {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Rgb,
-        num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
     };
 
     convert_image(
@@ -224,13 +222,11 @@ fn main() {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
-        num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
     };
 
     let status = convert_image(
@@ -267,13 +263,11 @@ fn main() -> Result<(), ErrorKind> {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Bt709, // Invalid: RGB format with YUV color space
-        num_planes: 1,
     };
 
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt601,
-        num_planes: 2,
     };
 
     convert_image(
@@ -309,7 +303,6 @@ fn main() -> Result<(), ErrorKind> {
     let format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Rgb,
-        num_planes: NUM_PLANES,
     };
 
     let mut sizes = [0usize; NUM_PLANES as usize];
@@ -341,7 +334,6 @@ fn main() -> Result<(), ErrorKind> {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt709,
-        num_planes: NUM_SRC_PLANES,
     };
 
     let mut src_sizes = [0usize; NUM_SRC_PLANES as usize];
@@ -353,7 +345,6 @@ fn main() -> Result<(), ErrorKind> {
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Bgra,
         color_space: ColorSpace::Rgb,
-        num_planes: NUM_DST_PLANES,
     };
 
     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];
@@ -394,7 +385,6 @@ fn main() -> Result<(), ErrorKind> {
     let src_format = ImageFormat {
         pixel_format: PixelFormat::Bgr,
         color_space: ColorSpace::Rgb,
-        num_planes: NUM_SRC_PLANES,
     };
 
     let src_strides = [RGB_STRIDE];
@@ -407,7 +397,6 @@ fn main() -> Result<(), ErrorKind> {
     let dst_format = ImageFormat {
         pixel_format: PixelFormat::Nv12,
         color_space: ColorSpace::Bt709,
-        num_planes: NUM_DST_PLANES,
     };
 
     let mut dst_sizes = [0usize; NUM_DST_PLANES as usize];

@@ -59,11 +59,11 @@ macro_rules! set_expected {
     };
 }
 
-fn is_valid_format(format: &ImageFormat) -> bool {
-    match format.pixel_format {
-        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => format.num_planes == 3,
-        PixelFormat::Nv12 => format.num_planes == 2,
-        _ => format.num_planes == 1,
+fn get_num_planes(format: PixelFormat) -> usize {
+    match format {
+        PixelFormat::I444 | PixelFormat::I422 | PixelFormat::I420 => 3,
+        PixelFormat::Nv12 => 2,
+        _ => 1,
     }
 }
 
@@ -90,13 +90,16 @@ fn check_bounds(
         return;
     }
 
+    let src_num_planes = get_num_planes(src_format.pixel_format);
+    let dst_num_planes = get_num_planes(dst_format.pixel_format);
+
     check_err(
         convert_image(
             width,
             height,
             src_format,
             None,
-            &src_buffers[..src_format.num_planes as usize - 1],
+            &src_buffers[..src_num_planes - 1],
             dst_format,
             None,
             dst_buffers,
@@ -113,14 +116,14 @@ fn check_bounds(
             src_buffers,
             dst_format,
             None,
-            &mut dst_buffers[..dst_format.num_planes as usize - 1],
+            &mut dst_buffers[..dst_num_planes - 1],
         )
         .unwrap_err(),
         ErrorKind::NotEnoughData,
     );
 
     // Overflow for source plane data
-    for i in 0..src_format.num_planes as usize {
+    for i in 0..src_num_planes {
         let mut src_vec = Vec::new();
 
         for (c, v) in src_buffers.iter().enumerate() {
@@ -148,7 +151,7 @@ fn check_bounds(
     }
 
     // Overflow for destination plane data
-    for i in 0..dst_format.num_planes as usize {
+    for i in 0..dst_num_planes {
         let mut dst_vec = Vec::new();
 
         for (c, v) in dst_buffers.iter_mut().enumerate() {
@@ -190,57 +193,39 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
     let src_image = vec![0_u8; src_size];
     let mut dst_image = vec![0_u8; dst_size];
 
-    for num_planes in 0..4 {
-        let src_format = ImageFormat {
-            pixel_format: src_pixel_format,
-            color_space: ColorSpace::Rgb,
-            num_planes: 1,
-        };
-        let dst_format = ImageFormat {
-            pixel_format: dst_pixel_format,
-            color_space: ColorSpace::Rgb,
-            num_planes,
-        };
+    let src_format = ImageFormat {
+        pixel_format: src_pixel_format,
+        color_space: ColorSpace::Rgb,
+    };
+    let dst_format = ImageFormat {
+        pixel_format: dst_pixel_format,
+        color_space: ColorSpace::Rgb,
+    };
 
-        let src_buffers = &[&src_image[..]];
-        let dst_buffers = &mut [&mut dst_image[..]];
+    let src_buffers = &[&src_image[..]];
+    let dst_buffers = &mut [&mut dst_image[..]];
 
-        let mut expected = Ok(());
-        set_expected!(
-            expected,
-            !is_valid_format(&src_format),
-            ErrorKind::InvalidValue
-        );
-        set_expected!(
-            expected,
-            !is_valid_format(&dst_format),
-            ErrorKind::InvalidValue
-        );
+    let status = convert_image(
+        WIDTH,
+        HEIGHT,
+        &src_format,
+        Some(&[src_stride; 1]),
+        src_buffers,
+        &dst_format,
+        Some(&[dst_stride; 1]),
+        dst_buffers,
+    );
 
-        let status = convert_image(
-            WIDTH,
-            HEIGHT,
-            &src_format,
-            Some(&[src_stride; 1]),
-            src_buffers,
-            &dst_format,
-            Some(&[dst_stride; 1]),
-            dst_buffers,
-        );
+    assert!(status.is_ok());
 
-        assert_eq!(expected.is_ok(), status.is_ok());
-        match status {
-            Ok(()) => check_bounds(
-                WIDTH,
-                HEIGHT,
-                &src_format,
-                src_buffers,
-                &dst_format,
-                dst_buffers,
-            ),
-            Err(err) => check_err(err, expected.unwrap_err()),
-        }
-    }
+    check_bounds(
+        WIDTH,
+        HEIGHT,
+        &src_format,
+        src_buffers,
+        &dst_format,
+        dst_buffers,
+    );
 }
 
 fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
@@ -256,7 +241,6 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
     let y_size = (WIDTH_YUV as usize) * (HEIGHT_YUV as usize);
     let uv_size = cw * ch;
 
-    let slices = &[0, y_size + uv_size, y_size, 0];
     let mut y_plane = match pixel_format {
         PixelFormat::Nv12 => vec![0_u8; y_size + uv_size],
         _ => vec![0_u8; y_size],
@@ -269,31 +253,25 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
         let src_size = src_stride * (HEIGHT_YUV as usize);
         let src_image = vec![0_u8; src_size];
 
-        for (num_planes, src_color_space, dst_color_space) in
-            iproduct!(0..4, COLOR_SPACES, COLOR_SPACES)
-        {
+        for (src_color_space, dst_color_space) in iproduct!(COLOR_SPACES, COLOR_SPACES) {
             let src_format = ImageFormat {
                 pixel_format: *src_pixel_format,
                 color_space: *src_color_space,
-                num_planes: 1,
             };
             let dst_format = ImageFormat {
                 pixel_format,
                 color_space: *dst_color_space,
-                num_planes,
             };
 
             let src_buffers = &[&src_image[..]];
-            let mut dst_strides = Vec::with_capacity(1);
-            let mut dst_buffers = Vec::with_capacity(1);
+            let mut dst_strides = Vec::with_capacity(3);
+            let mut dst_buffers = Vec::with_capacity(3);
 
             dst_strides.push(WIDTH_YUV as usize);
             if let PixelFormat::Nv12 = pixel_format {
-                dst_buffers.push(&mut y_plane[..slices[num_planes as usize]]);
+                dst_buffers.push(&mut y_plane[..]);
                 dst_buffers.push(&mut u_plane[..]);
-                if num_planes > 1 {
-                    dst_strides.push(cw);
-                }
+                dst_strides.push(cw);
             } else {
                 dst_strides.push(cw);
                 dst_strides.push(cw);
@@ -313,16 +291,6 @@ fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
             set_expected!(expected, !src_pf_rgb && src_cs_rgb, ErrorKind::InvalidValue);
             set_expected!(expected, src_pf_rgb && !src_cs_rgb, ErrorKind::InvalidValue);
             set_expected!(expected, dst_cs_rgb, ErrorKind::InvalidValue);
-            set_expected!(
-                expected,
-                !is_valid_format(&src_format),
-                ErrorKind::InvalidValue
-            );
-            set_expected!(
-                expected,
-                !is_valid_format(&dst_format),
-                ErrorKind::InvalidValue
-            );
             set_expected!(
                 expected,
                 src_pf != PIXEL_FORMAT_ARGB
@@ -377,7 +345,6 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
     let uv_size = cw * ch;
     let dst_size = (WIDTH_YUV as usize) * (HEIGHT_YUV as usize) * 4;
 
-    let slices = &[0, y_size + uv_size, y_size, 0];
     let y_plane = match pixel_format {
         PixelFormat::Nv12 => vec![0_u8; y_size + uv_size],
         _ => vec![0_u8; y_size],
@@ -386,31 +353,27 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
     let v_plane = vec![0_u8; uv_size];
     let mut dst_image = vec![0_u8; dst_size];
 
-    for (num_planes, dst_pixel_format, dst_color_space, src_color_space) in
-        iproduct!(0..4, PIXEL_FORMATS, COLOR_SPACES, COLOR_SPACES)
+    for (dst_pixel_format, dst_color_space, src_color_space) in
+        iproduct!(PIXEL_FORMATS, COLOR_SPACES, COLOR_SPACES)
     {
         let src_format = ImageFormat {
             pixel_format,
             color_space: *src_color_space,
-            num_planes,
         };
         let dst_format = ImageFormat {
             pixel_format: *dst_pixel_format,
             color_space: *dst_color_space,
-            num_planes: 1,
         };
 
-        let mut src_strides = Vec::with_capacity(1);
-        let mut src_buffers = Vec::with_capacity(1);
+        let mut src_strides = Vec::with_capacity(3);
+        let mut src_buffers = Vec::with_capacity(3);
         let dst_buffers = &mut [&mut dst_image[..]];
 
         src_strides.push(WIDTH_YUV as usize);
         if let PixelFormat::Nv12 = pixel_format {
-            src_buffers.push(&y_plane[..slices[num_planes as usize]]);
+            src_buffers.push(&y_plane[..]);
             src_buffers.push(&u_plane[..]);
-            if num_planes > 1 {
-                src_strides.push(cw);
-            }
+            src_strides.push(cw);
         } else {
             src_strides.push(cw);
             src_strides.push(cw);
@@ -431,16 +394,6 @@ fn yuv_to_rgb_errors(pixel_format: PixelFormat) {
         set_expected!(expected, src_cs_rgb, ErrorKind::InvalidValue);
         set_expected!(expected, !dst_pf_rgb && dst_cs_rgb, ErrorKind::InvalidValue);
         set_expected!(expected, dst_pf_rgb && !dst_cs_rgb, ErrorKind::InvalidValue);
-        set_expected!(
-            expected,
-            !is_valid_format(&src_format),
-            ErrorKind::InvalidValue
-        );
-        set_expected!(
-            expected,
-            !is_valid_format(&dst_format),
-            ErrorKind::InvalidValue
-        );
         set_expected!(
             expected,
             !(dst_pf == PIXEL_FORMAT_BGRA
