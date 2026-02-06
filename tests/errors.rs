@@ -225,7 +225,7 @@ fn rgb_conversion_errors(src_pixel_format: PixelFormat, dst_pixel_format: PixelF
         src_buffers,
         &dst_format,
         dst_buffers,
-    )
+    );
 }
 
 fn rgb_to_yuv_errors(pixel_format: PixelFormat) {
