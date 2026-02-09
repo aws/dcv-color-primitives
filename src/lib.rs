@@ -406,138 +406,63 @@ macro_rules! rgb_to_rgb {
     };
 }
 
+macro_rules! rgb_to_yuv_all {
+    ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident, $colorimetry:ident) => {
+        rgb_to_yuv!($conv, $set, $src_pf, $dst_pf, $colorimetry);
+    };
+    ($conv:expr, $set:ident, $src_pf:ident, $dst_pf:ident) => {
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt601);
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt601FR);
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt709);
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt709FR);
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt2020);
+        rgb_to_yuv_all!($conv, $set, $src_pf, $dst_pf, Bt2020FR);
+    };
+    ($conv:expr, $set:ident, $src_pf:ident) => {
+        rgb_to_yuv_all!($conv, $set, $src_pf, I420);
+        rgb_to_yuv_all!($conv, $set, $src_pf, I444);
+        rgb_to_yuv_all!($conv, $set, $src_pf, Nv12);
+    };
+    ($conv:expr, $set:ident) => {
+        rgb_to_yuv_all!($conv, $set, Argb);
+        rgb_to_yuv_all!($conv, $set, Bgr);
+        rgb_to_yuv_all!($conv, $set, Bgra);
+    };
+}
+
+macro_rules! yuv_to_rgb_all {
+    ($conv:expr, $set:ident, $src_pf:ident, $colorimetry:ident, $dst_pf:ident) => {
+        yuv_to_rgb!($conv, $set, $src_pf, $colorimetry, $dst_pf);
+    };
+    ($conv:expr, $set:ident, $src_pf:ident, $colorimetry:ident) => {
+        yuv_to_rgb_all!($conv, $set, $src_pf, $colorimetry, Bgr);
+        yuv_to_rgb_all!($conv, $set, $src_pf, $colorimetry, Bgra);
+        yuv_to_rgb_all!($conv, $set, $src_pf, $colorimetry, Rgb);
+        yuv_to_rgb_all!($conv, $set, $src_pf, $colorimetry, Rgba);
+    };
+    ($conv:expr, $set:ident, $src_pf:ident) => {
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt601);
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt601FR);
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt709);
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt709FR);
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt2020);
+        yuv_to_rgb_all!($conv, $set, $src_pf, Bt2020FR);
+    };
+    ($conv:expr, $set:ident) => {
+        yuv_to_rgb_all!($conv, $set, I420);
+        yuv_to_rgb_all!($conv, $set, I444);
+        yuv_to_rgb_all!($conv, $set, Nv12);
+    };
+}
+
 macro_rules! set_dispatch_table {
     ($conv:expr, $set:ident) => {
         rgb_to_rgb!($conv, $set, Argb, Rgb);
         rgb_to_rgb!($conv, $set, Bgr, Rgb);
         rgb_to_rgb!($conv, $set, Bgra, Rgb);
         rgb_to_rgb!($conv, $set, Rgb, Bgra);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt601);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt601FR);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt709);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt709FR);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt2020);
-        rgb_to_yuv!($conv, $set, Argb, I420, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt601);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt601FR);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt709);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt709FR);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt2020);
-        rgb_to_yuv!($conv, $set, Argb, I444, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt601);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt601FR);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt709);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt709FR);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt2020);
-        rgb_to_yuv!($conv, $set, Argb, Nv12, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt601);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt709);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgr, I420, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt601);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt709);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgr, I444, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt601);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt709);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgr, Nv12, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt601);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt709);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgra, I420, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt601);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt709);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgra, I444, Bt2020FR);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt601);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt601FR);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt709FR);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt2020);
-        rgb_to_yuv!($conv, $set, Bgra, Nv12, Bt2020FR);
-        yuv_to_rgb!($conv, $set, I420, Bt601, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt601, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt601, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt601, Rgba);
-        yuv_to_rgb!($conv, $set, I420, Bt601FR, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt601FR, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt601FR, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt601FR, Rgba);
-        yuv_to_rgb!($conv, $set, I420, Bt709, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt709, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt709, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt709, Rgba);
-        yuv_to_rgb!($conv, $set, I420, Bt709FR, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt709FR, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt709FR, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt709FR, Rgba);
-        yuv_to_rgb!($conv, $set, I420, Bt2020, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt2020, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt2020, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt2020, Rgba);
-        yuv_to_rgb!($conv, $set, I420, Bt2020FR, Bgr);
-        yuv_to_rgb!($conv, $set, I420, Bt2020FR, Bgra);
-        yuv_to_rgb!($conv, $set, I420, Bt2020FR, Rgb);
-        yuv_to_rgb!($conv, $set, I420, Bt2020FR, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt601, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt601, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt601, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt601, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt601FR, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt601FR, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt601FR, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt601FR, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt709, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt709, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt709, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt709, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt709FR, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt709FR, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt709FR, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt709FR, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt2020, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt2020, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt2020, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt2020, Rgba);
-        yuv_to_rgb!($conv, $set, I444, Bt2020FR, Bgr);
-        yuv_to_rgb!($conv, $set, I444, Bt2020FR, Bgra);
-        yuv_to_rgb!($conv, $set, I444, Bt2020FR, Rgb);
-        yuv_to_rgb!($conv, $set, I444, Bt2020FR, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt601FR, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt709FR, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020, Rgba);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020FR, Bgr);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020FR, Bgra);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020FR, Rgb);
-        yuv_to_rgb!($conv, $set, Nv12, Bt2020FR, Rgba);
+        rgb_to_yuv_all!($conv, $set);
+        yuv_to_rgb_all!($conv, $set);
     };
 }
 
