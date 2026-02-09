@@ -88,6 +88,15 @@ const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
         Y_OFFSET,
     ],
     [
+        i32x2_to_i32(XG_2020 - SHORT_HALF, XR_2020),
+        i32x2_to_i32(SHORT_HALF, XB_2020),
+        i32x2_to_i32(ZG_2020, -(YR_2020 + YG_2020)),
+        i32x2_to_i32(YG_2020, YR_2020),
+        i32x2_to_i32(0, -(-(YR_2020 + YG_2020) + ZG_2020)),
+        i32x2_to_i32(0, -(YR_2020 + YG_2020)),
+        Y_OFFSET,
+    ],
+    [
         i32x2_to_i32(XG_601FR - SHORT_HALF, XR_601FR),
         i32x2_to_i32(SHORT_HALF, XB_601FR),
         i32x2_to_i32(ZG_601FR, -(YR_601FR + YG_601FR)),
@@ -103,6 +112,15 @@ const FORWARD_WEIGHTS: [[i32; 7]; Colorimetry::Length as usize] = [
         i32x2_to_i32(YG_709FR, YR_709FR),
         i32x2_to_i32(0, -(-(YR_709FR + YG_709FR) + ZG_709FR)),
         i32x2_to_i32(0, -(YR_709FR + YG_709FR)),
+        FIX16_HALF,
+    ],
+    [
+        i32x2_to_i32(XG_2020FR - SHORT_HALF, XR_2020FR),
+        i32x2_to_i32(SHORT_HALF, XB_2020FR),
+        i32x2_to_i32(ZG_2020FR, -(YR_2020FR + YG_2020FR)),
+        i32x2_to_i32(YG_2020FR, YR_2020FR),
+        i32x2_to_i32(0, -(-(YR_2020FR + YG_2020FR) + ZG_2020FR)),
+        i32x2_to_i32(0, -(YR_2020FR + YG_2020FR)),
         FIX16_HALF,
     ],
 ];
@@ -129,6 +147,16 @@ const BACKWARD_WEIGHTS: [[i16; 8]; Colorimetry::Length as usize] = [
         i32_to_i16(BN_709),
     ],
     [
+        i32_to_i16(XXYM_2020),
+        i32_to_i16(RCRM_2020),
+        i32_to_i16(GCRM_2020),
+        i32_to_i16(GCBM_2020),
+        i32_to_i16(BCBM_2020),
+        i32_to_i16(RN_2020),
+        i32_to_i16(GP_2020),
+        i32_to_i16(BN_2020),
+    ],
+    [
         i32_to_i16(XXYM_601FR),
         i32_to_i16(RCRM_601FR),
         i32_to_i16(GCRM_601FR),
@@ -147,6 +175,16 @@ const BACKWARD_WEIGHTS: [[i16; 8]; Colorimetry::Length as usize] = [
         i32_to_i16(RN_709FR),
         i32_to_i16(GP_709FR),
         i32_to_i16(BN_709FR),
+    ],
+    [
+        i32_to_i16(XXYM_2020FR),
+        i32_to_i16(RCRM_2020FR),
+        i32_to_i16(GCRM_2020FR),
+        i32_to_i16(GCBM_2020FR),
+        i32_to_i16(BCBM_2020FR),
+        i32_to_i16(RN_2020FR),
+        i32_to_i16(GP_2020FR),
+        i32_to_i16(BN_2020FR),
     ],
 ];
 
@@ -1541,38 +1579,56 @@ rgb_to_yuv_converter!(Argb, I420, Bt601);
 rgb_to_yuv_converter!(Argb, I420, Bt601FR);
 rgb_to_yuv_converter!(Argb, I420, Bt709);
 rgb_to_yuv_converter!(Argb, I420, Bt709FR);
+rgb_to_yuv_converter!(Argb, I420, Bt2020);
+rgb_to_yuv_converter!(Argb, I420, Bt2020FR);
 rgb_to_yuv_converter!(Argb, I444, Bt601);
 rgb_to_yuv_converter!(Argb, I444, Bt601FR);
 rgb_to_yuv_converter!(Argb, I444, Bt709);
 rgb_to_yuv_converter!(Argb, I444, Bt709FR);
+rgb_to_yuv_converter!(Argb, I444, Bt2020);
+rgb_to_yuv_converter!(Argb, I444, Bt2020FR);
 rgb_to_yuv_converter!(Argb, Nv12, Bt601);
 rgb_to_yuv_converter!(Argb, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Argb, Nv12, Bt709);
 rgb_to_yuv_converter!(Argb, Nv12, Bt709FR);
+rgb_to_yuv_converter!(Argb, Nv12, Bt2020);
+rgb_to_yuv_converter!(Argb, Nv12, Bt2020FR);
 rgb_to_yuv_converter!(Bgr, I420, Bt601);
 rgb_to_yuv_converter!(Bgr, I420, Bt601FR);
 rgb_to_yuv_converter!(Bgr, I420, Bt709);
 rgb_to_yuv_converter!(Bgr, I420, Bt709FR);
+rgb_to_yuv_converter!(Bgr, I420, Bt2020);
+rgb_to_yuv_converter!(Bgr, I420, Bt2020FR);
 rgb_to_yuv_converter!(Bgr, I444, Bt601);
 rgb_to_yuv_converter!(Bgr, I444, Bt601FR);
 rgb_to_yuv_converter!(Bgr, I444, Bt709);
 rgb_to_yuv_converter!(Bgr, I444, Bt709FR);
+rgb_to_yuv_converter!(Bgr, I444, Bt2020);
+rgb_to_yuv_converter!(Bgr, I444, Bt2020FR);
 rgb_to_yuv_converter!(Bgr, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgr, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgr, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgr, Nv12, Bt709FR);
+rgb_to_yuv_converter!(Bgr, Nv12, Bt2020);
+rgb_to_yuv_converter!(Bgr, Nv12, Bt2020FR);
 rgb_to_yuv_converter!(Bgra, I420, Bt601);
 rgb_to_yuv_converter!(Bgra, I420, Bt601FR);
 rgb_to_yuv_converter!(Bgra, I420, Bt709);
 rgb_to_yuv_converter!(Bgra, I420, Bt709FR);
+rgb_to_yuv_converter!(Bgra, I420, Bt2020);
+rgb_to_yuv_converter!(Bgra, I420, Bt2020FR);
 rgb_to_yuv_converter!(Bgra, I444, Bt601);
 rgb_to_yuv_converter!(Bgra, I444, Bt601FR);
 rgb_to_yuv_converter!(Bgra, I444, Bt709);
 rgb_to_yuv_converter!(Bgra, I444, Bt709FR);
+rgb_to_yuv_converter!(Bgra, I444, Bt2020);
+rgb_to_yuv_converter!(Bgra, I444, Bt2020FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt601FR);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709);
 rgb_to_yuv_converter!(Bgra, Nv12, Bt709FR);
+rgb_to_yuv_converter!(Bgra, Nv12, Bt2020);
+rgb_to_yuv_converter!(Bgra, Nv12, Bt2020FR);
 yuv_to_rgb_converter!(I420, Bt601, Bgr);
 yuv_to_rgb_converter!(I420, Bt601, Bgra);
 yuv_to_rgb_converter!(I420, Bt601, Rgb);
@@ -1589,6 +1645,14 @@ yuv_to_rgb_converter!(I420, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I420, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I420, Bt709FR, Rgba);
+yuv_to_rgb_converter!(I420, Bt2020, Bgr);
+yuv_to_rgb_converter!(I420, Bt2020, Bgra);
+yuv_to_rgb_converter!(I420, Bt2020, Rgb);
+yuv_to_rgb_converter!(I420, Bt2020, Rgba);
+yuv_to_rgb_converter!(I420, Bt2020FR, Bgr);
+yuv_to_rgb_converter!(I420, Bt2020FR, Bgra);
+yuv_to_rgb_converter!(I420, Bt2020FR, Rgb);
+yuv_to_rgb_converter!(I420, Bt2020FR, Rgba);
 yuv_to_rgb_converter!(I444, Bt601, Bgr);
 yuv_to_rgb_converter!(I444, Bt601, Bgra);
 yuv_to_rgb_converter!(I444, Bt601, Rgb);
@@ -1605,6 +1669,14 @@ yuv_to_rgb_converter!(I444, Bt709FR, Bgr);
 yuv_to_rgb_converter!(I444, Bt709FR, Bgra);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgb);
 yuv_to_rgb_converter!(I444, Bt709FR, Rgba);
+yuv_to_rgb_converter!(I444, Bt2020, Bgr);
+yuv_to_rgb_converter!(I444, Bt2020, Bgra);
+yuv_to_rgb_converter!(I444, Bt2020, Rgb);
+yuv_to_rgb_converter!(I444, Bt2020, Rgba);
+yuv_to_rgb_converter!(I444, Bt2020FR, Bgr);
+yuv_to_rgb_converter!(I444, Bt2020FR, Bgra);
+yuv_to_rgb_converter!(I444, Bt2020FR, Rgb);
+yuv_to_rgb_converter!(I444, Bt2020FR, Rgba);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt601, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt601, Rgb);
@@ -1621,6 +1693,14 @@ yuv_to_rgb_converter!(Nv12, Bt709FR, Bgr);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Bgra);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgb);
 yuv_to_rgb_converter!(Nv12, Bt709FR, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt2020, Bgr);
+yuv_to_rgb_converter!(Nv12, Bt2020, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt2020, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt2020, Rgba);
+yuv_to_rgb_converter!(Nv12, Bt2020FR, Bgr);
+yuv_to_rgb_converter!(Nv12, Bt2020FR, Bgra);
+yuv_to_rgb_converter!(Nv12, Bt2020FR, Rgb);
+yuv_to_rgb_converter!(Nv12, Bt2020FR, Rgba);
 
 pub fn bgr_rgb(
     width: u32,

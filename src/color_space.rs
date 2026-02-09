@@ -36,10 +36,14 @@ pub enum ColorSpace {
     Bt601,
     /// YCbCr, ITU-R Recommendation BT.709 (CSC systems)
     Bt709,
+    /// YCbCr, ITU-R Recommendation BT.2020 (UHDTV systems)
+    Bt2020,
     /// YCbCr, BT.601 (full range)
     Bt601FR,
     /// YCbCr, BT.709 (full range)
     Bt709FR,
+    /// YCbCr, BT.2020 (full range)
+    Bt2020FR,
 }
 
 impl fmt::Display for ColorSpace {
@@ -49,8 +53,10 @@ impl fmt::Display for ColorSpace {
             ColorSpace::Rgb => write!(f, "rgb"),
             ColorSpace::Bt601 => write!(f, "bt-601"),
             ColorSpace::Bt709 => write!(f, "bt-709"),
+            ColorSpace::Bt2020 => write!(f, "bt-2020"),
             ColorSpace::Bt601FR => write!(f, "bt-601-fr"),
             ColorSpace::Bt709FR => write!(f, "bt-709-fr"),
+            ColorSpace::Bt2020FR => write!(f, "bt-2020-fr"),
         }
     }
 }
@@ -64,8 +70,10 @@ impl TryFrom<i32> for ColorSpace {
             0 => Ok(ColorSpace::Rgb),
             1 => Ok(ColorSpace::Bt601),
             2 => Ok(ColorSpace::Bt709),
-            3 => Ok(ColorSpace::Bt601FR),
-            4 => Ok(ColorSpace::Bt709FR),
+            3 => Ok(ColorSpace::Bt2020),
+            4 => Ok(ColorSpace::Bt601FR),
+            5 => Ok(ColorSpace::Bt709FR),
+            6 => Ok(ColorSpace::Bt2020FR),
             _ => Err(()),
         }
     }

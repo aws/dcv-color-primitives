@@ -38,15 +38,17 @@ const MAX_UV_HEIGHT: usize = MAX_PLANE_HEIGHT >> 1;
 const SUPPORTED_COLOR_SPACES: &[ColorSpace] = &[
     ColorSpace::Bt601,
     ColorSpace::Bt709,
+    ColorSpace::Bt2020,
     ColorSpace::Bt601FR,
     ColorSpace::Bt709FR,
+    ColorSpace::Bt2020FR,
 ];
 
 const YUV_RGB_MAX_WIDTH: usize = 33;
 const YUV_RGB_MAX_HEIGHT: usize = 3;
 const YUV_RGB_MAX_PAD: usize = 4;
 
-static COEFFICIENTS_TABLE: OnceLock<[Coefficients; 4]> = OnceLock::new();
+static COEFFICIENTS_TABLE: OnceLock<[Coefficients; 6]> = OnceLock::new();
 
 type FullPlane = [[u8; MAX_PLANE_WIDTH]; MAX_PLANE_HEIGHT];
 type SubSampledPlane = [[u8; MAX_UV_WIDTH]; MAX_UV_HEIGHT];
@@ -118,8 +120,10 @@ fn get_color_space_index(color_space: ColorSpace) -> usize {
     match color_space {
         ColorSpace::Bt601 => 0,
         ColorSpace::Bt709 => 1,
-        ColorSpace::Bt601FR => 2,
-        _ => 3,
+        ColorSpace::Bt2020 => 2,
+        ColorSpace::Bt601FR => 3,
+        ColorSpace::Bt709FR => 4,
+        _ => 5, // ColorSpace::Bt2020FR
     }
 }
 
@@ -137,22 +141,22 @@ fn get_expected_plane_data(
     height: usize,
 ) -> (SubSampledPlane, SubSampledPlane) {
     let coefficients = COEFFICIENTS_TABLE.get_or_init(|| {
-        let mut coefficients = [((0, 0, 0), (0, 0), 0, 0); 4];
+        let mut coefficients = [((0, 0, 0), (0, 0), 0, 0); 6];
 
         for (index, coeff_row) in coefficients.iter_mut().enumerate() {
-            let full_range = index >> 1;
-            let model = index & 1;
-            let (kr, kg, kb) = if model == 0 {
-                (0.299, 0.587, 0.114)
-            } else {
-                (0.2126, 0.7152, 0.0722)
+            let full_range = index >= 3;
+            let model = index % 3;
+            let (kr, kg, kb) = match model {
+                0 => (0.299, 0.587, 0.114),    // BT.601
+                1 => (0.2126, 0.7152, 0.0722), // BT.709
+                _ => (0.2627, 0.6780, 0.0593), // BT.2020
             };
-            let (y_min, y_max, c_min, c_max) = if full_range == 1 {
+            let (y_min, y_max, c_min, c_max) = if full_range {
                 (0, 255, 0, 255)
             } else {
                 (16, 235, 16, 240)
             };
-            let (y_scale, c_scale) = if full_range == 1 {
+            let (y_scale, c_scale) = if full_range {
                 (1f64, 1f64)
             } else {
                 (
@@ -457,15 +461,19 @@ fn rgb_to_yuv_ok(pixel_format: PixelFormat) {
             let y_plane = match color_space {
                 ColorSpace::Bt601 => &Y_BT601_REF,
                 ColorSpace::Bt709 => &Y_BT709_REF,
+                ColorSpace::Bt2020 => &Y_BT2020_REF,
                 ColorSpace::Bt601FR => &Y_BT601FR_REF,
-                _ => &Y_BT709FR_REF,
+                ColorSpace::Bt709FR => &Y_BT709FR_REF,
+                _ => &Y_BT2020FR_REF,
             };
             let (u_plane, v_plane) = if let PixelFormat::I444 = pixel_format {
                 let (u_plane, v_plane) = match color_space {
                     ColorSpace::Bt601 => (&CB_BT601_REF, &CR_BT601_REF),
                     ColorSpace::Bt709 => (&CB_BT709_REF, &CR_BT709_REF),
+                    ColorSpace::Bt2020 => (&CB_BT2020_REF, &CR_BT2020_REF),
                     ColorSpace::Bt601FR => (&CB_BT601FR_REF, &CR_BT601FR_REF),
-                    _ => (&CB_BT709FR_REF, &CR_BT709FR_REF),
+                    ColorSpace::Bt709FR => (&CB_BT709FR_REF, &CR_BT709FR_REF),
+                    _ => (&CB_BT2020FR_REF, &CR_BT2020FR_REF),
                 };
 
                 (
@@ -476,8 +484,10 @@ fn rgb_to_yuv_ok(pixel_format: PixelFormat) {
                 let (u_plane, v_plane) = match color_space {
                     ColorSpace::Bt601 => (&CB2_BT601_REF, &CR2_BT601_REF),
                     ColorSpace::Bt709 => (&CB2_BT709_REF, &CR2_BT709_REF),
+                    ColorSpace::Bt2020 => (&CB2_BT2020_REF, &CR2_BT2020_REF),
                     ColorSpace::Bt601FR => (&CB2_BT601FR_REF, &CR2_BT601FR_REF),
-                    _ => (&CB2_BT709FR_REF, &CR2_BT709FR_REF),
+                    ColorSpace::Bt709FR => (&CB2_BT709FR_REF, &CR2_BT709FR_REF),
+                    _ => (&CB2_BT2020FR_REF, &CR2_BT2020FR_REF),
                 };
                 (
                     PlaneRef::SubSampled(Cow::Borrowed(u_plane)),

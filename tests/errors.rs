@@ -30,12 +30,14 @@ const PIXEL_FORMATS: &[PixelFormat; 9] = &[
     PixelFormat::Nv12,
 ];
 
-const COLOR_SPACES: &[ColorSpace; 5] = &[
+const COLOR_SPACES: &[ColorSpace; 7] = &[
     ColorSpace::Rgb,
     ColorSpace::Bt601,
     ColorSpace::Bt709,
+    ColorSpace::Bt2020,
     ColorSpace::Bt601FR,
     ColorSpace::Bt709FR,
+    ColorSpace::Bt2020FR,
 ];
 
 const WIDTH_YUV: u32 = 33;

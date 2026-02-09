@@ -27,7 +27,7 @@ use utils::{
     Coefficients, FIX16, FIX18, FULL_RANGE, RGB_SRC, UV_SHIFT, UV_SHIFT_18, compute_coefficients,
 };
 
-const COLOR_MODELS: [ColorModel; 2] = [ColorModel::Bt601, ColorModel::Bt709];
+const COLOR_MODELS: [ColorModel; 3] = [ColorModel::Bt601, ColorModel::Bt709, ColorModel::Bt2020];
 const COLOR_RANGES: [bool; 2] = [false, true];
 const NUM_CONFIGS: usize = COLOR_MODELS.len() * COLOR_RANGES.len();
 
@@ -52,6 +52,7 @@ const TEST_COLORS: [(u8, u8, u8); 8] = [
 enum ColorModel {
     Bt601,
     Bt709,
+    Bt2020,
 }
 
 impl ColorModel {
@@ -59,6 +60,7 @@ impl ColorModel {
         match self {
             ColorModel::Bt601 => (0.299, 0.587, 0.114),
             ColorModel::Bt709 => (0.2126, 0.7152, 0.0722),
+            ColorModel::Bt2020 => (0.2627, 0.6780, 0.0593),
         }
     }
 
@@ -66,6 +68,7 @@ impl ColorModel {
         match self {
             ColorModel::Bt601 => 601,
             ColorModel::Bt709 => 709,
+            ColorModel::Bt2020 => 2020,
         }
     }
 }

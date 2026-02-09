@@ -125,7 +125,9 @@ pub enum Sampler {
 pub enum Colorimetry {
     Bt601,
     Bt709,
+    Bt2020,
     Bt601FR,
     Bt709FR,
+    Bt2020FR,
     Length,
 }
