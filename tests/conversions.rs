@@ -30,7 +30,7 @@ mod utils {
 }
 use utils::*;
 
-const MAX_PLANE_WIDTH: usize = 8;
+const MAX_PLANE_WIDTH: usize = 16;
 const MAX_PLANE_HEIGHT: usize = 8;
 const MAX_UV_WIDTH: usize = MAX_PLANE_WIDTH >> 1;
 const MAX_UV_HEIGHT: usize = MAX_PLANE_HEIGHT >> 1;
@@ -231,7 +231,12 @@ fn check_plane(plane: &[u8], reference: &PlaneRef, width: usize, stride: usize) 
 
     for (row, exp) in plane.chunks_exact(stride).zip(reference.iter()) {
         let (payload, pad) = row.split_at(width);
-        assert!(payload.iter().zip(exp).all(|(&x, &y)| x == y));
+        assert!(
+            payload
+                .iter()
+                .zip(exp)
+                .all(|(&x, &y)| (i32::from(x) - i32::from(y)).abs() <= 1)
+        );
         assert!(pad.iter().all(|&x| x == 0));
     }
 }

@@ -100,7 +100,7 @@ consumed CPU cycles instead of elapsed time.
 Linux examples:
 ```
 ./run-bench -c 1 # runs cargo bench and outputs CPU cycles
-./run.bench -c 1 -p "/i420" # runs cargo bench, output CPU cycles, filtering tests that contains '/i420'
+./run-bench -c 1 -f "/i420" # runs cargo bench, output CPU cycles, filtering tests that contains '/i420'
 ```
 
 ## WebAssembly
